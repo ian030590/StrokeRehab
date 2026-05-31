@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/build.mjs",
+    "build:cloudflare": "node scripts/build.mjs --target=cloudflare",
+    "build:github": "node scripts/build.mjs --target=github",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
