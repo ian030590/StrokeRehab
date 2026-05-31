@@ -6,13 +6,24 @@ A web-based rehabilitation program for stroke, brain injury, or neurodegenerativ
 
 This repo currently implements the Café Barista upper-limb hand movement rehabilitation game:
 
+- Modular StrokeRehab shell with five main pages: motor training, cognitive training, settings, credits, and related links
 - React + TypeScript + Vite UI
 - Zustand session state and rehabilitation data logging
 - React Three Fiber 2.5D barista scene
 - MediaPipe Hand Landmarker camera tracking
 - Demo mode for testing the full grasp, transport, and pouring loop without a camera
 - Therapist-adjustable grasp threshold, pour angle, drop debounce, pour duration, side, assist level, and cup count
-- Session JSON export with grasps, drops, completion time, ROM, trajectory samples, smoothness, and dynamic-assist flags
+- Session result page with CSV export for grasps, drops, completion time, ROM, trajectory samples, smoothness, and dynamic-assist flags
+
+## Site Structure
+
+- `動作訓練`: module list for upper-limb and hand movement training. Café Barista is currently the first playable module.
+- `認知訓練`: placeholder module list for attention, memory, and executive-function training.
+- `設定`: therapist-facing default parameters for training modules.
+- `致謝`: project and open-source acknowledgements.
+- `相關網頁`: rehabilitation and implementation resources.
+
+When a playable module finishes all planned rounds, the app routes to `成績結算`, where the session can be downloaded as a CSV file.
 
 ## Run
 
