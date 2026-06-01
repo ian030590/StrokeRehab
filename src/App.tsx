@@ -5,7 +5,7 @@ import { Navbar } from './components/Navbar';
 const MotorTrainingPage = lazy(() => import('./pages/MotorTrainingPage'));
 const CognitiveTrainingPage = lazy(() => import('./pages/CognitiveTrainingPage'));
 const LanguageTrainingPage = lazy(() => import('./pages/LanguageTrainingPage'));
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const CreditsPage = lazy(() => import('./pages/CreditsPage'));
 const RelatedLinksPage = lazy(() => import('./pages/RelatedLinksPage'));
 const WritingDefenseGame = lazy(() => import('./pages/training/WritingDefenseGame'));
