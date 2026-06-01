@@ -8,15 +8,15 @@ const SHAPES = {
 };
 
 const SPEEDS = {
-  beginner: 0.08,
-  intermediate: 0.12,
-  hard: 0.18,
+  beginner: 0.15,
+  intermediate: 0.2,
+  hard: 0.25,
 };
 
 const SPAWN_RATES = {
-  beginner: 4000,
-  intermediate: 3000,
-  hard: 2000,
+  beginner: 3000,
+  intermediate: 2000,
+  hard: 1500,
 };
 
 interface Enemy {
@@ -81,7 +81,7 @@ export default function WritingDefenseGame() {
           id: Date.now(),
           shape: randomShape,
           x: Math.random() * 80 + 10, // 10% to 90% width
-          y: -10, // Start slightly above screen
+          y: -5, // Start just above screen to slide in smoothly
           speed: (SPEEDS[difficulty] || SPEEDS.beginner) * (deltaTime / 16),
         };
         setEnemies((prev) => [...prev, newEnemy]);
@@ -96,7 +96,7 @@ export default function WritingDefenseGame() {
         const remaining = nextEnemies.filter((e) => e.y < 100);
         const escaped = nextEnemies.length - remaining.length;
         if (escaped > 0) {
-          setMissed((m) => m + escaped);
+          setTimeout(() => setMissed((m) => m + escaped), 0);
         }
         return remaining;
       });
@@ -223,6 +223,7 @@ export default function WritingDefenseGame() {
     setTimeLeft(duration);
     setIsGameOver(false);
     setFeedback(null);
+    spawnTimerRef.current = 5000; // Force immediate spawn on start!
   };
 
   return (
