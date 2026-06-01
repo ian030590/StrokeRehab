@@ -110,6 +110,15 @@ export default function ModuleSettingsModal({
         <div className="config-summary">
           目前設定 <strong>{summary}</strong>
         </div>
+
+        {/* Preload fonts/glyphs for WritingDefenseGame to prevent in-game stutter */}
+        {module.id === "writing-defense" && (
+          <div aria-hidden="true" style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, overflow: 'hidden' }}>
+            <span style={{ fontFamily: 'sans-serif', fontWeight: 'bold' }}>
+              ⭕🔺🟥｜一❤️⭐🥚⬡天古元右左夫吉👾
+            </span>
+          </div>
+        )}
       </section>
     </div>
   );

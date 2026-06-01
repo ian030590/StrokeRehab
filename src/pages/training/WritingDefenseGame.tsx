@@ -244,6 +244,14 @@ export default function WritingDefenseGame() {
 
       {/* Game Area (Enemies & Feedback) */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+        <style>
+          {`
+            @keyframes fadeOutUp {
+              0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+              100% { opacity: 0; transform: translate(-50%, -30px) scale(1.2); }
+            }
+          `}
+        </style>
         {enemies.map((enemy) => (
           <div
             key={enemy.id}
@@ -295,14 +303,6 @@ export default function WritingDefenseGame() {
             }}
           >
             {feedback.text}
-            <style>
-              {`
-                @keyframes fadeOutUp {
-                  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-                  100% { opacity: 0; transform: translate(-50%, -30px) scale(1.2); }
-                }
-              `}
-            </style>
           </div>
         )}
       </div>
