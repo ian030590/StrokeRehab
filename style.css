@@ -456,10 +456,11 @@ svg {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 24px;
+  padding: 10px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
+  margin-bottom: 12px;
 }
 
 .setting-info {

@@ -477,7 +477,7 @@ html, body, #root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 10px 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-m);
@@ -1008,7 +1008,8 @@ html, body, #root {
 /* ── Settings Page ── */
 .settings-container {
   width: 100%;
-  max-width: 100%; /* Make it fully fit the screen width */
+  max-width: 768px;
+  margin: 0 auto;
 }
 
 .settings-tabs {
