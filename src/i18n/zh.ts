@@ -1,10 +1,14 @@
 export const zh = {
   // Navigation
   'nav.trainingList': '動作訓練',
+  'nav.cognitiveTraining': '認知訓練',
+  'nav.languageTraining': '語言訓練',
   'nav.assessment': '評估',
-  'nav.settings': '設定與校正',
+  'nav.settings': '設定',
   'nav.credits': '致謝',
   'nav.links': '相關網站',
+  'nav.primary': '主要導覽',
+  'nav.toggleMenu': '切換導覽選單',
   'nav.noUser': '未選擇使用者',
   'nav.downloadScores': '下載成績',
   'nav.scoresBackupReminder': '成績保存在瀏覽器，請定期下載備份',
@@ -131,8 +135,11 @@ export const zh = {
   'settings.train.wgDesc': '自動追蹤眼動並給予準確度評分',
   'settings.train.mode': '訓練模式',
   'settings.tab.crowding': '擁擠效應',
-  'settings.title': '設定與校正',
-  'settings.subtitle': '調整訓練參數與螢幕校正',
+  'settings.title': '設定',
+  'settings.subtitle': '調整介面語言與網站偏好',
+  'settings.page.title': '設定',
+  'settings.page.subtitle': '切換介面語言與網站偏好設定。',
+  'settings.contentLabel': '設定內容',
   'settings.distance.title': '觀看距離',
   'settings.distance.desc': '受試者眼睛至螢幕的距離（公分）',
   'settings.sound.title': '音效回饋',
@@ -145,6 +152,9 @@ export const zh = {
   'settings.prefix.placeholder': '輸入前綴',
   'settings.language.title': '語言',
   'settings.language.desc': '切換介面顯示語言',
+  'settings.language.current': '目前語言',
+  'settings.language.zh': '中文',
+  'settings.language.en': 'English',
 
   // Calibration
   'settings.cal.rulerMode': '尺規校正',
@@ -360,8 +370,17 @@ export const zh = {
   'preset.path.randomizedSmooth': '平滑隨機',
   'preset.path.peekaboo': '躲貓貓',
 
+  // Stroke Trainer pages
+  'training.motor.title': '動作訓練',
+  'training.motor.subtitle': '選擇訓練模組，依照受訓者狀態設定強度、時間、側別與提示程度。',
+  'training.cognitive.title': '認知訓練',
+  'training.cognitive.subtitle': '以空間注意、規則切換、工作記憶與反應抑制為核心，建立可調整的訓練流程。',
+  'training.language.title': '語言訓練',
+  'training.language.subtitle': '以詞彙提取、命名、句型組合與聽理解為核心，建立可調整的溝通訓練流程。',
+
   // Credits Page
   'credits.title': '致謝',
+  'credits.contentLabel': '致謝內容',
   'credits.subtitle': '參考的開源專案與資源',
   'credits.webgazer.title': 'WebGazer.js',
   'credits.webgazer.desc': '提供基於攝影機的視線追蹤功能，使用機器學習模型估計使用者注視位置。',
@@ -400,6 +419,9 @@ export const zh = {
   // Links Page
   'links.title': '相關網站',
   'links.subtitle': '其他實用的中風復健與相關資源網站',
+  'links.contentLabel': '相關網站內容',
+  'links.visionTrainer.title': 'Vision Trainer',
+  'links.visionTrainer.desc': '視覺訓練與評估工具網站',
   'links.strokeTrainer.title': 'StrokeTrainer',
   'links.strokeTrainer.desc': '中風復健訓練平台，提供多種復健練習工具',
 };

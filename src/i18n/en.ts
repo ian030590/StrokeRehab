@@ -3,10 +3,14 @@ import type { TranslationKey } from './zh';
 export const en: Record<TranslationKey, string> = {
   // Navigation
   'nav.trainingList': 'Motor Training',
+  'nav.cognitiveTraining': 'Cognitive Training',
+  'nav.languageTraining': 'Language Training',
   'nav.assessment': 'Assessment',
   'nav.settings': 'Settings',
   'nav.credits': 'Credits',
   'nav.links': 'Related Sites',
+  'nav.primary': 'Primary navigation',
+  'nav.toggleMenu': 'Toggle navigation menu',
   'nav.noUser': 'No User Selected',
   'nav.downloadScores': 'Download Scores',
   'nav.scoresBackupReminder': 'Records stay in this browser. \nDownload backups regularly.',
@@ -133,8 +137,11 @@ export const en: Record<TranslationKey, string> = {
   'settings.train.wgDesc': 'Automatically track eye movement and provide accuracy score',
   'settings.train.mode': 'Training Mode',
   'settings.tab.crowding': 'Crowding',
-  'settings.title': 'Settings & Calibration',
-  'settings.subtitle': 'Adjust training parameters and screen calibration',
+  'settings.title': 'Settings',
+  'settings.subtitle': 'Adjust interface language and site preferences',
+  'settings.page.title': 'Settings',
+  'settings.page.subtitle': 'Switch interface language and site preferences.',
+  'settings.contentLabel': 'Settings content',
   'settings.distance.title': 'Viewing Distance',
   'settings.distance.desc': 'Distance from subject eyes to screen (cm)',
   'settings.sound.title': 'Auditory Feedback',
@@ -147,6 +154,9 @@ export const en: Record<TranslationKey, string> = {
   'settings.prefix.placeholder': 'Enter prefix',
   'settings.language.title': 'Language (語言)',
   'settings.language.desc': 'Switch interface language',
+  'settings.language.current': 'Current language',
+  'settings.language.zh': '中文',
+  'settings.language.en': 'English',
 
   // Calibration
   'settings.cal.rulerMode': 'Ruler Calibration',
@@ -362,8 +372,17 @@ export const en: Record<TranslationKey, string> = {
   'preset.path.randomizedSmooth': 'Randomized Smooth',
   'preset.path.peekaboo': 'Peek-a-boo',
 
+  // Stroke Trainer pages
+  'training.motor.title': 'Motor Training',
+  'training.motor.subtitle': 'Select training modules and adjust intensity, duration, side, and cueing to match the participant.',
+  'training.cognitive.title': 'Cognitive Training',
+  'training.cognitive.subtitle': 'Build adjustable training flows around spatial attention, rule switching, working memory, and response inhibition.',
+  'training.language.title': 'Language Training',
+  'training.language.subtitle': 'Build communication training around word retrieval, naming, sentence construction, and auditory comprehension.',
+
   // Credits Page
   'credits.title': 'Credits',
+  'credits.contentLabel': 'Credits content',
   'credits.subtitle': 'Referenced open source projects and resources',
   'credits.webgazer.title': 'WebGazer.js',
   'credits.webgazer.desc': 'Provides webcam-based eye tracking using machine learning models to estimate user gaze location.',
@@ -402,6 +421,9 @@ export const en: Record<TranslationKey, string> = {
   // Links Page
   'links.title': 'Related Websites',
   'links.subtitle': 'Other useful stroke rehabilitation and related resource websites',
+  'links.contentLabel': 'Related websites content',
+  'links.visionTrainer.title': 'Vision Trainer',
+  'links.visionTrainer.desc': 'Visual training and assessment tools website',
   'links.strokeTrainer.title': 'StrokeTrainer',
   'links.strokeTrainer.desc': 'Stroke rehabilitation training platform with various rehab exercise tools',
 };

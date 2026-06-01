@@ -1,11 +1,14 @@
 import TrainingModulesPage from "./TrainingModulesPage";
+import { useT } from "../i18n";
 
 export default function MotorTrainingPage() {
+  const { t } = useT();
+
   return (
     <TrainingModulesPage
       category="motor"
-      title="動作訓練"
-      subtitle="選擇訓練模組，依照受訓者狀態設定強度、時間、側別與提示程度。"
+      title={t("training.motor.title")}
+      subtitle={t("training.motor.subtitle")}
     />
   );
 }

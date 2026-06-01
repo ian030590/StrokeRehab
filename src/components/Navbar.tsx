@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useT } from '../i18n';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) => `navbar-link ${isActive ? 'active' : ''}`;
 const logoStyle = { width: 'auto', objectFit: 'contain' } as const;
 
 const navItems = [
-  { to: '/motor', label: '動作訓練', end: false },
-  { to: '/cognitive', label: '認知訓練', end: false },
-  { to: '/language', label: '語言訓練', end: false },
-  { to: '/settings', label: '設定', end: false },
-  { to: '/credits', label: '致謝', end: false },
-  { to: '/links', label: '相關網站', end: false },
-];
+  { to: '/motor', labelKey: 'nav.trainingList', end: false },
+  { to: '/cognitive', labelKey: 'nav.cognitiveTraining', end: false },
+  { to: '/language', labelKey: 'nav.languageTraining', end: false },
+  { to: '/settings', labelKey: 'nav.settings', end: false },
+  { to: '/credits', labelKey: 'nav.credits', end: false },
+  { to: '/links', labelKey: 'nav.links', end: false },
+] as const;
 
 export function Navbar() {
+  const { t } = useT();
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleMenu = () => setIsOpen((open) => !open);
@@ -24,10 +26,10 @@ export function Navbar() {
       <div className="navbar-inner">
         <NavLink to="/motor" className="navbar-brand" onClick={closeMenu}>
           <img src={`${import.meta.env.BASE_URL}assets/logo.svg`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
-          Stroke Trainer
+          {t('nav.brand')}
         </NavLink>
 
-        <button className="navbar-toggle" onClick={toggleMenu} aria-label="切換導覽選單" aria-expanded={isOpen}>
+        <button className="navbar-toggle" onClick={toggleMenu} aria-label={t('nav.toggleMenu')} aria-expanded={isOpen}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {isOpen ? (
               <>
@@ -45,7 +47,7 @@ export function Navbar() {
         </button>
 
         <div className={`navbar-menu ${isOpen ? 'is-open' : ''}`}>
-          <div className="navbar-links" aria-label="主要導覽">
+          <div className="navbar-links" aria-label={t('nav.primary')}>
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -54,7 +56,7 @@ export function Navbar() {
                 className={navLinkClass}
                 onClick={closeMenu}
               >
-                {item.label}
+                {t(item.labelKey)}
               </NavLink>
             ))}
           </div>

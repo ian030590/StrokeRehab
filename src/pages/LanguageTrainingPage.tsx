@@ -1,11 +1,14 @@
 import TrainingModulesPage from "./TrainingModulesPage";
+import { useT } from "../i18n";
 
 export default function LanguageTrainingPage() {
+  const { t } = useT();
+
   return (
     <TrainingModulesPage
       category="language"
-      title="語言訓練"
-      subtitle="以詞彙提取、命名、句型組合與聽理解為核心，建立可調整的溝通訓練流程。"
+      title={t("training.language.title")}
+      subtitle={t("training.language.subtitle")}
     />
   );
 }

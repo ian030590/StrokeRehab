@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { zh } from './zh';
 import type { ReactNode } from 'react';
 import type { TranslationKey } from './zh';
@@ -14,13 +14,18 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const LANGUAGE_KEY = 'vision_trainer_language';
+const LANGUAGE_KEY = 'stroke_trainer_language';
+const LEGACY_LANGUAGE_KEY = 'vision_trainer_language';
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Language>(() => {
-    const saved = localStorage.getItem(LANGUAGE_KEY);
+    const saved = localStorage.getItem(LANGUAGE_KEY) ?? localStorage.getItem(LEGACY_LANGUAGE_KEY);
     return (saved === 'en' || saved === 'zh') ? saved : 'zh';
   });
+
+  useEffect(() => {
+    document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+  }, [lang]);
 
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
