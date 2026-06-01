@@ -226,10 +226,10 @@ export default function WritingDefenseGame() {
   };
 
   return (
-    <div className="writing-defense-container" style={{ position: 'relative', width: '100%', height: '100%', backgroundColor: '#1a1a2e', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div className="writing-defense-container" style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: '#1a1a2e', overflow: 'hidden' }}>
       
       {/* HUD */}
-      <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', color: 'white', zIndex: 10, background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '20px', display: 'flex', justifyContent: 'space-between', color: 'white', zIndex: 10, background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)', pointerEvents: 'none' }}>
         <div>
           <h2 style={{ margin: 0 }}>書寫保衛戰</h2>
           <p style={{ margin: 0, opacity: 0.8 }}>難度: {difficulty} | 時間: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</p>
@@ -240,8 +240,8 @@ export default function WritingDefenseGame() {
         </div>
       </div>
 
-      {/* Game Area */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      {/* Game Area (Enemies & Feedback) */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
         {enemies.map((enemy) => (
           <div
             key={enemy.id}
@@ -284,9 +284,9 @@ export default function WritingDefenseGame() {
               top: `${feedback.y - 10}%`,
               transform: 'translate(-50%, -50%)',
               color: feedback.color,
-              fontSize: '2rem',
+              fontSize: '2.5rem',
               fontWeight: 'bold',
-              textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+              textShadow: '0 2px 8px rgba(0,0,0,0.9)',
               pointerEvents: 'none',
               animation: 'fadeOutUp 1s forwards',
               zIndex: 15
@@ -296,8 +296,8 @@ export default function WritingDefenseGame() {
             <style>
               {`
                 @keyframes fadeOutUp {
-                  0% { opacity: 1; transform: translate(-50%, 0); }
-                  100% { opacity: 0; transform: translate(-50%, -20px); }
+                  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+                  100% { opacity: 0; transform: translate(-50%, -30px) scale(1.2); }
                 }
               `}
             </style>
@@ -306,8 +306,8 @@ export default function WritingDefenseGame() {
       </div>
 
       {/* Drawing Canvas */}
-      <div style={{ height: '40%', borderTop: '2px solid #4a4a6a', position: 'relative', backgroundColor: 'rgba(255,255,255,0.05)' }}>
-        <p style={{ position: 'absolute', top: '10px', left: '10px', color: 'rgba(255,255,255,0.5)', margin: 0, pointerEvents: 'none' }}>在此畫出敵人的形狀來擊退他們...</p>
+      <div style={{ position: 'absolute', inset: 0, zIndex: 5 }}>
+        <p style={{ position: 'absolute', top: '100px', left: '20px', color: 'rgba(255,255,255,0.5)', margin: 0, pointerEvents: 'none', fontSize: '1.2rem' }}>在螢幕任何地方畫出圖形...</p>
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
@@ -325,14 +325,14 @@ export default function WritingDefenseGame() {
       {!isPlaying && !isGameOver && (
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
           <div style={{ textAlign: 'center', color: 'white' }}>
-            <h1 style={{ fontSize: '3.5rem', marginBottom: '20px', color: '#60a5fa' }}>書寫保衛戰</h1>
-            <p style={{ marginBottom: '10px', fontSize: '1.2rem' }}>外星人軍團帶著卡片入侵了！</p>
-            <p style={{ marginBottom: '30px', fontSize: '1.2rem', color: '#9ca3af' }}>在下方畫板描繪出他們卡片上的形狀來擊退他們。</p>
+            <h1 style={{ fontSize: '4rem', marginBottom: '20px', color: '#60a5fa' }}>書寫保衛戰</h1>
+            <p style={{ marginBottom: '10px', fontSize: '1.5rem' }}>外星人軍團帶著卡片入侵了！</p>
+            <p style={{ marginBottom: '40px', fontSize: '1.2rem', color: '#9ca3af' }}>在螢幕上描繪出他們卡片上的形狀來擊退他們。</p>
             <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.5)', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
               開始遊戲
             </button>
             <br />
-            <button onClick={() => navigate('/motor')} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+            <button onClick={() => navigate('/motor')} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1.2rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
               返回模組列表
             </button>
           </div>
@@ -342,16 +342,16 @@ export default function WritingDefenseGame() {
       {isGameOver && (
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
           <div style={{ textAlign: 'center', color: 'white' }}>
-            <h1 style={{ fontSize: '4rem', marginBottom: '10px' }}>遊戲結束</h1>
-            <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '30px', borderRadius: '15px', marginBottom: '30px', minWidth: '300px' }}>
-              <h2 style={{ fontSize: '2.5rem', color: '#4ade80', margin: '0 0 10px 0' }}>總得分: {score}</h2>
-              <h3 style={{ fontSize: '1.8rem', color: '#f87171', margin: 0 }}>錯過: {missed}</h3>
+            <h1 style={{ fontSize: '5rem', marginBottom: '10px' }}>遊戲結束</h1>
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '30px', borderRadius: '15px', marginBottom: '40px', minWidth: '350px' }}>
+              <h2 style={{ fontSize: '3rem', color: '#4ade80', margin: '0 0 10px 0' }}>總得分: {score}</h2>
+              <h3 style={{ fontSize: '2rem', color: '#f87171', margin: 0 }}>錯過: {missed}</h3>
             </div>
             <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
-              <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.2rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
+              <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
                 再玩一次
               </button>
-              <button onClick={() => navigate('/motor')} style={{ padding: '15px 40px', fontSize: '1.2rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+              <button onClick={() => navigate('/motor')} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                 結束訓練
               </button>
             </div>
