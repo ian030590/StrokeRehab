@@ -27,6 +27,19 @@ interface Enemy {
   speed: number;
 }
 
+const createEnemy = (difficulty: keyof typeof SHAPES): Enemy => {
+  const availableShapes = SHAPES[difficulty] || SHAPES.beginner;
+  const randomShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
+
+  return {
+    id: Date.now() + Math.random(),
+    shape: randomShape,
+    x: Math.random() * 80 + 10,
+    y: -5,
+    speed: SPEEDS[difficulty] || SPEEDS.beginner,
+  };
+};
+
 export default function WritingDefenseGame() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -67,61 +80,46 @@ export default function WritingDefenseGame() {
     }
   }, [isPlaying, timeLeft]);
 
-  const gameStateRef = useRef({ isPlaying, difficulty });
   useEffect(() => {
-    gameStateRef.current = { isPlaying, difficulty };
-  }, [isPlaying, difficulty]);
+    if (!isPlaying) return;
 
-  useEffect(() => {
     let animationFrameId: number;
-    let lastTime = 0;
+    let lastTime: number | null = null;
 
     const loop = (time: number) => {
-      if (!lastTime) lastTime = time;
-      const deltaTime = time - lastTime;
+      if (lastTime === null) lastTime = time;
+      const deltaTime = Math.min(time - lastTime, 100);
       lastTime = time;
 
-      const { isPlaying: currentIsPlaying, difficulty: currentDifficulty } = gameStateRef.current;
-
-      if (currentIsPlaying) {
-        spawnTimerRef.current += deltaTime;
-        const currentSpawnRate = SPAWN_RATES[currentDifficulty] || SPAWN_RATES.beginner;
-        if (spawnTimerRef.current > currentSpawnRate) {
-          spawnTimerRef.current = 0;
-          const availableShapes = SHAPES[currentDifficulty] || SHAPES.beginner;
-          const randomShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
-          const newEnemy: Enemy = {
-            id: Date.now(),
-            shape: randomShape,
-            x: Math.random() * 80 + 10,
-            y: -5,
-            speed: SPEEDS[currentDifficulty] || SPEEDS.beginner,
-          };
-          setEnemies((prev) => [...prev, newEnemy]);
-        }
-
-        setEnemies((prev) => {
-          const dtRatio = (deltaTime || 16) / 16;
-          const nextEnemies = prev.map((enemy) => ({
-            ...enemy,
-            y: enemy.y + enemy.speed * dtRatio,
-          }));
-          
-          const remaining = nextEnemies.filter((e) => e.y < 100);
-          const escaped = nextEnemies.length - remaining.length;
-          if (escaped > 0) {
-            setTimeout(() => setMissed((m) => m + escaped), 0);
-          }
-          return remaining;
-        });
+      spawnTimerRef.current += deltaTime;
+      const currentSpawnRate = SPAWN_RATES[difficulty] || SPAWN_RATES.beginner;
+      const shouldSpawn = spawnTimerRef.current >= currentSpawnRate;
+      if (shouldSpawn) {
+        spawnTimerRef.current = 0;
       }
+
+      setEnemies((prev) => {
+        const enemiesForFrame = shouldSpawn ? [...prev, createEnemy(difficulty)] : prev;
+        const dtRatio = (deltaTime || 16) / 16;
+        const nextEnemies = enemiesForFrame.map((enemy) => ({
+          ...enemy,
+          y: enemy.y + enemy.speed * dtRatio,
+        }));
+
+        const remaining = nextEnemies.filter((e) => e.y < 100);
+        const escaped = nextEnemies.length - remaining.length;
+        if (escaped > 0) {
+          setTimeout(() => setMissed((m) => m + escaped), 0);
+        }
+        return remaining;
+      });
 
       animationFrameId = requestAnimationFrame(loop);
     };
 
     animationFrameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animationFrameId);
-  }, []);
+  }, [difficulty, isPlaying]);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -260,7 +258,7 @@ export default function WritingDefenseGame() {
     setTimeLeft(duration);
     setIsGameOver(false);
     setFeedback(null);
-    spawnTimerRef.current = 5000; // Force immediate spawn on start!
+    spawnTimerRef.current = SPAWN_RATES[difficulty] || SPAWN_RATES.beginner;
   };
 
   return (
