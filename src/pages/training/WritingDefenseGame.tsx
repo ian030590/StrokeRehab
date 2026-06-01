@@ -42,12 +42,14 @@ export default function WritingDefenseGame() {
   const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; color: string; x: number; y: number } | null>(null);
+  const [hoverMode, setHoverMode] = useState(true);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const spawnTimerRef = useRef<number>(0);
   const drawingTimeoutRef = useRef<number | null>(null);
+  const strokeTimeoutRef = useRef<number | null>(null);
   const feedbackTimeoutRef = useRef<number | null>(null);
   
   const [isDrawing, setIsDrawing] = useState(false);
@@ -128,6 +130,7 @@ export default function WritingDefenseGame() {
   }, []);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (hoverMode) return;
     if (!ctxRef.current || !isPlaying) return;
     setIsDrawing(true);
     if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
@@ -138,18 +141,41 @@ export default function WritingDefenseGame() {
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || !ctxRef.current || !isPlaying) return;
+    if (!ctxRef.current || !isPlaying) return;
     e.preventDefault();
     const { offsetX, offsetY } = getCoordinates(e);
-    ctxRef.current.lineTo(offsetX, offsetY);
-    ctxRef.current.stroke();
+
+    if (hoverMode) {
+      if (!isDrawing) {
+        setIsDrawing(true);
+        ctxRef.current.beginPath();
+        ctxRef.current.moveTo(offsetX, offsetY);
+      } else {
+        ctxRef.current.lineTo(offsetX, offsetY);
+        ctxRef.current.stroke();
+      }
+
+      if (strokeTimeoutRef.current) clearTimeout(strokeTimeoutRef.current);
+      strokeTimeoutRef.current = window.setTimeout(() => {
+        setIsDrawing(false);
+      }, 150); // Small pause lifts the pen
+
+      if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
+      drawingTimeoutRef.current = window.setTimeout(() => {
+        setIsDrawing(false);
+        handleRecognition();
+      }, 800); // Longer pause triggers recognition
+    } else {
+      if (!isDrawing) return;
+      ctxRef.current.lineTo(offsetX, offsetY);
+      ctxRef.current.stroke();
+    }
   };
 
   const stopDrawing = () => {
-    if (!isDrawing) return;
+    if (hoverMode || !isDrawing) return;
     setIsDrawing(false);
     
-    // Simulate shape recognition after a short delay
     if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
     drawingTimeoutRef.current = window.setTimeout(() => {
       handleRecognition();
@@ -235,6 +261,12 @@ export default function WritingDefenseGame() {
         <div>
           <h2 style={{ margin: 0 }}>書寫保衛戰</h2>
           <p style={{ margin: 0, opacity: 0.8 }}>難度: {difficulty} | 時間: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</p>
+        </div>
+        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'flex-start', paddingTop: '5px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'rgba(255,255,255,0.1)', padding: '5px 12px', borderRadius: '20px', fontSize: '1rem', border: '1px solid rgba(255,255,255,0.2)' }}>
+            <input type="checkbox" checked={hoverMode} onChange={(e) => setHoverMode(e.target.checked)} style={{ cursor: 'pointer' }} />
+            觸控板模式 (免按壓)
+          </label>
         </div>
         <div style={{ textAlign: 'right' }}>
           <h3 style={{ margin: 0, color: '#4ade80' }}>得分: {score}</h3>
