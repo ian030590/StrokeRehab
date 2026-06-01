@@ -299,7 +299,6 @@ export default function WritingDefenseGame() {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              transition: 'top 0.1s linear',
             }}
           >
             <div style={{ fontSize: '3rem', lineHeight: 1, marginBottom: '-5px', zIndex: 2 }}>
