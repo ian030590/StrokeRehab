@@ -1,8 +1,11 @@
+import TrainingModulesPage from "./TrainingModulesPage";
+
 export default function MotorTrainingPage() {
   return (
-    <main className="page-content blank-page" aria-labelledby="motor-page-title">
-      <h1 id="motor-page-title">動作訓練</h1>
-      <section className="blank-surface" aria-label="動作訓練內容" />
-    </main>
+    <TrainingModulesPage
+      category="motor"
+      title="動作訓練"
+      subtitle="選擇訓練模組，依照受訓者狀態設定強度、時間、側別與提示程度。"
+    />
   );
 }

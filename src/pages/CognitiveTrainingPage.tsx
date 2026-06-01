@@ -1,8 +1,11 @@
+import TrainingModulesPage from "./TrainingModulesPage";
+
 export default function CognitiveTrainingPage() {
   return (
-    <main className="page-content blank-page" aria-labelledby="cognitive-page-title">
-      <h1 id="cognitive-page-title">認知訓練</h1>
-      <section className="blank-surface" aria-label="認知訓練內容" />
-    </main>
+    <TrainingModulesPage
+      category="cognitive"
+      title="認知訓練"
+      subtitle="以注意力、視覺搜尋、工作記憶與反應抑制為核心，建立可調整的訓練流程。"
+    />
   );
 }
