@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getTrainingModules } from "../trainingModules";
 import type { TrainingCategory, TrainingModuleId } from "../trainingModules";
 import TrainingModuleCard from "../components/TrainingModuleCard";
+import { useNavigate } from "react-router-dom";
 import ModuleSettingsModal from "../components/ModuleSettingsModal";
 
 interface TrainingModulesPageProps {
@@ -17,6 +18,7 @@ export default function TrainingModulesPage({
 }: TrainingModulesPageProps) {
   const modules = getTrainingModules(category);
   const [expandedModuleId, setExpandedModuleId] = useState<TrainingModuleId | null>(null);
+  const navigate = useNavigate();
 
   const expandedModule = modules.find((m) => m.id === expandedModuleId);
 
@@ -45,9 +47,13 @@ export default function TrainingModulesPage({
           <ModuleSettingsModal
             module={expandedModule}
             onClose={() => setExpandedModuleId(null)}
-            onApply={(summary) => {
-              alert(`準備啟動 [${expandedModule.title}]\n\n${summary}`);
-              // 這裡可以加入實際導向到訓練畫面的邏輯，例如 navigate(`/training?module=${expandedModule.id}...`)
+            onApply={(summary, values) => {
+              if (expandedModule.id === "writing-defense") {
+                const params = new URLSearchParams(values);
+                navigate(`/training/writing-defense?${params.toString()}`);
+              } else {
+                alert(`準備啟動 [${expandedModule.title}]\n\n${summary}`);
+              }
             }}
           />
         )}

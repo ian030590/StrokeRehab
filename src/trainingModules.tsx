@@ -3,10 +3,7 @@ import type { ReactNode } from "react";
 export type TrainingCategory = "motor" | "cognitive" | "language";
 
 export type TrainingModuleId =
-  | "reach-target"
-  | "hand-sequence"
-  | "balance-shift"
-  | "gait-rhythm"
+  | "writing-defense"
   | "spatial-attention"
   | "attention-switch"
   | "memory-match"
@@ -45,9 +42,16 @@ const intensityOptions: readonly ModuleSettingOption[] = [
 ];
 
 const durationOptions: readonly ModuleSettingOption[] = [
+  { value: "1", label: "1 分鐘" },
+  { value: "2", label: "2 分鐘" },
   { value: "3", label: "3 分鐘" },
   { value: "5", label: "5 分鐘" },
-  { value: "8", label: "8 分鐘" },
+];
+
+const difficultyOptions: readonly ModuleSettingOption[] = [
+  { value: "beginner", label: "初階", description: "最慢的敵人速度，簡單形狀（圓形、三角形、正方形、直線）" },
+  { value: "intermediate", label: "中階", description: "較快的敵人速度，中等形狀（愛心、星星、橢圓、六邊形）" },
+  { value: "hard", label: "高階", description: "最快的敵人速度，困難形狀（中文字：天、古、元、右、左、夫、吉）" },
 ];
 
 const sideOptions: readonly ModuleSettingOption[] = [
@@ -96,90 +100,22 @@ function icon(children: ReactNode) {
 
 export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
   {
-    id: "reach-target",
+    id: "writing-defense",
     category: "motor",
-    title: "上肢觸碰訓練",
-    description: "以可調整距離與方向的目標，練習肩肘控制、伸手與回收動作。",
+    title: "書寫保衛戰",
+    description: "透過觸控板或觸控螢幕畫出對應的圖案，擊退不斷逼近的敵人。訓練手部精細動作與反應時間。",
     icon: icon(
       <>
-        <path d="M4 12h7" />
-        <path d="M11 12l-3-3" />
-        <path d="M11 12l-3 3" />
-        <circle cx="17" cy="12" r="3" />
-        <path d="M20 12h1" />
-      </>,
+        <path d="M12 19l7-7 3 3-7 7-3-3z" />
+        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+        <path d="M2 2l7.586 7.586" />
+        <circle cx="11" cy="11" r="2" />
+      </>
     ),
-    tags: ["動作控制", "上肢", "目標導向"],
+    tags: ["動作控制", "書寫", "精細動作", "反應遊戲"],
     settings: [
-      { id: "intensity", label: "訓練強度", options: intensityOptions },
-      { id: "duration", label: "訓練時間", options: durationOptions },
-      { id: "side", label: "訓練側別", options: sideOptions },
-      { id: "assist", label: "提示程度", options: assistOptions },
-    ],
-  },
-  {
-    id: "hand-sequence",
-    category: "motor",
-    title: "手部序列訓練",
-    description: "依照順序完成按壓、抓握或放開任務，訓練手指分化與動作計畫。",
-    icon: icon(
-      <>
-        <path d="M6 20V9" />
-        <path d="M10 20V5" />
-        <path d="M14 20V7" />
-        <path d="M18 20v-9" />
-        <path d="M5 20h14" />
-      </>,
-    ),
-    tags: ["手功能", "序列", "精細動作"],
-    settings: [
-      { id: "intensity", label: "節奏速度", options: intensityOptions },
-      { id: "duration", label: "訓練時間", options: durationOptions },
-      { id: "side", label: "訓練側別", options: sideOptions },
-      { id: "assist", label: "提示程度", options: assistOptions },
-    ],
-  },
-  {
-    id: "balance-shift",
-    category: "motor",
-    title: "坐站重心轉移",
-    description: "透過方向提示練習左右與前後重心控制，支援坐姿或站姿訓練情境。",
-    icon: icon(
-      <>
-        <path d="M12 3v18" />
-        <path d="M7 8l5-5 5 5" />
-        <path d="M7 16l5 5 5-5" />
-        <path d="M3 12h18" />
-      </>,
-    ),
-    tags: ["平衡", "軀幹控制", "重心轉移"],
-    settings: [
-      { id: "intensity", label: "轉移幅度", options: intensityOptions },
-      { id: "duration", label: "訓練時間", options: durationOptions },
-      { id: "side", label: "主要方向", options: sideOptions },
-      { id: "assist", label: "安全提示", options: assistOptions },
-    ],
-  },
-  {
-    id: "gait-rhythm",
-    category: "motor",
-    title: "步態節奏訓練",
-    description: "用節拍與步伐提示建立穩定節奏，支援步速與跨步反應練習。",
-    icon: icon(
-      <>
-        <path d="M8 4v5l-2 4" />
-        <path d="M16 4v5l2 4" />
-        <path d="M7 20l3-5" />
-        <path d="M17 20l-3-5" />
-        <path d="M9 9h6" />
-      </>,
-    ),
-    tags: ["步態", "節奏", "下肢"],
-    settings: [
-      { id: "intensity", label: "節拍速度", options: intensityOptions },
-      { id: "duration", label: "訓練時間", options: durationOptions },
-      { id: "side", label: "訓練側別", options: sideOptions },
-      { id: "assist", label: "提示程度", options: assistOptions },
+      { id: "difficulty", label: "遊戲難度", options: difficultyOptions },
+      { id: "duration", label: "遊戲時間", options: durationOptions },
     ],
   },
   {

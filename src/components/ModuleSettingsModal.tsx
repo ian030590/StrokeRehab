@@ -4,7 +4,7 @@ import type { TrainingModuleCardData } from "../trainingModules";
 interface ModuleSettingsModalProps {
   module: TrainingModuleCardData;
   onClose: () => void;
-  onApply: (summary: string) => void;
+  onApply: (summary: string, values: Record<string, string>) => void;
 }
 
 function getDefaultValues(module: TrainingModuleCardData) {
@@ -93,7 +93,7 @@ export default function ModuleSettingsModal({
             className="btn btn-primary btn-lg config-start-btn"
             type="button"
             onClick={() => {
-              onApply(`${module.title}：${summary}`);
+              onApply(`${module.title}：${summary}`, values);
               onClose();
             }}
           >

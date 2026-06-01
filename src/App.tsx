@@ -8,6 +8,7 @@ const LanguageTrainingPage = lazy(() => import('./pages/LanguageTrainingPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const CreditsPage = lazy(() => import('./pages/CreditsPage'));
 const RelatedLinksPage = lazy(() => import('./pages/RelatedLinksPage'));
+const WritingDefenseGame = lazy(() => import('./pages/training/WritingDefenseGame'));
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/links" element={<RelatedLinksPage />} />
+          <Route path="/training/writing-defense" element={<WritingDefenseGame />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/motor" replace />} />
