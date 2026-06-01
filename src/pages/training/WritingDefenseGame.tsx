@@ -42,7 +42,9 @@ export default function WritingDefenseGame() {
   const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; color: string; x: number; y: number } | null>(null);
-  const [hoverMode, setHoverMode] = useState(true);
+  
+  const device = searchParams.get("device") || "tablet";
+  const hoverMode = device === "trackpad";
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
@@ -261,12 +263,6 @@ export default function WritingDefenseGame() {
         <div>
           <h2 style={{ margin: 0 }}>書寫保衛戰</h2>
           <p style={{ margin: 0, opacity: 0.8 }}>難度: {difficulty} | 時間: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</p>
-        </div>
-        <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'flex-start', paddingTop: '5px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'rgba(255,255,255,0.1)', padding: '5px 12px', borderRadius: '20px', fontSize: '1rem', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <input type="checkbox" checked={hoverMode} onChange={(e) => setHoverMode(e.target.checked)} style={{ cursor: 'pointer' }} />
-            觸控板模式 (免按壓)
-          </label>
         </div>
         <div style={{ textAlign: 'right' }}>
           <h3 style={{ margin: 0, color: '#4ade80' }}>得分: {score}</h3>

@@ -54,6 +54,11 @@ const difficultyOptions: readonly ModuleSettingOption[] = [
   { value: "hard", label: "高階", description: "最快的敵人速度，困難形狀（中文字：天、古、元、右、左、夫、吉）" },
 ];
 
+const deviceOptions: readonly ModuleSettingOption[] = [
+  { value: "tablet", label: "平板電腦", description: "需觸控螢幕拖曳或滑鼠按壓作畫" },
+  { value: "trackpad", label: "觸控板", description: "免按壓，手指在觸控板滑動即可作畫" },
+];
+
 const sideOptions: readonly ModuleSettingOption[] = [
   { value: "left", label: "左側" },
   { value: "right", label: "右側" },
@@ -116,6 +121,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
     settings: [
       { id: "difficulty", label: "遊戲難度", options: difficultyOptions },
       { id: "duration", label: "遊戲時間", options: durationOptions },
+      { id: "device", label: "使用設備", options: deviceOptions },
     ],
   },
   {
