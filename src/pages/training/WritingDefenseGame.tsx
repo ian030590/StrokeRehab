@@ -47,8 +47,6 @@ export default function WritingDefenseGame() {
   const hoverMode = device === "trackpad";
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number>(0);
-  const lastTimeRef = useRef<number>(0);
   const spawnTimerRef = useRef<number>(0);
   const drawingTimeoutRef = useRef<number | null>(null);
   const strokeTimeoutRef = useRef<number | null>(null);
@@ -69,51 +67,61 @@ export default function WritingDefenseGame() {
     }
   }, [isPlaying, timeLeft]);
 
-  const gameLoop = (time: number) => {
-    if (!lastTimeRef.current) lastTimeRef.current = time;
-    const deltaTime = time - lastTimeRef.current;
-    lastTimeRef.current = time;
-
-    if (isPlaying) {
-      spawnTimerRef.current += deltaTime;
-      const currentSpawnRate = SPAWN_RATES[difficulty] || SPAWN_RATES.beginner;
-      if (spawnTimerRef.current > currentSpawnRate) {
-        spawnTimerRef.current = 0;
-        const availableShapes = SHAPES[difficulty] || SHAPES.beginner;
-        const randomShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
-        const newEnemy: Enemy = {
-          id: Date.now(),
-          shape: randomShape,
-          x: Math.random() * 80 + 10, // 10% to 90% width
-          y: -5, // Start just above screen to slide in smoothly
-          speed: SPEEDS[difficulty] || SPEEDS.beginner,
-        };
-        setEnemies((prev) => [...prev, newEnemy]);
-      }
-
-      setEnemies((prev) => {
-        const dtRatio = (deltaTime || 16) / 16;
-        const nextEnemies = prev.map((enemy) => ({
-          ...enemy,
-          y: enemy.y + enemy.speed * dtRatio,
-        }));
-        
-        const remaining = nextEnemies.filter((e) => e.y < 100);
-        const escaped = nextEnemies.length - remaining.length;
-        if (escaped > 0) {
-          setTimeout(() => setMissed((m) => m + escaped), 0);
-        }
-        return remaining;
-      });
-    }
-
-    requestRef.current = requestAnimationFrame(gameLoop);
-  };
+  const gameStateRef = useRef({ isPlaying, difficulty });
+  useEffect(() => {
+    gameStateRef.current = { isPlaying, difficulty };
+  }, [isPlaying, difficulty]);
 
   useEffect(() => {
-    requestRef.current = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(requestRef.current!);
-  }, [isPlaying, difficulty]);
+    let animationFrameId: number;
+    let lastTime = 0;
+
+    const loop = (time: number) => {
+      if (!lastTime) lastTime = time;
+      const deltaTime = time - lastTime;
+      lastTime = time;
+
+      const { isPlaying: currentIsPlaying, difficulty: currentDifficulty } = gameStateRef.current;
+
+      if (currentIsPlaying) {
+        spawnTimerRef.current += deltaTime;
+        const currentSpawnRate = SPAWN_RATES[currentDifficulty] || SPAWN_RATES.beginner;
+        if (spawnTimerRef.current > currentSpawnRate) {
+          spawnTimerRef.current = 0;
+          const availableShapes = SHAPES[currentDifficulty] || SHAPES.beginner;
+          const randomShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
+          const newEnemy: Enemy = {
+            id: Date.now(),
+            shape: randomShape,
+            x: Math.random() * 80 + 10,
+            y: -5,
+            speed: SPEEDS[currentDifficulty] || SPEEDS.beginner,
+          };
+          setEnemies((prev) => [...prev, newEnemy]);
+        }
+
+        setEnemies((prev) => {
+          const dtRatio = (deltaTime || 16) / 16;
+          const nextEnemies = prev.map((enemy) => ({
+            ...enemy,
+            y: enemy.y + enemy.speed * dtRatio,
+          }));
+          
+          const remaining = nextEnemies.filter((e) => e.y < 100);
+          const escaped = nextEnemies.length - remaining.length;
+          if (escaped > 0) {
+            setTimeout(() => setMissed((m) => m + escaped), 0);
+          }
+          return remaining;
+        });
+      }
+
+      animationFrameId = requestAnimationFrame(loop);
+    };
+
+    animationFrameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
 
   useEffect(() => {
     if (canvasRef.current) {
