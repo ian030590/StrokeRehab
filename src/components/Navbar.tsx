@@ -25,7 +25,7 @@ export function Navbar() {
     <nav className="navbar stroke-navbar">
       <div className="navbar-inner">
         <NavLink to="/motor" className="navbar-brand" onClick={closeMenu}>
-          <img src={`${import.meta.env.BASE_URL}assets/logo.svg`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
+          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
           {t('nav.brand')}
         </NavLink>
 
