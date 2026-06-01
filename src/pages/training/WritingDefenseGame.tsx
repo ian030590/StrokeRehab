@@ -82,15 +82,16 @@ export default function WritingDefenseGame() {
           shape: randomShape,
           x: Math.random() * 80 + 10, // 10% to 90% width
           y: -5, // Start just above screen to slide in smoothly
-          speed: (SPEEDS[difficulty] || SPEEDS.beginner) * (deltaTime / 16),
+          speed: SPEEDS[difficulty] || SPEEDS.beginner,
         };
         setEnemies((prev) => [...prev, newEnemy]);
       }
 
       setEnemies((prev) => {
+        const dtRatio = (deltaTime || 16) / 16;
         const nextEnemies = prev.map((enemy) => ({
           ...enemy,
-          y: enemy.y + enemy.speed,
+          y: enemy.y + enemy.speed * dtRatio,
         }));
         
         const remaining = nextEnemies.filter((e) => e.y < 100);
