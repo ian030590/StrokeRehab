@@ -1,24 +1,32 @@
 {
-  "name": "stroke-rehab",
+  "name": "stroke-trainer",
   "private": true,
-  "version": "0.1.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "node scripts/build.mjs",
-    "build:cloudflare": "node scripts/build.mjs --target=cloudflare",
-    "build:github": "node scripts/build.mjs --target=github",
-    "preview": "vite preview --host 127.0.0.1"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "@jspsych/extension-webgazer": "^1.2.0",
+    "@jspsych/plugin-html-button-response": "^2.1.0",
+    "@jspsych/plugin-webgazer-calibrate": "^2.1.0",
+    "@jspsych/plugin-webgazer-init-camera": "^2.1.0",
+    "jspsych": "^8.2.1",
+    "pixi.js": "^8.18.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.1",
+    "recharts": "^3.8.1",
+    "three": "^0.184.0"
   },
   "devDependencies": {
-    "@types/react": "18.3.12",
-    "@types/react-dom": "18.3.1",
-    "@vitejs/plugin-react": "4.3.4",
-    "typescript": "5.6.3",
-    "vite": "5.4.11"
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "^4.5.2",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
   }
 }

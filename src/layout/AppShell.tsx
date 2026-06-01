@@ -48,7 +48,7 @@ export default function AppShell({
           <button
             className="navbar-brand"
             type="button"
-            aria-label="StrokeRehab 首頁"
+            aria-label="Stroke Trainer 首頁"
             onClick={() => handleNavigate("motor")}
           >
             <span className="navbar-brand-mark" aria-hidden="true">
@@ -57,7 +57,7 @@ export default function AppShell({
                 <path d="M8 13h3l1.5-3 2 5 1-2H19" />
               </svg>
             </span>
-            StrokeRehab
+            Stroke Trainer
           </button>
 
           <button

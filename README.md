@@ -1,66 +1,47 @@
-# StrokeRehab
+# Stroke Trainer
 
-A web-based rehabilitation program skeleton for stroke, brain injury, or neurodegenerative cognitive diseases.
+Stroke Trainer 是一個基於 React + Vite 建構的中風復健訓練 Web 應用程式。目前提供動作、認知與語言三類訓練入口，並以卡片方式呈現每個訓練模組與可調整設定。
 
-## Site Structure
+## 頁面
 
-- `動作訓練`
-- `認知訓練`
-- `設定`
-- `致謝`
-- `相關網頁`
+- 動作訓練
+- 認知訓練
+- 語言訓練
+- 設定
+- 致謝
+- 相關網站
 
-The current implementation is an empty modular website skeleton. `相關網頁` includes a link to [VisionTrainer](https://visiontrainer.pages.dev).
+## 訓練模組
 
-## Run
+### 動作訓練
+
+- 上肢觸碰訓練
+- 手部序列訓練
+- 坐站重心轉移
+- 步態節奏訓練
+
+### 認知訓練
+
+- 空間注意訓練
+- 注意力切換訓練
+- 工作記憶配對
+- 抑制反應訓練
+
+### 語言訓練
+
+- 詞彙提取訓練
+- 日常命名訓練
+- 句型組合訓練
+- 聽理解反應訓練
+
+## 開發
 
 ```bash
 npm install
 npm run dev
-```
-
-## Build
-
-```bash
 npm run build
 ```
 
-## Deploy
+## 免責聲明
 
-### GitHub Pages
-
-GitHub Pages project sites need assets to be built under the repository path, such as `/StrokeRehab/`.
-
-This repo includes `.github/workflows/deploy-github-pages.yml`. In GitHub:
-
-1. Push to `main` or `master`.
-2. Open repository Settings > Pages.
-3. Set Source to `GitHub Actions`.
-
-The workflow runs:
-
-```bash
-npm ci
-npm run build:github
-```
-
-If your GitHub Pages site is a user or organization site repository ending in `.github.io`, the build script automatically uses `/` instead.
-
-### Cloudflare Pages
-
-Use these Cloudflare Pages settings:
-
-- Framework preset: `Vite`
-- Build command: `npm run build:cloudflare`
-- Build output directory: `dist`
-- Node version: `20`
-
-Cloudflare deploys from the root path, so `build:cloudflare` uses `/` as the Vite base path.
-
-### Custom Base Path
-
-Override the base path for any host with:
-
-```bash
-VITE_BASE_PATH=/custom-path/ npm run build
-```
+本應用為復健訓練與互動練習用途，不作為醫療診斷、治療替代或復健成效保證。若需要個別化治療建議，請尋求專業醫療協助。

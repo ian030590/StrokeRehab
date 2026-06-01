@@ -1,4 +1,4 @@
-export type AppPage = "motor" | "cognitive" | "settings" | "credits" | "links";
+export type AppPage = "motor" | "cognitive" | "language" | "settings" | "credits" | "links";
 
 export interface NavItem {
   page: AppPage;
@@ -8,14 +8,16 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { page: "motor", label: "動作訓練" },
   { page: "cognitive", label: "認知訓練" },
+  { page: "language", label: "語言訓練" },
   { page: "settings", label: "設定" },
   { page: "credits", label: "致謝" },
-  { page: "links", label: "相關網頁" },
+  { page: "links", label: "相關網站" },
 ];
 
 const appPages = new Set<AppPage>([
   "motor",
   "cognitive",
+  "language",
   "settings",
   "credits",
   "links",

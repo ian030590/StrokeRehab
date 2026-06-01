@@ -1,46 +1,39 @@
-import { useCallback, useEffect, useState } from "react";
-import AppShell from "./layout/AppShell";
-import { parseHashPage, setHashPage, type AppPage } from "./navigation";
-import CognitiveTrainingPage from "./pages/CognitiveTrainingPage";
-import CreditsPage from "./pages/CreditsPage";
-import MotorTrainingPage from "./pages/MotorTrainingPage";
-import RelatedLinksPage from "./pages/RelatedLinksPage";
-import SettingsPage from "./pages/SettingsPage";
+import { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Navbar } from './components/Navbar';
 
-function useHashRoute() {
-  const [page, setPage] = useState<AppPage>(() => parseHashPage(window.location.hash));
+const MotorTrainingPage = lazy(() => import('./pages/MotorTrainingPage'));
+const CognitiveTrainingPage = lazy(() => import('./pages/CognitiveTrainingPage'));
+const LanguageTrainingPage = lazy(() => import('./pages/LanguageTrainingPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const CreditsPage = lazy(() => import('./pages/CreditsPage'));
+const RelatedLinksPage = lazy(() => import('./pages/RelatedLinksPage'));
 
-  useEffect(() => {
-    if (!window.location.hash) {
-      setHashPage("motor");
-    }
+export function App() {
+  return (
+    <Suspense fallback={<div className="app-loading" />}>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Navigate to="/motor" replace />} />
+          <Route path="/motor" element={<MotorTrainingPage />} />
+          <Route path="/cognitive" element={<CognitiveTrainingPage />} />
+          <Route path="/language" element={<LanguageTrainingPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/links" element={<RelatedLinksPage />} />
+        </Route>
 
-    const onHashChange = () => {
-      setPage(parseHashPage(window.location.hash));
-    };
-
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
-
-  const navigate = useCallback((nextPage: AppPage) => {
-    setHashPage(nextPage);
-    setPage(nextPage);
-  }, []);
-
-  return { page, navigate };
+        <Route path="*" element={<Navigate to="/motor" replace />} />
+      </Routes>
+    </Suspense>
+  );
 }
 
-export default function App() {
-  const { page, navigate } = useHashRoute();
-
+function AppLayout() {
   return (
-    <AppShell activePage={page} onNavigate={navigate}>
-      {page === "motor" && <MotorTrainingPage />}
-      {page === "cognitive" && <CognitiveTrainingPage />}
-      {page === "settings" && <SettingsPage />}
-      {page === "credits" && <CreditsPage />}
-      {page === "links" && <RelatedLinksPage />}
-    </AppShell>
+    <div className="app-layout stroke-app">
+      <Navbar />
+      <Outlet />
+    </div>
   );
 }

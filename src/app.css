@@ -212,11 +212,47 @@
   margin: 0;
 }
 
+.status-banner {
+  display: flex;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  line-height: 1.5;
+}
+
 .training-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
   gap: 24px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tag-motor {
+  border-color: rgba(61, 127, 111, 0.35);
+  color: #3d7f6f;
+}
+
+.tag-cognitive {
+  border-color: rgba(122, 92, 153, 0.35);
+  color: #7a5c99;
+}
+
+.tag-language {
+  border-color: rgba(0, 94, 184, 0.35);
+  color: var(--accent-dark);
 }
 
 .training-module-card {
