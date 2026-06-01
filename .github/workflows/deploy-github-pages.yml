@@ -33,7 +33,7 @@ jobs:
         run: npm ci
 
       - name: Build GitHub Pages artifact
-        run: npm run build:github
+        run: npm run build
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

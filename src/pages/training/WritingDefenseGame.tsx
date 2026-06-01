@@ -8,9 +8,15 @@ const SHAPES = {
 };
 
 const SPEEDS = {
-  beginner: 0.5,
-  intermediate: 1.0,
-  hard: 1.5,
+  beginner: 0.08,
+  intermediate: 0.12,
+  hard: 0.18,
+};
+
+const SPAWN_RATES = {
+  beginner: 4000,
+  intermediate: 3000,
+  hard: 2000,
 };
 
 interface Enemy {
@@ -35,12 +41,14 @@ export default function WritingDefenseGame() {
   const [missed, setMissed] = useState(0);
   const [enemies, setEnemies] = useState<Enemy[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
+  const [feedback, setFeedback] = useState<{ text: string; color: string; x: number; y: number } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const spawnTimerRef = useRef<number>(0);
   const drawingTimeoutRef = useRef<number | null>(null);
+  const feedbackTimeoutRef = useRef<number | null>(null);
   
   const [isDrawing, setIsDrawing] = useState(false);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -64,7 +72,8 @@ export default function WritingDefenseGame() {
 
     if (isPlaying) {
       spawnTimerRef.current += deltaTime;
-      if (spawnTimerRef.current > 2000) {
+      const currentSpawnRate = SPAWN_RATES[difficulty] || SPAWN_RATES.beginner;
+      if (spawnTimerRef.current > currentSpawnRate) {
         spawnTimerRef.current = 0;
         const availableShapes = SHAPES[difficulty] || SHAPES.beginner;
         const randomShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
@@ -143,27 +152,49 @@ export default function WritingDefenseGame() {
     if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
     drawingTimeoutRef.current = window.setTimeout(() => {
       handleRecognition();
-    }, 800);
+    }, 600);
+  };
+
+  const showFeedback = (text: string, color: string, x: number, y: number) => {
+    setFeedback({ text, color, x, y });
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+    feedbackTimeoutRef.current = window.setTimeout(() => {
+      setFeedback(null);
+    }, 1000);
   };
 
   const handleRecognition = () => {
     if (!ctxRef.current || !canvasRef.current) return;
-    // Clear canvas
-    ctxRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     
-    // Mock Recognition: Destroys the lowest enemy
+    // Mock Recognition: 80% chance to match the lowest enemy, 20% chance to miss
     setEnemies((prev) => {
-      if (prev.length === 0) return prev;
+      if (prev.length === 0) {
+        ctxRef.current?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+        return prev;
+      }
+      
       let lowestIndex = 0;
       for (let i = 1; i < prev.length; i++) {
         if (prev[i].y > prev[lowestIndex].y) {
           lowestIndex = i;
         }
       }
-      setScore((s) => s + 1);
-      const newEnemies = [...prev];
-      newEnemies.splice(lowestIndex, 1);
-      return newEnemies;
+      
+      const targetEnemy = prev[lowestIndex];
+      const isHit = Math.random() < 0.8;
+      
+      if (isHit) {
+        setScore((s) => s + 1);
+        showFeedback("完美！", "#4ade80", targetEnemy.x, targetEnemy.y);
+        const newEnemies = [...prev];
+        newEnemies.splice(lowestIndex, 1);
+        ctxRef.current?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+        return newEnemies;
+      } else {
+        showFeedback("未辨識", "#f87171", targetEnemy.x, targetEnemy.y);
+        ctxRef.current?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+        return prev;
+      }
     });
   };
 
@@ -191,6 +222,7 @@ export default function WritingDefenseGame() {
     setEnemies([]);
     setTimeLeft(duration);
     setIsGameOver(false);
+    setFeedback(null);
   };
 
   return (
@@ -218,19 +250,59 @@ export default function WritingDefenseGame() {
               left: `${enemy.x}%`,
               top: `${enemy.y}%`,
               transform: 'translate(-50%, -50%)',
-              backgroundColor: 'white',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '2rem',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-              color: 'black',
-              fontWeight: 'bold',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
               transition: 'top 0.1s linear',
             }}
           >
-            {enemy.shape}
+            <div style={{ fontSize: '3rem', lineHeight: 1, marginBottom: '-5px', zIndex: 2 }}>
+              👾
+            </div>
+            <div style={{
+              backgroundColor: 'white',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: '1.8rem',
+              boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
+              color: 'black',
+              fontWeight: 'bold',
+              border: '3px solid #3b82f6',
+              zIndex: 1
+            }}>
+              {enemy.shape}
+            </div>
           </div>
         ))}
+
+        {/* Feedback Animation */}
+        {feedback && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${feedback.x}%`,
+              top: `${feedback.y - 10}%`,
+              transform: 'translate(-50%, -50%)',
+              color: feedback.color,
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+              pointerEvents: 'none',
+              animation: 'fadeOutUp 1s forwards',
+              zIndex: 15
+            }}
+          >
+            {feedback.text}
+            <style>
+              {`
+                @keyframes fadeOutUp {
+                  0% { opacity: 1; transform: translate(-50%, 0); }
+                  100% { opacity: 0; transform: translate(-50%, -20px); }
+                }
+              `}
+            </style>
+          </div>
+        )}
       </div>
 
       {/* Drawing Canvas */}
@@ -245,39 +317,44 @@ export default function WritingDefenseGame() {
           onTouchStart={startDrawing}
           onTouchMove={draw}
           onTouchEnd={stopDrawing}
-          style={{ width: '100%', height: '100%', touchAction: 'none' }}
+          style={{ width: '100%', height: '100%', touchAction: 'none', cursor: 'crosshair' }}
         />
       </div>
 
       {/* Overlays */}
       {!isPlaying && !isGameOver && (
-        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
           <div style={{ textAlign: 'center', color: 'white' }}>
-            <h1 style={{ fontSize: '3rem', marginBottom: '20px' }}>書寫保衛戰</h1>
-            <p style={{ marginBottom: '30px', fontSize: '1.2rem' }}>畫出敵人身上的形狀來擊退他們！</p>
-            <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.5)' }}>
+            <h1 style={{ fontSize: '3.5rem', marginBottom: '20px', color: '#60a5fa' }}>書寫保衛戰</h1>
+            <p style={{ marginBottom: '10px', fontSize: '1.2rem' }}>外星人軍團帶著卡片入侵了！</p>
+            <p style={{ marginBottom: '30px', fontSize: '1.2rem', color: '#9ca3af' }}>在下方畫板描繪出他們卡片上的形狀來擊退他們。</p>
+            <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.5)', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
               開始遊戲
             </button>
             <br />
-            <button onClick={() => navigate('/motor')} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1rem', borderRadius: '20px', border: '1px solid white', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' }}>
-              返回
+            <button onClick={() => navigate('/motor')} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+              返回模組列表
             </button>
           </div>
         </div>
       )}
 
       {isGameOver && (
-        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
           <div style={{ textAlign: 'center', color: 'white' }}>
             <h1 style={{ fontSize: '4rem', marginBottom: '10px' }}>遊戲結束</h1>
-            <h2 style={{ fontSize: '2rem', color: '#4ade80' }}>總得分: {score}</h2>
-            <h3 style={{ fontSize: '1.5rem', color: '#f87171', marginBottom: '30px' }}>錯過: {missed}</h3>
-            <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', marginRight: '20px' }}>
-              再玩一次
-            </button>
-            <button onClick={() => navigate('/motor')} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: '1px solid white', backgroundColor: 'transparent', color: 'white', cursor: 'pointer' }}>
-              結束
-            </button>
+            <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '30px', borderRadius: '15px', marginBottom: '30px', minWidth: '300px' }}>
+              <h2 style={{ fontSize: '2.5rem', color: '#4ade80', margin: '0 0 10px 0' }}>總得分: {score}</h2>
+              <h3 style={{ fontSize: '1.8rem', color: '#f87171', margin: 0 }}>錯過: {missed}</h3>
+            </div>
+            <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
+              <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.2rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
+                再玩一次
+              </button>
+              <button onClick={() => navigate('/motor')} style={{ padding: '15px 40px', fontSize: '1.2rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+                結束訓練
+              </button>
+            </div>
           </div>
         </div>
       )}
