@@ -448,28 +448,46 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
       {phase === 'menu' && (
         <div className="drawing-defense-panel">
-          <h1>畫畫塔防</h1>
-          <p>依照最前方敵人畫板上的圖形，在畫面上描繪相同圖形來消滅敵人。</p>
-          <div className="drawing-defense-controls">
-            <label>
-              難度
-              <select className="input" value={difficulty} onChange={(event) => setDifficulty(event.target.value as Difficulty)}>
+          <div className="module-config-panel config-modal-panel">
+            <h1 className="section-title">畫畫塔防</h1>
+            <p className="section-subtitle">依照最前方敵人畫板上的圖形，在畫面上描繪相同圖形來消滅敵人。</p>
+
+            <div className="config-section">
+              <div className="config-label">難度設定</div>
+              <div className="difficulty-selector">
                 {Object.entries(DIFFICULTIES).map(([key, value]) => (
-                  <option key={key} value={key}>{value.label} - {value.enemyCount} 隻</option>
+                  <button
+                    key={key}
+                    type="button"
+                    className={`diff-btn ${difficulty === key ? 'active' : ''}`}
+                    onClick={() => setDifficulty(key as Difficulty)}
+                  >
+                    <span className="diff-btn-label">{value.label}</span>
+                    <span className="diff-btn-desc">{value.enemyCount} 隻敵人</span>
+                  </button>
                 ))}
-              </select>
-            </label>
-            <label>
-              敵人速度 {speed} px/s
-              <input type="range" min="45" max="170" step="5" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} />
-            </label>
-            <label>
-              辨識嚴格度 {strictness}%
-              <input type="range" min="10" max="90" step="5" value={strictness} onChange={(event) => setStrictness(Number(event.target.value))} />
-            </label>
-            <div className="drawing-defense-wait-options">
-              <span>收筆等待</span>
-              <div>
+              </div>
+            </div>
+
+            <div className="config-section">
+              <div className="config-label">速度與辨識</div>
+              <div className="difficulty-selector">
+                <label className="diff-btn" style={{ cursor: 'default', alignItems: 'stretch' }}>
+                  <span className="diff-btn-label">敵人速度</span>
+                  <span className="diff-btn-desc">{speed} px/s</span>
+                  <input type="range" min="45" max="170" step="5" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} />
+                </label>
+                <label className="diff-btn" style={{ cursor: 'default', alignItems: 'stretch' }}>
+                  <span className="diff-btn-label">辨識嚴格度</span>
+                  <span className="diff-btn-desc">{strictness}%</span>
+                  <input type="range" min="10" max="90" step="5" value={strictness} onChange={(event) => setStrictness(Number(event.target.value))} />
+                </label>
+              </div>
+            </div>
+
+            <div className="config-section">
+              <div className="config-label">收筆等待</div>
+              <div className="rounds-selector">
                 {STROKE_WAIT_OPTIONS.map((wait) => (
                   <button
                     key={wait}
@@ -497,10 +515,21 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <span>ms</span>
               </div>
             </div>
-          </div>
-          <div className="drawing-defense-actions">
-            <button className="btn btn-primary btn-lg" onClick={startGame}>開始遊戲</button>
-            <button className="btn btn-ghost btn-lg" onClick={onExit}>返回目錄</button>
+
+            <div className="config-actions">
+              <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5,3 19,12 5,21" />
+                </svg>
+                開始訓練
+                <span className="ready-dot" />
+              </button>
+              <button className="btn btn-ghost btn-lg" onClick={onExit}>取消</button>
+            </div>
+
+            <div className="config-summary">
+              難度 <strong>{activeConfig.label}</strong> · 敵人 <strong>{activeConfig.enemyCount}</strong> · 速度 <strong>{speed} px/s</strong>
+            </div>
           </div>
         </div>
       )}
@@ -515,19 +544,60 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       )}
 
       {phase === 'results' && result && (
-        <div className="drawing-defense-panel">
-          <h1>{result.Game_Result === 'Victory' ? '勝利' : '失敗'}</h1>
-          <div className="drawing-defense-results">
-            <span>總時長：{result.Total_Duration_Seconds} 秒</span>
-            <span>消滅敵人：{result.Enemies_Defeated}</span>
-            <span>剩餘 HP：{result.HP_Remaining}/3</span>
-            <span>嚴格度：{result.Recognition_Strictness}%</span>
-            <span>收筆等待：{result.Stroke_Wait_Milliseconds} ms</span>
-          </div>
-          <div className="drawing-defense-actions">
-            <button className="btn btn-primary btn-lg" onClick={downloadResult}>下載成績 CSV</button>
-            <button className="btn btn-secondary btn-lg" onClick={restartGame}>再玩一次</button>
-            <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回目錄</button>
+        <div className="drawing-defense-panel drawing-defense-results-panel">
+          <div className="experiment-results">
+            <h1>訓練完成！</h1>
+            <div className="results-score" style={{ color: result.Game_Result === 'Victory' ? 'var(--accent)' : 'var(--warning)' }}>
+              {result.Game_Result === 'Victory' ? '勝利' : '失敗'}
+            </div>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
+              使用者：<b style={{ color: 'var(--accent)' }}>{result.Participant_ID}</b>
+            </div>
+
+            <table className="results-table">
+              <thead>
+                <tr>
+                  <th>項目</th>
+                  <th>結果</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>總時長</td>
+                  <td>{result.Total_Duration_Seconds} 秒</td>
+                </tr>
+                <tr>
+                  <td>消滅敵人</td>
+                  <td style={{ fontWeight: 600, color: 'var(--accent)' }}>{result.Enemies_Defeated}</td>
+                </tr>
+                <tr>
+                  <td>剩餘 HP</td>
+                  <td>{result.HP_Remaining}/3</td>
+                </tr>
+                <tr>
+                  <td>難度</td>
+                  <td>{DIFFICULTIES[result.Difficulty].label}</td>
+                </tr>
+                <tr>
+                  <td>敵人速度</td>
+                  <td>{result.Enemy_Speed} px/s</td>
+                </tr>
+                <tr>
+                  <td>辨識嚴格度</td>
+                  <td>{result.Recognition_Strictness}%</td>
+                </tr>
+                <tr>
+                  <td>收筆等待</td>
+                  <td>{result.Stroke_Wait_Milliseconds} ms</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div className="results-actions">
+              <button className="btn btn-primary btn-lg" onClick={downloadResult}>下載 CSV 成績</button>
+              <button className="btn btn-secondary btn-lg" onClick={restartGame}>再玩一次</button>
+              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回設定</button>
+            </div>
           </div>
         </div>
       )}
