@@ -64,14 +64,6 @@ export function Navbar() {
         <div className={`navbar-menu ${isOpen ? 'is-open' : ''}`}>
           <div className="navbar-links">
             <NavLink
-              to="/"
-              end
-              className={navLinkClass}
-              onClick={closeMenu}
-            >
-              {t('nav.trainingList')}
-            </NavLink>
-            <NavLink
               to="/training?module=motor-training"
               className={() => `navbar-link ${activeTrainingModule === 'motor-training' ? 'active' : ''}`}
               onClick={closeMenu}

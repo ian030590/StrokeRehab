@@ -1,7 +1,5 @@
 export const zh = {
   // Navigation
-  'nav.trainingList': '訓練分類',
-  'nav.assessment': '評估',
   'nav.settings': '設定',
   'nav.credits': '致謝',
   'nav.links': '相關網站',
@@ -62,7 +60,7 @@ export const zh = {
   'home.module.motor.desc': '透過各種動作指引練習，協助恢復肢體運動功能，提升協調與控制能力。',
   'home.module.cognitive.title': '認知訓練',
   'home.module.cognitive.desc': '透過記憶、注意力與邏輯思考練習，活化大腦神經網絡，改善認知功能。',
-  'home.module.speech.title': '言語訓練',
+  'home.module.speech.title': '口語訓練',
   'home.module.speech.desc': '提供發音、口腔肌肉控制與語言理解練習，協助改善溝通能力。',
 
   // Training Config

@@ -2,8 +2,6 @@ import type { TranslationKey } from './zh';
 
 export const en: Record<TranslationKey, string> = {
   // Navigation
-  'nav.trainingList': 'Training Categories',
-  'nav.assessment': 'Assessment',
   'nav.settings': 'Settings',
   'nav.credits': 'Credits',
   'nav.links': 'Related Sites',
