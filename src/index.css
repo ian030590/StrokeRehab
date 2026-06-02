@@ -1740,3 +1740,180 @@ body #webgazer-calibrate-container #calibration-point {
   transform: translateY(0);
   box-shadow: 0 4px 8px rgba(0, 94, 184, 0.08);
 }
+
+/* Drawing Tower Defense */
+.training-module-button {
+  text-align: left;
+  font-family: var(--font-family);
+}
+
+.drawing-defense {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #f6f7f8;
+  touch-action: none;
+}
+
+.drawing-defense-stage,
+.drawing-defense-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.drawing-defense-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.drawing-defense-input {
+  z-index: 2;
+  cursor: crosshair;
+}
+
+.drawing-defense-hud {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid rgba(194, 198, 212, 0.9);
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-ambient);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.drawing-defense-hud div {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.drawing-defense-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  background: rgba(242, 244, 243, 0.82);
+  color: var(--text-primary);
+  text-align: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.drawing-defense-panel h1 {
+  font-size: 36px;
+  line-height: 1.2;
+}
+
+.drawing-defense-panel p {
+  max-width: 640px;
+  color: var(--text-secondary);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.drawing-defense-panel-compact {
+  gap: 14px;
+}
+
+.drawing-defense-controls {
+  width: min(640px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg-card);
+}
+
+.drawing-defense-controls label {
+  display: grid;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.drawing-defense-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.drawing-defense-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drawing-defense-results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 12px;
+  width: min(560px, 100%);
+}
+
+.drawing-defense-results span {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg-card);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .drawing-defense-hud {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .drawing-defense-panel {
+    padding: 24px 18px;
+  }
+
+  .drawing-defense-panel h1 {
+    font-size: 30px;
+  }
+
+  .drawing-defense-actions {
+    width: 100%;
+  }
+
+  .drawing-defense-actions .btn {
+    flex: 1 1 180px;
+  }
+
+  .drawing-defense-results {
+    grid-template-columns: 1fr;
+  }
+}
