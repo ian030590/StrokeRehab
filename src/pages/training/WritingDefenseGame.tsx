@@ -4,20 +4,29 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 const SHAPES = {
   beginner: ["⭕", "🔺", "🟥", "｜", "一"],
   intermediate: ["❤️", "⭐", "🥚", "⬡"],
-  hard: ["天", "古", "元", "右", "左", "夫", "吉"],
+  advanced: ["天", "古", "元", "右", "左", "夫", "吉"],
 };
 
-const SPEEDS = {
-  beginner: 0.15,
-  intermediate: 0.2,
-  hard: 0.25,
+const SPEED_PRESETS = {
+  low: { enemySpeed: 0.15, spawnRate: 3000 },
+  moderate: { enemySpeed: 0.2, spawnRate: 2000 },
+  high: { enemySpeed: 0.25, spawnRate: 1500 },
 };
 
-const SPAWN_RATES = {
-  beginner: 3000,
-  intermediate: 2000,
-  hard: 1500,
+const DIFFICULTY_LABELS = {
+  beginner: "初級",
+  intermediate: "中級",
+  advanced: "高級",
 };
+
+const SPEED_LABELS = {
+  low: "慢速",
+  moderate: "標準",
+  high: "快速",
+};
+
+type Difficulty = keyof typeof SHAPES;
+type SpeedLevel = keyof typeof SPEED_PRESETS;
 
 interface Enemy {
   id: number;
@@ -27,7 +36,18 @@ interface Enemy {
   speed: number;
 }
 
-const createEnemy = (difficulty: keyof typeof SHAPES): Enemy => {
+const normalizeDifficulty = (value: string | null): Difficulty => {
+  if (value === "intermediate" || value === "advanced") return value;
+  if (value === "hard") return "advanced";
+  return "beginner";
+};
+
+const normalizeSpeed = (value: string | null): SpeedLevel => {
+  if (value === "moderate" || value === "high") return value;
+  return "low";
+};
+
+const createEnemy = (difficulty: Difficulty, enemySpeed: number): Enemy => {
   const availableShapes = SHAPES[difficulty] || SHAPES.beginner;
   const randomShape = availableShapes[Math.floor(Math.random() * availableShapes.length)];
 
@@ -36,7 +56,7 @@ const createEnemy = (difficulty: keyof typeof SHAPES): Enemy => {
     shape: randomShape,
     x: Math.random() * 80 + 10,
     y: -5,
-    speed: SPEEDS[difficulty] || SPEEDS.beginner,
+    speed: enemySpeed,
   };
 };
 
@@ -44,7 +64,9 @@ export default function WritingDefenseGame() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const difficulty = (searchParams.get("difficulty") || "beginner") as keyof typeof SHAPES;
+  const difficulty = normalizeDifficulty(searchParams.get("difficulty"));
+  const speedLevel = normalizeSpeed(searchParams.get("speed"));
+  const { enemySpeed, spawnRate } = SPEED_PRESETS[speedLevel];
   const durationStr = searchParams.get("duration") || "3";
   const duration = parseInt(durationStr, 10) * 60; // in seconds
 
@@ -92,14 +114,13 @@ export default function WritingDefenseGame() {
       lastTime = time;
 
       spawnTimerRef.current += deltaTime;
-      const currentSpawnRate = SPAWN_RATES[difficulty] || SPAWN_RATES.beginner;
-      const shouldSpawn = spawnTimerRef.current >= currentSpawnRate;
+      const shouldSpawn = spawnTimerRef.current >= spawnRate;
       if (shouldSpawn) {
         spawnTimerRef.current = 0;
       }
 
       setEnemies((prev) => {
-        const enemiesForFrame = shouldSpawn ? [...prev, createEnemy(difficulty)] : prev;
+        const enemiesForFrame = shouldSpawn ? [...prev, createEnemy(difficulty, enemySpeed)] : prev;
         const dtRatio = (deltaTime || 16) / 16;
         const nextEnemies = enemiesForFrame.map((enemy) => ({
           ...enemy,
@@ -119,7 +140,7 @@ export default function WritingDefenseGame() {
 
     animationFrameId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [difficulty, isPlaying]);
+  }, [difficulty, enemySpeed, isPlaying, spawnRate]);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -258,7 +279,7 @@ export default function WritingDefenseGame() {
     setTimeLeft(duration);
     setIsGameOver(false);
     setFeedback(null);
-    spawnTimerRef.current = SPAWN_RATES[difficulty] || SPAWN_RATES.beginner;
+    spawnTimerRef.current = spawnRate;
   };
 
   return (
@@ -268,7 +289,7 @@ export default function WritingDefenseGame() {
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '20px', display: 'flex', justifyContent: 'space-between', color: 'white', zIndex: 10, background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)', pointerEvents: 'none' }}>
         <div>
           <h2 style={{ margin: 0 }}>書寫保衛戰</h2>
-          <p style={{ margin: 0, opacity: 0.8 }}>難度: {difficulty} | 時間: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</p>
+          <p style={{ margin: 0, opacity: 0.8 }}>圖像難度: {DIFFICULTY_LABELS[difficulty]} | 速度: {SPEED_LABELS[speedLevel]} | 時間: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</p>
         </div>
         <div style={{ textAlign: 'right' }}>
           <h3 style={{ margin: 0, color: '#4ade80' }}>得分: {score}</h3>

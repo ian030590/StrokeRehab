@@ -49,9 +49,15 @@ const durationOptions: readonly ModuleSettingOption[] = [
 ];
 
 const difficultyOptions: readonly ModuleSettingOption[] = [
-  { value: "beginner", label: "初階", description: "最慢的敵人速度，簡單形狀（圓形、三角形、正方形、直線）" },
-  { value: "intermediate", label: "中階", description: "較快的敵人速度，中等形狀（愛心、星星、橢圓、六邊形）" },
-  { value: "hard", label: "高階", description: "最快的敵人速度，困難形狀（中文字：天、古、元、右、左、夫、吉）" },
+  { value: "beginner", label: "初級", description: "簡單圖形（圓形、三角形、正方形、直線）" },
+  { value: "intermediate", label: "中級", description: "中等圖形（愛心、星星、橢圓、六邊形）" },
+  { value: "advanced", label: "高級", description: "中文字（天、古、元、右、左、夫、吉）" },
+];
+
+const writingSpeedOptions: readonly ModuleSettingOption[] = [
+  { value: "low", label: "慢速", description: "敵人移動與出現節奏較慢" },
+  { value: "moderate", label: "標準", description: "敵人以穩定速度前進" },
+  { value: "high", label: "快速", description: "敵人移動與出現節奏較快" },
 ];
 
 const deviceOptions: readonly ModuleSettingOption[] = [
@@ -119,7 +125,8 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
     ),
     tags: ["動作控制", "書寫", "精細動作", "反應遊戲"],
     settings: [
-      { id: "difficulty", label: "遊戲難度", options: difficultyOptions },
+      { id: "difficulty", label: "圖像難度", options: difficultyOptions },
+      { id: "speed", label: "敵人速度", options: writingSpeedOptions },
       { id: "duration", label: "遊戲時間", options: durationOptions },
       { id: "device", label: "使用設備", options: deviceOptions },
     ],
