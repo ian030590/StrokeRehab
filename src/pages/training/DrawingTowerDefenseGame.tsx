@@ -8,6 +8,7 @@ type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type ShapeId = 'circle' | 'cross' | 'square' | 'triangle' | 'vertical-line' | 'horizontal-line';
 type GamePhase = 'menu' | 'playing' | 'paused' | 'results';
 type GameResult = 'Victory' | 'Defeat';
+type BackgroundMode = 'stars' | 'color';
 
 interface DrawingTowerDefenseGameProps {
   onExit: () => void;
@@ -15,7 +16,6 @@ interface DrawingTowerDefenseGameProps {
 
 interface DifficultyConfig {
   label: string;
-  enemyCount: number;
   spawnMode: 'after-clear-delay' | 'after-clear' | 'fixed-interval';
   spawnIntervalSec: number;
   description: string;
@@ -35,8 +35,11 @@ interface Enemy {
 }
 
 interface SessionRecord {
+  Test_Date: string;
   Participant_ID: string;
   Difficulty: Difficulty;
+  Enemy_Count: number;
+  Starting_HP: number;
   Enemy_Speed: number;
   Recognition_Strictness: number;
   Stroke_Wait_Milliseconds: number;
@@ -49,19 +52,23 @@ interface SessionRecord {
 const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 'vertical-line', 'horizontal-line'];
 const DEFAULT_JUDGE_DELAY_MS = 300;
 const STROKE_WAIT_OPTIONS = [220, DEFAULT_JUDGE_DELAY_MS, 350] as const;
+const HP_OPTIONS = [1, 3, 5] as const;
+const ENEMY_COUNT_OPTIONS = [6, 12, 18] as const;
 const ENEMY_SPEED_OPTIONS = [30, 60, 90] as const;
+const DEFAULT_HP = 3;
 const DEFAULT_ENEMY_SPEED = 30;
 const DEFAULT_ENEMY_COUNT = 12;
+const ENEMY_SPAWN_Y = 0;
+const ENEMY_VISUAL_HEIGHT = 98;
+const BACKGROUND_COLOR_OPTIONS = ['#F6F7F8', '#E8F3FF', '#EAF7EF', '#FFF4E6', '#F3EAFE', '#111827'] as const;
 const RECOGNIZER_POINTS = 64;
 const RECOGNIZER_SIZE = 200;
-const starSkyBackgroundStyle: CSSProperties = {
-  backgroundImage: `url(${import.meta.env.BASE_URL}assets/StarSky.png)`,
-};
+const starSkyBackgroundImage = `url(${import.meta.env.BASE_URL}assets/StarSky.png)`;
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
-  Beginner: { label: '初級', enemyCount: DEFAULT_ENEMY_COUNT, spawnMode: 'after-clear-delay', spawnIntervalSec: 2, description: '消滅後 2 秒出現下一名' },
-  Intermediate: { label: '中級', enemyCount: DEFAULT_ENEMY_COUNT, spawnMode: 'after-clear', spawnIntervalSec: 0, description: '消滅後馬上出現下一名' },
-  Advanced: { label: '高級', enemyCount: DEFAULT_ENEMY_COUNT, spawnMode: 'fixed-interval', spawnIntervalSec: 3, description: '每 3 秒出現一名' },
+  Beginner: { label: '初級', spawnMode: 'after-clear-delay', spawnIntervalSec: 2, description: '消滅後 2 秒出現下一名' },
+  Intermediate: { label: '中級', spawnMode: 'after-clear', spawnIntervalSec: 0, description: '消滅後馬上出現下一名' },
+  Advanced: { label: '高級', spawnMode: 'fixed-interval', spawnIntervalSec: 3, description: '每 3 秒出現一名' },
 };
 
 const SHAPE_LABEL: Record<ShapeId, string> = {
@@ -83,26 +90,47 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const strokesRef = useRef<Point[][]>([]);
   const recognitionTimerRef = useRef<number | null>(null);
   const isDrawingRef = useRef(false);
-  const metricsRef = useRef({ defeated: 0, hp: 3, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
+  const metricsRef = useRef({ defeated: 0, hp: DEFAULT_HP, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
   const phaseRef = useRef<GamePhase>('menu');
-  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: DEFAULT_ENEMY_SPEED, strictness: 45, strokeWaitMs: DEFAULT_JUDGE_DELAY_MS });
+  const configRef = useRef({
+    difficulty: 'Beginner' as Difficulty,
+    enemyCount: DEFAULT_ENEMY_COUNT,
+    maxHp: DEFAULT_HP,
+    speed: DEFAULT_ENEMY_SPEED,
+    strictness: 45,
+    strokeWaitMs: DEFAULT_JUDGE_DELAY_MS,
+  });
   const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
 
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
+  const [enemyCount, setEnemyCount] = useState(DEFAULT_ENEMY_COUNT);
+  const [customEnemyCount, setCustomEnemyCount] = useState(DEFAULT_ENEMY_COUNT);
+  const [maxHp, setMaxHp] = useState(DEFAULT_HP);
+  const [customHp, setCustomHp] = useState(DEFAULT_HP);
   const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [customSpeed, setCustomSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [strictness, setStrictness] = useState(45);
   const [strokeWaitMs, setStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
-  const [hp, setHp] = useState(3);
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
+  const [backgroundColor, setBackgroundColor] = useState<string>(BACKGROUND_COLOR_OPTIONS[0]);
+  const [hp, setHp] = useState(DEFAULT_HP);
   const [defeated, setDefeated] = useState(0);
   const [spawned, setSpawned] = useState(0);
   const [recognized, setRecognized] = useState<string>('尚未辨識');
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
+  const isCustomEnemyCount = !ENEMY_COUNT_OPTIONS.includes(enemyCount as typeof ENEMY_COUNT_OPTIONS[number]);
+  const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
+  const backgroundSummary = backgroundMode === 'stars' ? '星空' : backgroundColor;
+  const backgroundStyle = useMemo<CSSProperties>(() => (
+    backgroundMode === 'stars'
+      ? { backgroundImage: starSkyBackgroundImage }
+      : { backgroundImage: 'none', backgroundColor }
+  ), [backgroundColor, backgroundMode]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -110,8 +138,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, []);
 
   useEffect(() => {
-    configRef.current = { difficulty, speed, strictness, strokeWaitMs };
-  }, [difficulty, speed, strictness, strokeWaitMs]);
+    configRef.current = { difficulty, enemyCount, maxHp, speed, strictness, strokeWaitMs };
+  }, [difficulty, enemyCount, maxHp, speed, strictness, strokeWaitMs]);
 
   useEffect(() => {
     jsPsychRef.current = initJsPsych();
@@ -143,8 +171,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     enemiesRef.current = [];
     const metrics = metricsRef.current;
     const record: SessionRecord = {
+      Test_Date: formatTestDate(new Date()),
       Participant_ID: getActiveUser() || 'Unknown',
       Difficulty: configRef.current.difficulty,
+      Enemy_Count: configRef.current.enemyCount,
+      Starting_HP: configRef.current.maxHp,
       Enemy_Speed: configRef.current.speed,
       Recognition_Strictness: configRef.current.strictness,
       Stroke_Wait_Milliseconds: configRef.current.strokeWaitMs,
@@ -212,17 +243,17 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     const enemy: Enemy = {
       id: metricsRef.current.nextId++,
       x: 70 + Math.random() * Math.max(80, w - 140),
-      y: 58,
+      y: ENEMY_SPAWN_Y,
       shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
       node: new Container(),
     };
     const monster = new Text({ text: '👾', style: { fontSize: 42 } });
     monster.anchor.set(0.5);
     monster.x = 0;
-    monster.y = -6;
+    monster.y = 24;
     const board = new Graphics();
-    board.roundRect(-34, 18, 68, 50, 6).fill(0xffffff).stroke({ color: 0xc2c6d4, width: 2 });
-    drawShape(enemy.shape, board, 0, 43, 54);
+    board.roundRect(-34, 48, 68, 50, 6).fill(0xffffff).stroke({ color: 0xc2c6d4, width: 2 });
+    drawShape(enemy.shape, board, 0, 73, 54);
     enemy.node.addChild(monster, board);
     enemy.node.x = enemy.x;
     enemy.node.y = enemy.y;
@@ -285,8 +316,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     clearPixiState();
     app.stage.removeChildren();
     drawLayout(app);
-    metricsRef.current = { defeated: 0, hp: 3, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 };
-    setHp(3);
+    const initialHp = configRef.current.maxHp;
+    metricsRef.current = { defeated: 0, hp: initialHp, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 };
+    setHp(initialHp);
     setDefeated(0);
     setSpawned(0);
     setResult(null);
@@ -340,6 +372,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         const dt = Math.min(ticker.deltaMS / 1000, 0.05);
         const metrics = metricsRef.current;
         const cfg = DIFFICULTIES[configRef.current.difficulty];
+        const targetEnemyCount = configRef.current.enemyCount;
         metrics.elapsed += dt;
         const noActiveEnemies = enemiesRef.current.length === 0;
         if (cfg.spawnMode === 'fixed-interval' || noActiveEnemies) {
@@ -347,7 +380,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         } else {
           metrics.spawnTimer = 0;
         }
-        if (metrics.spawned < cfg.enemyCount) {
+        if (metrics.spawned < targetEnemyCount) {
           const shouldSpawn =
             metrics.spawned === 0 ||
             (cfg.spawnMode === 'after-clear-delay' && noActiveEnemies && metrics.spawnTimer >= cfg.spawnIntervalSec) ||
@@ -358,7 +391,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             spawnEnemy(app);
           }
         }
-        const enemyBottomOffset = 68;
+        const enemyBottomOffset = ENEMY_VISUAL_HEIGHT;
         const defenseY = app.renderer.height - enemyBottomOffset;
         for (const enemy of [...enemiesRef.current]) {
           enemy.y += configRef.current.speed * dt;
@@ -374,7 +407,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           finishGame('Defeat');
           return;
         }
-        if (metrics.spawned >= cfg.enemyCount && enemiesRef.current.length === 0 && metrics.hp > 0) {
+        if (metrics.spawned >= targetEnemyCount && enemiesRef.current.length === 0 && metrics.hp > 0) {
           finishGame('Victory');
         }
       });
@@ -444,7 +477,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     };
   }, [handlePointerEnd, redrawPath]);
 
-  const progressText = useMemo(() => `${spawned}/${activeConfig.enemyCount}`, [activeConfig.enemyCount, spawned]);
+  const progressText = useMemo(() => `${spawned}/${enemyCount}`, [enemyCount, spawned]);
 
   const downloadResult = () => {
     if (!result) return;
@@ -452,11 +485,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   };
 
   return (
-    <div className={`drawing-defense drawing-defense-phase-${phase}`} style={starSkyBackgroundStyle}>
+    <div className={`drawing-defense drawing-defense-phase-${phase}`} style={backgroundStyle}>
       <div ref={pixiHostRef} className="drawing-defense-stage" />
       <div ref={overlayRef} className="drawing-defense-input" />
       {phase !== 'results' && <div className="drawing-defense-hud">
-        <div><strong>HP</strong> {hp}/3</div>
+        <div><strong>HP</strong> {hp}/{maxHp}</div>
         <div><strong>消滅</strong> {defeated}</div>
         <div><strong>敵人</strong> {progressText}</div>
         <div><strong>辨識</strong> {recognized}</div>
@@ -472,8 +505,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <h1>畫畫塔防</h1>
               </div>
               <div className="drawing-defense-config-stats">
-                <span><strong>{activeConfig.enemyCount}</strong> 敵人</span>
-                <span><strong>3</strong> HP</span>
+                <span><strong>{enemyCount}</strong> 敵人</span>
+                <span><strong>{maxHp}</strong> HP</span>
                 <span><strong>{speed}</strong> px/s</span>
               </div>
             </header>
@@ -499,6 +532,92 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       <span className="drawing-defense-option-meta">{value.description}</span>
                     </button>
                   ))}
+                </div>
+              </section>
+
+              <section className="drawing-defense-setting">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>生命值</h2>
+                    <p>{maxHp} HP</p>
+                  </div>
+                  <span>{isCustomHp ? '自訂' : '預設'}</span>
+                </div>
+                <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
+                  {HP_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`drawing-defense-option ${maxHp === option ? 'active' : ''}`}
+                      onClick={() => setMaxHp(option)}
+                    >
+                      <span className="drawing-defense-option-title">{option} HP</span>
+                    </button>
+                  ))}
+                  <label
+                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomHp ? 'active' : ''}`}
+                    onClick={() => setMaxHp(customHp)}
+                  >
+                    <span className="drawing-defense-option-title">自訂</span>
+                    <input
+                      className="drawing-defense-number-input"
+                      type="number"
+                      min="1"
+                      max="20"
+                      step="1"
+                      value={customHp}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 20);
+                        setCustomHp(value);
+                        setMaxHp(value);
+                      }}
+                      onFocus={() => setMaxHp(customHp)}
+                      aria-label="自訂生命值"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="drawing-defense-setting">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>敵人數量</h2>
+                    <p>{enemyCount} 人</p>
+                  </div>
+                  <span>{isCustomEnemyCount ? '自訂' : '預設'}</span>
+                </div>
+                <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
+                  {ENEMY_COUNT_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`drawing-defense-option ${enemyCount === option ? 'active' : ''}`}
+                      onClick={() => setEnemyCount(option)}
+                    >
+                      <span className="drawing-defense-option-title">{option} 人</span>
+                    </button>
+                  ))}
+                  <label
+                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomEnemyCount ? 'active' : ''}`}
+                    onClick={() => setEnemyCount(customEnemyCount)}
+                  >
+                    <span className="drawing-defense-option-title">自訂</span>
+                    <input
+                      className="drawing-defense-number-input"
+                      type="number"
+                      min="1"
+                      max="60"
+                      step="1"
+                      value={customEnemyCount}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 60);
+                        setCustomEnemyCount(value);
+                        setEnemyCount(value);
+                      }}
+                      onFocus={() => setEnemyCount(customEnemyCount)}
+                      aria-label="自訂敵人數量"
+                    />
+                  </label>
                 </div>
               </section>
 
@@ -605,14 +724,73 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                   </label>
                 </div>
               </section>
+
+              <section className="drawing-defense-setting drawing-defense-setting-wide">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>背景</h2>
+                    <p>{backgroundSummary}</p>
+                  </div>
+                  <span>{backgroundMode === 'stars' ? '圖片' : '顏色'}</span>
+                </div>
+                <div className="drawing-defense-background-controls">
+                  <button
+                    type="button"
+                    className={`drawing-defense-option ${backgroundMode === 'stars' ? 'active' : ''}`}
+                    onClick={() => setBackgroundMode('stars')}
+                  >
+                    <span className="drawing-defense-option-title">星空圖片</span>
+                    <span className="drawing-defense-option-meta">目前背景貼圖</span>
+                  </button>
+                  <div
+                    className={`drawing-defense-background-card ${backgroundMode === 'color' ? 'active' : ''}`}
+                    onClick={() => setBackgroundMode('color')}
+                  >
+                    <div className="drawing-defense-background-card-header">
+                      <span>背景顏色</span>
+                      <strong>{backgroundColor}</strong>
+                    </div>
+                    <div className="drawing-defense-color-palette" role="group" aria-label="背景色票">
+                      {BACKGROUND_COLOR_OPTIONS.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          className={`drawing-defense-color-swatch ${backgroundColor === color ? 'active' : ''}`}
+                          style={{ backgroundColor: color }}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setBackgroundMode('color');
+                            setBackgroundColor(color);
+                          }}
+                          aria-label={`背景顏色 ${color}`}
+                        />
+                      ))}
+                      <input
+                        className="drawing-defense-color-input"
+                        type="color"
+                        value={backgroundColor}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => {
+                          setBackgroundMode('color');
+                          setBackgroundColor(event.target.value);
+                        }}
+                        aria-label="自訂背景顏色"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
 
             <div className="drawing-defense-config-footer">
               <div className="drawing-defense-config-summary">
                 <strong>{activeConfig.label}</strong>
+                <span>{enemyCount} 敵人</span>
+                <span>{maxHp} HP</span>
                 <span>{speed} px/s</span>
                 <span>{strictness}%</span>
                 <span>{strokeWaitMs} ms</span>
+                <span>{backgroundSummary}</span>
               </div>
               <div className="drawing-defense-config-actions">
                 <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
@@ -642,12 +820,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           <div className="experiment-results">
             <h1>訓練完成！</h1>
             <div className="results-score">
-              {result.Enemies_Defeated}/{DIFFICULTIES[result.Difficulty].enemyCount}
+              {result.Enemies_Defeated}/{result.Enemy_Count}
             </div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 24, color: 'var(--text-secondary)', flexWrap: 'wrap', justifyContent: 'center' }}>
               <span>使用者：<b style={{ color: 'var(--accent)' }}>{result.Participant_ID}</b></span>
               <span>總時長：<b style={{ color: 'var(--accent)' }}>{result.Total_Duration_Seconds} 秒</b></span>
-              <span>剩餘 HP：<b style={{ color: 'var(--accent)' }}>{result.HP_Remaining}/3</b></span>
+              <span>剩餘 HP：<b style={{ color: 'var(--accent)' }}>{result.HP_Remaining}/{result.Starting_HP}</b></span>
             </div>
 
             <table className="results-table">
@@ -664,7 +842,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 </tr>
                 <tr>
                   <td>總敵人數</td>
-                  <td>{DIFFICULTIES[result.Difficulty].enemyCount}</td>
+                  <td>{result.Enemy_Count}</td>
+                </tr>
+                <tr>
+                  <td>生命值</td>
+                  <td>{result.Starting_HP} HP</td>
                 </tr>
                 <tr>
                   <td>難度</td>
@@ -1074,19 +1256,22 @@ function radialCoefficientOfVariation(points: Point[], box: ReturnType<typeof ge
 }
 
 function toCsv(records: SessionRecord[]): string {
-  const headers: (keyof SessionRecord)[] = [
-    'Participant_ID',
-    'Difficulty',
-    'Enemy_Speed',
-    'Recognition_Strictness',
-    'Stroke_Wait_Milliseconds',
-    'Total_Duration_Seconds',
-    'Enemies_Defeated',
-    'HP_Remaining',
-    'Game_Result',
+  const columns: Array<{ key: keyof SessionRecord; label: string }> = [
+    { key: 'Test_Date', label: '測驗日期' },
+    { key: 'Participant_ID', label: 'Participant_ID' },
+    { key: 'Difficulty', label: 'Difficulty' },
+    { key: 'Enemy_Count', label: 'Enemy_Count' },
+    { key: 'Starting_HP', label: 'Starting_HP' },
+    { key: 'Enemy_Speed', label: 'Enemy_Speed' },
+    { key: 'Recognition_Strictness', label: 'Recognition_Strictness' },
+    { key: 'Stroke_Wait_Milliseconds', label: 'Stroke_Wait_Milliseconds' },
+    { key: 'Total_Duration_Seconds', label: 'Total_Duration_Seconds' },
+    { key: 'Enemies_Defeated', label: 'Enemies_Defeated' },
+    { key: 'HP_Remaining', label: 'HP_Remaining' },
+    { key: 'Game_Result', label: 'Game_Result' },
   ];
-  const rows = records.map((record) => headers.map((header) => csvCell(record[header])).join(','));
-  return [headers.join(','), ...rows].join('\n');
+  const rows = records.map((record) => columns.map((column) => csvCell(record[column.key])).join(','));
+  return [columns.map((column) => column.label).join(','), ...rows].join('\n');
 }
 
 function csvCell(value: unknown): string {
@@ -1097,4 +1282,11 @@ function csvCell(value: unknown): string {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+function formatTestDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

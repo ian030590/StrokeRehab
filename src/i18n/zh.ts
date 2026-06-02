@@ -225,7 +225,7 @@ export const zh = {
   'exp.csv.user': '使用者',
   'exp.csv.sessionId': '紀錄ID',
   'exp.csv.savedAt': '儲存時間',
-  'exp.csv.date': '日期',
+  'exp.csv.date': '測驗日期',
   'exp.csv.time': '時間',
   'exp.csv.module': '模組',
   'exp.csv.moduleId': '模組ID',

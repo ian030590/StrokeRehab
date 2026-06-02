@@ -121,11 +121,11 @@ export function downloadAllTrainingRecordsCsv(t: TFunction): boolean {
 
 export function buildTrainingRecordsCsv(records: TrainingRecord[], t: TFunction): string {
   const headers = [
+    t('exp.csv.date'),
+    t('exp.csv.time'),
     t('exp.csv.sessionId'),
     t('exp.csv.savedAt'),
     t('exp.csv.user'),
-    t('exp.csv.date'),
-    t('exp.csv.time'),
     t('exp.csv.module'),
     t('exp.csv.moduleId'),
     t('exp.csv.diff'),
@@ -166,11 +166,11 @@ function toCsvRows(record: TrainingRecord, t: TFunction): CsvRow[] {
   const readingCrowding = record.config?.readingCrowding ?? '';
 
   const base = [
+    date,
+    time,
     record.id,
     record.savedAt,
     record.userName,
-    date,
-    time,
     moduleLabel,
     record.moduleId,
     difficulty,

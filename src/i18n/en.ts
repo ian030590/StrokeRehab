@@ -226,7 +226,7 @@ export const en: Record<TranslationKey, string> = {
   'exp.csv.user': 'User',
   'exp.csv.sessionId': 'Record ID',
   'exp.csv.savedAt': 'Saved At',
-  'exp.csv.date': 'Date',
+  'exp.csv.date': 'Test Date',
   'exp.csv.time': 'Time',
   'exp.csv.module': 'Module',
   'exp.csv.moduleId': 'Module ID',
