@@ -144,11 +144,17 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       HP_Remaining: metrics.hp,
       Game_Result: gameResult,
     };
-    (jsPsychRef.current?.data.write as ((data: Record<string, unknown>) => void) | undefined)?.(record as unknown as Record<string, unknown>);
     setResult(record);
     setHp(metrics.hp);
     setDefeated(metrics.defeated);
     setPhase('results');
+    try {
+      const jsPsychData = jsPsychRef.current?.data;
+      const writeData = jsPsychData?.write as unknown as ((data: Record<string, unknown>) => void) | undefined;
+      writeData?.call(jsPsychData, record as unknown as Record<string, unknown>);
+    } catch (error) {
+      console.warn('Unable to write drawing tower defense result to jsPsych data.', error);
+    }
   }, [setPhase]);
 
   const drawLayout = useCallback((app: Application) => {
