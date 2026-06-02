@@ -1,10 +1,52 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Application, Graphics, Text } from "pixi.js";
 
-const SHAPES = {
-  beginner: ["⭕", "🔺", "🟥", "｜", "一"],
-  intermediate: ["❤️", "⭐", "🥚", "⬡"],
-  advanced: ["天", "古", "元", "右", "左", "夫", "吉"],
+type Difficulty = "beginner" | "intermediate" | "advanced";
+type PixiShapeKind =
+  | "circle"
+  | "triangle"
+  | "square"
+  | "vertical-line"
+  | "horizontal-line"
+  | "heart"
+  | "star"
+  | "oval"
+  | "hexagon";
+type ShapeTarget =
+  | { type: "pixi"; kind: PixiShapeKind; label: string }
+  | { type: "text"; value: string; label: string };
+
+const TARGET_WIDTH = 72;
+const TARGET_HEIGHT = 56;
+const TARGET_COLOR = 0x000000;
+const TRACKPAD_START_X_RATIO = 0.5;
+const TRACKPAD_START_Y_RATIO = 2 / 3;
+const TRACKPAD_SENSITIVITY = 1.1;
+
+const SHAPES: Record<Difficulty, readonly ShapeTarget[]> = {
+  beginner: [
+    { type: "pixi", kind: "circle", label: "圓形" },
+    { type: "pixi", kind: "triangle", label: "三角形" },
+    { type: "pixi", kind: "square", label: "正方形" },
+    { type: "pixi", kind: "vertical-line", label: "直線" },
+    { type: "pixi", kind: "horizontal-line", label: "橫線" },
+  ],
+  intermediate: [
+    { type: "pixi", kind: "heart", label: "愛心" },
+    { type: "pixi", kind: "star", label: "星形" },
+    { type: "pixi", kind: "oval", label: "橢圓形" },
+    { type: "pixi", kind: "hexagon", label: "六邊形" },
+  ],
+  advanced: [
+    { type: "text", value: "天", label: "天" },
+    { type: "text", value: "古", label: "古" },
+    { type: "text", value: "元", label: "元" },
+    { type: "text", value: "右", label: "右" },
+    { type: "text", value: "左", label: "左" },
+    { type: "text", value: "夫", label: "夫" },
+    { type: "text", value: "吉", label: "吉" },
+  ],
 };
 
 const SPEED_PRESETS = {
@@ -25,15 +67,175 @@ const SPEED_LABELS = {
   high: "快速",
 };
 
-type Difficulty = keyof typeof SHAPES;
 type SpeedLevel = keyof typeof SPEED_PRESETS;
 
 interface Enemy {
   id: number;
-  shape: string;
+  shape: ShapeTarget;
   x: number;
   y: number;
   speed: number;
+}
+
+function ShapeTargetCanvas({ shape }: { shape: ShapeTarget }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    let cancelled = false;
+    let initialized = false;
+    const app = new Application();
+
+    const init = async () => {
+      await app.init({
+        width: TARGET_WIDTH,
+        height: TARGET_HEIGHT,
+        backgroundAlpha: 0,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true,
+      });
+
+      initialized = true;
+      if (cancelled) {
+        app.destroy(true, { children: true });
+        return;
+      }
+
+      const canvas = app.canvas as HTMLCanvasElement;
+      canvas.style.display = "block";
+      canvas.style.width = `${TARGET_WIDTH}px`;
+      canvas.style.height = `${TARGET_HEIGHT}px`;
+      host.innerHTML = "";
+      host.appendChild(canvas);
+      drawTargetShape(app, shape);
+    };
+
+    init().catch((error) => {
+      console.error("PixiJS target shape failed:", error);
+    });
+
+    return () => {
+      cancelled = true;
+      host.innerHTML = "";
+      if (initialized) {
+        app.destroy(true, { children: true });
+      }
+    };
+  }, [shape]);
+
+  return (
+    <div
+      ref={hostRef}
+      aria-label={shape.label}
+      role="img"
+      style={{ width: TARGET_WIDTH, height: TARGET_HEIGHT }}
+    />
+  );
+}
+
+function drawTargetShape(app: Application, shape: ShapeTarget) {
+  app.stage.removeChildren();
+
+  if (shape.type === "text") {
+    const text = new Text({
+      text: shape.value,
+      style: {
+        fontFamily: "sans-serif",
+        fontSize: 42,
+        fontWeight: "700",
+        fill: TARGET_COLOR,
+      },
+    });
+    text.anchor.set(0.5);
+    text.x = TARGET_WIDTH / 2;
+    text.y = TARGET_HEIGHT / 2;
+    app.stage.addChild(text);
+    return;
+  }
+
+  const gfx = new Graphics();
+  app.stage.addChild(gfx);
+  drawPixiShape(gfx, shape.kind);
+}
+
+function drawPixiShape(gfx: Graphics, kind: PixiShapeKind) {
+  const cx = TARGET_WIDTH / 2;
+  const cy = TARGET_HEIGHT / 2;
+  const stroke = { color: TARGET_COLOR, width: 5 };
+
+  switch (kind) {
+    case "circle":
+      gfx.circle(cx, cy, 18).stroke(stroke);
+      break;
+    case "triangle":
+      gfx.moveTo(cx, 9).lineTo(58, 47).lineTo(14, 47).lineTo(cx, 9).stroke(stroke);
+      break;
+    case "square":
+      gfx.rect(18, 10, 36, 36).stroke(stroke);
+      break;
+    case "vertical-line":
+      gfx.moveTo(cx, 8).lineTo(cx, 48).stroke({ color: TARGET_COLOR, width: 7 });
+      break;
+    case "horizontal-line":
+      gfx.moveTo(14, cy).lineTo(58, cy).stroke({ color: TARGET_COLOR, width: 7 });
+      break;
+    case "heart":
+      drawClosedPointShape(gfx, createHeartPoints(cx, cy + 3, 1.35), true);
+      break;
+    case "star":
+      drawClosedPointShape(gfx, createStarPoints(cx, cy, 21, 9), true);
+      break;
+    case "oval":
+      gfx.ellipse(cx, cy, 24, 16).stroke(stroke);
+      break;
+    case "hexagon":
+      drawClosedPointShape(gfx, createRegularPolygonPoints(cx, cy, 23, 6), false);
+      break;
+  }
+}
+
+function drawClosedPointShape(
+  gfx: Graphics,
+  points: { x: number; y: number }[],
+  filled: boolean,
+) {
+  if (points.length === 0) return;
+  gfx.moveTo(points[0].x, points[0].y);
+  points.slice(1).forEach((point) => gfx.lineTo(point.x, point.y));
+  gfx.lineTo(points[0].x, points[0].y);
+
+  if (filled) {
+    gfx.fill({ color: TARGET_COLOR });
+  } else {
+    gfx.stroke({ color: TARGET_COLOR, width: 5 });
+  }
+}
+
+function createRegularPolygonPoints(cx: number, cy: number, radius: number, sides: number) {
+  return Array.from({ length: sides }, (_, index) => {
+    const angle = -Math.PI / 2 + (index * Math.PI * 2) / sides;
+    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+  });
+}
+
+function createStarPoints(cx: number, cy: number, outerRadius: number, innerRadius: number) {
+  return Array.from({ length: 10 }, (_, index) => {
+    const radius = index % 2 === 0 ? outerRadius : innerRadius;
+    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
+    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
+  });
+}
+
+function createHeartPoints(cx: number, cy: number, scale: number) {
+  return Array.from({ length: 48 }, (_, index) => {
+    const t = (index / 48) * Math.PI * 2;
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+    return { x: cx + x * scale, y: cy + y * scale };
+  });
 }
 
 const normalizeDifficulty = (value: string | null): Difficulty => {
@@ -86,8 +288,12 @@ export default function WritingDefenseGame() {
   const drawingTimeoutRef = useRef<number | null>(null);
   const strokeTimeoutRef = useRef<number | null>(null);
   const feedbackTimeoutRef = useRef<number | null>(null);
+  const trackpadCursorRef = useRef<{ x: number; y: number } | null>(null);
+  const trackpadLastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const trackpadSessionActiveRef = useRef(false);
   
   const [isDrawing, setIsDrawing] = useState(false);
+  const [trackpadCursor, setTrackpadCursor] = useState<{ x: number; y: number } | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 
   useEffect(() => {
@@ -158,6 +364,25 @@ export default function WritingDefenseGame() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!hoverMode || isPlaying) return;
+    if (document.pointerLockElement === canvasRef.current) {
+      document.exitPointerLock();
+    }
+    setTrackpadCursor(null);
+    trackpadCursorRef.current = null;
+    trackpadLastPointerRef.current = null;
+    trackpadSessionActiveRef.current = false;
+  }, [hoverMode, isPlaying]);
+
+  useEffect(() => {
+    return () => {
+      if (document.pointerLockElement === canvasRef.current) {
+        document.exitPointerLock();
+      }
+    };
+  }, []);
+
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (hoverMode) return;
     if (!ctxRef.current || !isPlaying) return;
@@ -172,17 +397,10 @@ export default function WritingDefenseGame() {
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!ctxRef.current || !isPlaying) return;
     e.preventDefault();
-    const { offsetX, offsetY } = getCoordinates(e);
 
     if (hoverMode) {
-      if (!isDrawing) {
-        setIsDrawing(true);
-        ctxRef.current.beginPath();
-        ctxRef.current.moveTo(offsetX, offsetY);
-      } else {
-        ctxRef.current.lineTo(offsetX, offsetY);
-        ctxRef.current.stroke();
-      }
+      if ("touches" in e) return;
+      drawWithTrackpad(e);
 
       if (strokeTimeoutRef.current) clearTimeout(strokeTimeoutRef.current);
       strokeTimeoutRef.current = window.setTimeout(() => {
@@ -192,9 +410,12 @@ export default function WritingDefenseGame() {
       if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
       drawingTimeoutRef.current = window.setTimeout(() => {
         setIsDrawing(false);
+        trackpadSessionActiveRef.current = false;
+        resetTrackpadCursor(false);
         handleRecognition();
       }, 800); // Longer pause triggers recognition
     } else {
+      const { offsetX, offsetY } = getCoordinates(e);
       if (!isDrawing) return;
       ctxRef.current.lineTo(offsetX, offsetY);
       ctxRef.current.stroke();
@@ -271,6 +492,81 @@ export default function WritingDefenseGame() {
     };
   };
 
+  const resetTrackpadCursor = (activateSession: boolean) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const cursor = {
+      x: canvas.width * TRACKPAD_START_X_RATIO,
+      y: canvas.height * TRACKPAD_START_Y_RATIO,
+    };
+    trackpadCursorRef.current = cursor;
+    trackpadLastPointerRef.current = null;
+    trackpadSessionActiveRef.current = activateSession;
+    setTrackpadCursor(cursor);
+    return cursor;
+  };
+
+  const getTrackpadMovement = (e: React.MouseEvent) => {
+    const nativeEvent = e.nativeEvent;
+    const movementX = Number.isFinite(nativeEvent.movementX) ? nativeEvent.movementX : 0;
+    const movementY = Number.isFinite(nativeEvent.movementY) ? nativeEvent.movementY : 0;
+
+    if (movementX !== 0 || movementY !== 0 || document.pointerLockElement === canvasRef.current) {
+      return { dx: movementX, dy: movementY };
+    }
+
+    const current = getCoordinates(e);
+    const last = trackpadLastPointerRef.current;
+    trackpadLastPointerRef.current = { x: current.offsetX, y: current.offsetY };
+    if (!last) return { dx: 0, dy: 0 };
+    return {
+      dx: current.offsetX - last.x,
+      dy: current.offsetY - last.y,
+    };
+  };
+
+  const drawWithTrackpad = (e: React.MouseEvent) => {
+    const ctx = ctxRef.current;
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+
+    let cursor = trackpadCursorRef.current;
+    if (!trackpadSessionActiveRef.current || !cursor) {
+      cursor = resetTrackpadCursor(true);
+    }
+    if (!cursor) return;
+
+    const { dx, dy } = getTrackpadMovement(e);
+    const nextCursor = {
+      x: Math.max(0, Math.min(canvas.width, cursor.x + dx * TRACKPAD_SENSITIVITY)),
+      y: Math.max(0, Math.min(canvas.height, cursor.y + dy * TRACKPAD_SENSITIVITY)),
+    };
+
+    if (!isDrawing) {
+      setIsDrawing(true);
+      ctx.beginPath();
+      ctx.moveTo(cursor.x, cursor.y);
+    }
+
+    ctx.lineTo(nextCursor.x, nextCursor.y);
+    ctx.stroke();
+    trackpadCursorRef.current = nextCursor;
+    setTrackpadCursor(nextCursor);
+  };
+
+  const requestTrackpadPointerLock = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !hoverMode) return;
+
+    const request = canvas.requestPointerLock();
+    if (request && "catch" in request) {
+      request.catch(() => {
+        // Pointer Lock can fail outside a trusted browser gesture; fallback still draws with relative movement.
+      });
+    }
+  };
+
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
@@ -280,6 +576,10 @@ export default function WritingDefenseGame() {
     setIsGameOver(false);
     setFeedback(null);
     spawnTimerRef.current = spawnRate;
+    if (hoverMode) {
+      resetTrackpadCursor(false);
+      window.setTimeout(requestTrackpadPointerLock, 0);
+    }
   };
 
   return (
@@ -320,21 +620,33 @@ export default function WritingDefenseGame() {
               alignItems: 'center',
             }}
           >
-            <div style={{ fontSize: '3rem', lineHeight: 1, marginBottom: '-5px', zIndex: 2 }}>
-              👾
-            </div>
+            <div
+              aria-hidden="true"
+              style={{
+                width: '38px',
+                height: '24px',
+                marginBottom: '-4px',
+                zIndex: 2,
+                border: '2px solid #dbeafe',
+                borderRadius: '16px 16px 8px 8px',
+                background: 'linear-gradient(180deg, #93c5fd 0%, #334155 100%)',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.35)',
+              }}
+            />
             <div style={{
               backgroundColor: 'white',
-              padding: '8px 16px',
+              padding: '6px 12px',
               borderRadius: '6px',
-              fontSize: '1.8rem',
               boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
-              color: 'black',
-              fontWeight: 'bold',
               border: '3px solid #3b82f6',
-              zIndex: 1
+              zIndex: 1,
+              minWidth: '96px',
+              minHeight: '72px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}>
-              {enemy.shape}
+              <ShapeTargetCanvas shape={enemy.shape} />
             </div>
           </div>
         ))}
@@ -375,6 +687,24 @@ export default function WritingDefenseGame() {
           onTouchEnd={stopDrawing}
           style={{ width: '100%', height: '100%', touchAction: 'none', cursor: 'crosshair' }}
         />
+        {hoverMode && isPlaying && trackpadCursor && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: `${trackpadCursor.x}px`,
+              top: `${trackpadCursor.y}px`,
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              border: '2px solid rgba(96, 165, 250, 0.95)',
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              boxShadow: '0 0 12px rgba(96, 165, 250, 0.9)',
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
       </div>
 
       {/* Overlays */}
