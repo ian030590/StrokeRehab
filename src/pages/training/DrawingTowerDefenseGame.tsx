@@ -32,6 +32,15 @@ interface Enemy {
   y: number;
   shape: ShapeId;
   node: Container;
+  spawnedAtSec: number;
+  resultIndex: number;
+}
+
+interface EnemyResult {
+  Enemy_Number: number;
+  Shape: ShapeId;
+  Reaction_Time_Seconds: number | null;
+  Defeated: boolean;
 }
 
 interface SessionRecord {
@@ -47,6 +56,7 @@ interface SessionRecord {
   Enemies_Defeated: number;
   HP_Remaining: number;
   Game_Result: GameResult;
+  Enemy_Results: EnemyResult[];
 }
 
 const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 'vertical-line', 'horizontal-line'];
@@ -88,6 +98,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const drawingLayerRef = useRef<Graphics | null>(null);
   const pathRef = useRef<Point[]>([]);
   const strokesRef = useRef<Point[][]>([]);
+  const enemyResultsRef = useRef<EnemyResult[]>([]);
   const recognitionTimerRef = useRef<number | null>(null);
   const isDrawingRef = useRef(false);
   const metricsRef = useRef({ defeated: 0, hp: DEFAULT_HP, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
@@ -157,6 +168,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     drawingLayerRef.current?.clear();
   }, []);
 
+  const recordEnemyOutcome = useCallback((enemy: Enemy, defeatedEnemy: boolean) => {
+    const result = enemyResultsRef.current[enemy.resultIndex];
+    if (!result || result.Reaction_Time_Seconds !== null) return;
+    const reactionTime = Math.max(0, metricsRef.current.elapsed - enemy.spawnedAtSec);
+    result.Reaction_Time_Seconds = Number(reactionTime.toFixed(2));
+    result.Defeated = defeatedEnemy;
+  }, []);
+
   const finishGame = useCallback((gameResult: GameResult) => {
     if (phaseRef.current === 'results') return;
     if (recognitionTimerRef.current !== null) {
@@ -167,6 +186,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     pathRef.current = [];
     strokesRef.current = [];
     drawingLayerRef.current?.clear();
+    enemiesRef.current.forEach((enemy) => recordEnemyOutcome(enemy, false));
     enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
     enemiesRef.current = [];
     const metrics = metricsRef.current;
@@ -183,6 +203,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       Enemies_Defeated: metrics.defeated,
       HP_Remaining: metrics.hp,
       Game_Result: gameResult,
+      Enemy_Results: enemyResultsRef.current.map((enemyResult) => ({ ...enemyResult })),
     };
     setResult(record);
     setHp(metrics.hp);
@@ -195,7 +216,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     } catch (error) {
       console.warn('Unable to write drawing tower defense result to jsPsych data.', error);
     }
-  }, [setPhase]);
+  }, [recordEnemyOutcome, setPhase]);
 
   const drawLayout = useCallback((app: Application) => {
     const w = app.renderer.width;
@@ -229,13 +250,24 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
   const spawnEnemy = useCallback((app: Application) => {
     const w = app.renderer.width;
+    const enemyNumber = metricsRef.current.spawned + 1;
+    const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+    const resultIndex = enemyResultsRef.current.length;
     const enemy: Enemy = {
       id: metricsRef.current.nextId++,
       x: 70 + Math.random() * Math.max(80, w - 140),
       y: ENEMY_SPAWN_Y,
-      shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+      shape,
       node: new Container(),
+      spawnedAtSec: metricsRef.current.elapsed,
+      resultIndex,
     };
+    enemyResultsRef.current.push({
+      Enemy_Number: enemyNumber,
+      Shape: shape,
+      Reaction_Time_Seconds: null,
+      Defeated: false,
+    });
     const monster = new Text({ text: '👾', style: { fontSize: 42 } });
     monster.anchor.set(0.5);
     monster.x = 0;
@@ -287,6 +319,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       setRecognized(recognition ? SHAPE_LABEL[recognition] : '未辨識');
       const target = enemiesRef.current[0];
       if (recognition && target && recognition === target.shape) {
+        recordEnemyOutcome(target, true);
         target.node.destroy({ children: true });
         enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== target.id);
         metricsRef.current.defeated += 1;
@@ -297,7 +330,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         drawingLayerRef.current?.clear();
       }, 650);
     }, configRef.current.strokeWaitMs);
-  }, []);
+  }, [recordEnemyOutcome]);
 
   const startGame = useCallback(() => {
     const app = appRef.current;
@@ -307,6 +340,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     drawLayout(app);
     const initialHp = configRef.current.maxHp;
     metricsRef.current = { defeated: 0, hp: initialHp, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 };
+    enemyResultsRef.current = [];
     setHp(initialHp);
     setDefeated(0);
     setSpawned(0);
@@ -386,6 +420,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
           if (enemy.y > defenseY) {
+            recordEnemyOutcome(enemy, false);
             enemy.node.destroy({ children: true });
             enemiesRef.current = enemiesRef.current.filter((item) => item.id !== enemy.id);
             metrics.hp = Math.max(0, metrics.hp - 1);
@@ -417,7 +452,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       app.destroy(true, { children: true });
       appRef.current = null;
     };
-  }, [drawLayout, finishGame, spawnEnemy]);
+  }, [drawLayout, finishGame, recordEnemyOutcome, spawnEnemy]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -808,51 +843,43 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         <div className="experiment-container drawing-defense-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
             <h1>訓練完成！</h1>
-            <div className="results-score">
-              {result.Enemies_Defeated}/{result.Enemy_Count}
-            </div>
-            <div style={{ display: 'flex', gap: 24, marginBottom: 24, color: 'var(--text-secondary)', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <span>使用者：<b style={{ color: 'var(--accent)' }}>{result.Participant_ID}</b></span>
-              <span>總時長：<b style={{ color: 'var(--accent)' }}>{result.Total_Duration_Seconds} 秒</b></span>
-              <span>剩餘 HP：<b style={{ color: 'var(--accent)' }}>{result.HP_Remaining}/{result.Starting_HP}</b></span>
+            <div className="drawing-defense-result-summary">
+              <span>
+                <small>使用者</small>
+                <strong>{result.Participant_ID}</strong>
+              </span>
+              <span>
+                <small>消滅敵人數 / 總敵人數</small>
+                <strong>{result.Enemies_Defeated}/{result.Enemy_Count}</strong>
+              </span>
+              <span>
+                <small>總時長</small>
+                <strong>{result.Total_Duration_Seconds} 秒</strong>
+              </span>
             </div>
 
             <table className="results-table">
               <thead>
                 <tr>
-                  <th>項目</th>
-                  <th>結果</th>
+                  <th>#</th>
+                  <th>圖形種類</th>
+                  <th>反應時間</th>
+                  <th>是否成功消滅</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>消滅敵人</td>
-                  <td style={{ fontWeight: 600, color: 'var(--accent)' }}>{result.Enemies_Defeated}</td>
-                </tr>
-                <tr>
-                  <td>總敵人數</td>
-                  <td>{result.Enemy_Count}</td>
-                </tr>
-                <tr>
-                  <td>生命值</td>
-                  <td>{result.Starting_HP} HP</td>
-                </tr>
-                <tr>
-                  <td>難度</td>
-                  <td>{DIFFICULTIES[result.Difficulty].label}</td>
-                </tr>
-                <tr>
-                  <td>敵人速度</td>
-                  <td>{result.Enemy_Speed} px/s</td>
-                </tr>
-                <tr>
-                  <td>辨識嚴格度</td>
-                  <td>{result.Recognition_Strictness}%</td>
-                </tr>
-                <tr>
-                  <td>收筆等待</td>
-                  <td>{result.Stroke_Wait_Milliseconds} ms</td>
-                </tr>
+                {result.Enemy_Results.map((enemyResult) => (
+                  <tr key={enemyResult.Enemy_Number}>
+                    <td>{enemyResult.Enemy_Number}</td>
+                    <td>{SHAPE_LABEL[enemyResult.Shape]}</td>
+                    <td>
+                      {enemyResult.Reaction_Time_Seconds === null ? '-' : `${enemyResult.Reaction_Time_Seconds} 秒`}
+                    </td>
+                    <td className={enemyResult.Defeated ? 'result-success' : 'result-fail'}>
+                      {enemyResult.Defeated ? '成功' : '未消滅'}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
@@ -874,6 +901,7 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   if (rawPoints.length < 6) return null;
 
   if (looksLikeCircle(rawPoints, strictness)) return 'circle';
+  if (looksLikeCross(usableStrokes, rawPoints, getBox(rawPoints), crossTolerance(strictness))) return 'cross';
 
   const candidate = normalizeGesture(usableStrokes);
   let best: { shape: ShapeId; score: number } | null = null;
@@ -890,7 +918,12 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   }
 
   const threshold = 0.42 + strictness * 0.0025;
-  return best && best.score >= threshold ? best.shape : null;
+  const adjustedThreshold = best?.shape === 'cross' ? threshold - 0.06 : threshold;
+  return best && best.score >= adjustedThreshold ? best.shape : null;
+}
+
+function crossTolerance(strictness: number): number {
+  return 1 - clamp(strictness, 0, 100) / 100;
 }
 
 function looksLikeCircle(points: Point[], strictness: number): boolean {
@@ -1245,21 +1278,28 @@ function radialCoefficientOfVariation(points: Point[], box: ReturnType<typeof ge
 }
 
 function toCsv(records: SessionRecord[]): string {
-  const columns: Array<{ key: keyof SessionRecord; label: string }> = [
-    { key: 'Test_Date', label: '測驗日期' },
-    { key: 'Participant_ID', label: 'Participant_ID' },
-    { key: 'Difficulty', label: 'Difficulty' },
-    { key: 'Enemy_Count', label: 'Enemy_Count' },
-    { key: 'Starting_HP', label: 'Starting_HP' },
-    { key: 'Enemy_Speed', label: 'Enemy_Speed' },
-    { key: 'Recognition_Strictness', label: 'Recognition_Strictness' },
-    { key: 'Stroke_Wait_Milliseconds', label: 'Stroke_Wait_Milliseconds' },
-    { key: 'Total_Duration_Seconds', label: 'Total_Duration_Seconds' },
-    { key: 'Enemies_Defeated', label: 'Enemies_Defeated' },
-    { key: 'HP_Remaining', label: 'HP_Remaining' },
-    { key: 'Game_Result', label: 'Game_Result' },
+  const columns: Array<{ label: string; value: (record: SessionRecord, enemyResult: EnemyResult | null) => unknown }> = [
+    { label: '測驗日期', value: (record) => record.Test_Date },
+    { label: 'Participant_ID', value: (record) => record.Participant_ID },
+    { label: 'Difficulty', value: (record) => record.Difficulty },
+    { label: 'Enemy_Count', value: (record) => record.Enemy_Count },
+    { label: 'Starting_HP', value: (record) => record.Starting_HP },
+    { label: 'Enemy_Speed', value: (record) => record.Enemy_Speed },
+    { label: 'Recognition_Strictness', value: (record) => record.Recognition_Strictness },
+    { label: 'Stroke_Wait_Milliseconds', value: (record) => record.Stroke_Wait_Milliseconds },
+    { label: 'Total_Duration_Seconds', value: (record) => record.Total_Duration_Seconds },
+    { label: 'Enemies_Defeated', value: (record) => record.Enemies_Defeated },
+    { label: 'HP_Remaining', value: (record) => record.HP_Remaining },
+    { label: 'Game_Result', value: (record) => record.Game_Result },
+    { label: 'Enemy_Number', value: (_record, enemyResult) => enemyResult?.Enemy_Number ?? '' },
+    { label: 'Enemy_Shape', value: (_record, enemyResult) => enemyResult ? SHAPE_LABEL[enemyResult.Shape] : '' },
+    { label: 'Enemy_Reaction_Time_Seconds', value: (_record, enemyResult) => enemyResult?.Reaction_Time_Seconds ?? '' },
+    { label: 'Enemy_Defeated', value: (_record, enemyResult) => enemyResult?.Defeated ?? '' },
   ];
-  const rows = records.map((record) => columns.map((column) => csvCell(record[column.key])).join(','));
+  const rows = records.flatMap((record) => {
+    const enemyResults = record.Enemy_Results.length > 0 ? record.Enemy_Results : [null];
+    return enemyResults.map((enemyResult) => columns.map((column) => csvCell(column.value(record, enemyResult))).join(','));
+  });
   return [columns.map((column) => column.label).join(','), ...rows].join('\n');
 }
 

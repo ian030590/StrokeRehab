@@ -910,6 +910,35 @@ html, body, #root {
   margin: 16px 0;
 }
 
+.drawing-defense-result-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 12px;
+  width: min(720px, 100%);
+  margin: 16px 0 18px;
+}
+
+.drawing-defense-result-summary span {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg-card);
+}
+
+.drawing-defense-result-summary small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.drawing-defense-result-summary strong {
+  color: var(--accent-dark);
+  font-size: 20px;
+  font-weight: 800;
+}
+
 .results-table {
   width: 100%;
   max-width: 600px;
@@ -943,6 +972,20 @@ html, body, #root {
 
 .results-table td.rt-slow {
   color: var(--warning);
+}
+
+.results-table td.result-success {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.results-table td.result-fail {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.drawing-defense-results-container .results-table {
+  max-width: 760px;
 }
 
 .results-actions {
@@ -2339,6 +2382,10 @@ body #webgazer-calibrate-container #calibration-point {
   }
 
   .drawing-defense-results {
+    grid-template-columns: 1fr;
+  }
+
+  .drawing-defense-result-summary {
     grid-template-columns: 1fr;
   }
 }
