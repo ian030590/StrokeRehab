@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { HEALTH_EXERCISE_VIDEOS } from "./healthExerciseVideos";
 
 export type TrainingCategory = "motor" | "cognitive" | "language";
 
 export type TrainingModuleId =
   | "writing-defense"
+  | "healthy-movement"
   | "connect-dots"
   | "chinese-crossword"
   | "spatial-attention"
@@ -61,6 +63,12 @@ const writingSpeedOptions: readonly ModuleSettingOption[] = [
   { value: "moderate", label: "標準", description: "敵人以穩定速度前進" },
   { value: "high", label: "快速", description: "敵人移動與出現節奏較快" },
 ];
+
+const healthExerciseVideoOptions: readonly ModuleSettingOption[] = HEALTH_EXERCISE_VIDEOS.map((video) => ({
+  value: video.id,
+  label: video.title,
+  description: `${video.provider}${video.durationLabel ? ` / ${video.durationLabel}` : ""} / ${video.audience}`,
+}));
 
 const sideOptions: readonly ModuleSettingOption[] = [
   { value: "left", label: "左側" },
@@ -143,6 +151,24 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
       { id: "difficulty", label: "圖像難度", options: difficultyOptions },
       { id: "speed", label: "敵人速度", options: writingSpeedOptions },
       { id: "duration", label: "遊戲時間", options: durationOptions },
+    ],
+  },
+  {
+    id: "healthy-movement",
+    category: "motor",
+    title: "健康動一動",
+    description: "彙整健康操 YouTube 影片，選擇影片後前往觀看並跟著活動。未來可持續新增影片來源。",
+    icon: icon(
+      <>
+        <rect x="3" y="5" width="18" height="12" rx="2" />
+        <path d="M10 9l5 3-5 3V9Z" />
+        <path d="M8 21h8" />
+        <path d="M12 17v4" />
+      </>,
+    ),
+    tags: ["健康操", "YouTube影片", "動作訓練", "電腦遊戲", "平板遊戲"],
+    settings: [
+      { id: "video", label: "健康操影片", options: healthExerciseVideoOptions },
     ],
   },
   {

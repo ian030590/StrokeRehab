@@ -48,7 +48,7 @@ export default function TrainingModulesPage({
             module={expandedModule}
             onClose={() => setExpandedModuleId(null)}
             onApply={(summary, values) => {
-              if (expandedModule.id === "writing-defense" || expandedModule.id === "connect-dots" || expandedModule.id === "chinese-crossword") {
+              if (expandedModule.id === "writing-defense" || expandedModule.id === "healthy-movement" || expandedModule.id === "connect-dots" || expandedModule.id === "chinese-crossword") {
                 const params = new URLSearchParams(values);
                 navigate(`/training/${expandedModule.id}?${params.toString()}`);
               } else {
