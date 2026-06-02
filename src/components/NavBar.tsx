@@ -47,10 +47,10 @@ export function Navbar() {
     <nav className="navbar">
       <div className="navbar-inner">
         <NavLink to="/" className="navbar-brand" onClick={closeMenu}>
-          <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
+          <img src={`${import.meta.env.BASE_URL}assets/logo.svg`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
           {t('nav.brand')}
         </NavLink>
- 
+
         <button className="navbar-toggle" onClick={toggleMenu} aria-label="Toggle menu">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             {isOpen ? (
