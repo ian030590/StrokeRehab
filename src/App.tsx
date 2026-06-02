@@ -12,10 +12,9 @@ export function App() {
   return (
     <Suspense fallback={<div className="app-loading" />}>
       <Routes>
-        <Route path="/training" element={<TrainingPage />} />
-
         <Route element={<AppLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/training" element={<TrainingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/links" element={<LinksPage />} />
