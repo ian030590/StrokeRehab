@@ -39,7 +39,7 @@ export function App() {
 
 function AppLayout() {
   return (
-    <div className="app-layout stroke-app">
+    <div className="app-layout">
       <Navbar />
       <Outlet />
     </div>

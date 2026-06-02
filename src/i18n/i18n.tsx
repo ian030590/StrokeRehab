@@ -15,7 +15,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 const LANGUAGE_KEY = 'stroke_trainer_language';
-const LEGACY_LANGUAGE_KEY = 'vision_trainer_language';
+const LEGACY_LANGUAGE_KEY = 'stroke_trainer_language';
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Language>(() => {

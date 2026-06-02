@@ -10,9 +10,8 @@ export const DEFAULT_DISTANCE_CM = 60;
 export const DEFAULT_CAL_BAR_LENGTH_MM = 149;
 export const CAL_BAR_LENGTH_PX = 700;
 export const APP_VERSION = '3.0.0';
-export const STORAGE_PREFIX = 'vision_trainer_';
+export const STORAGE_PREFIX = 'stroke_trainer_';
 
-import type { OculomotorPattern, OculomotorTargetShape } from '../pages/training/oculomotor/types';
 
 export const DRIVING_DURATION_MIN_SEC = 80;
 export const DRIVING_DURATION_MAX_SEC = 240;
@@ -36,14 +35,14 @@ export interface AppSettings {
   auditoryFeedbackEnabled: boolean;
   downloadDirectory: string;
   oculomotorMode: 'pursuit' | 'reaction-jumps' | 'multi-object' | 'lilac-chaser';
-  oculomotorPattern: OculomotorPattern;
+  oculomotorPattern: string;
   oculomotorDurationSec: number;
   oculomotorSpeedDegPerSec: number;
   oculomotorTargetSizeMm: number;
   oculomotorDistractorCount: number;
   oculomotorTargetColor: string;
   oculomotorBackgroundColor: string;
-  oculomotorTargetShape: OculomotorTargetShape;
+  oculomotorTargetShape: string;
   oculomotorCustomTargetImage: string;
   oculomotorTargetOpacity: number;
   oculomotorBackgroundImage: string;

@@ -22,7 +22,7 @@ export function Navbar() {
   const closeMenu = () => setIsOpen(false);
 
   return (
-    <nav className="navbar stroke-navbar">
+    <nav className="navbar">
       <div className="navbar-inner">
         <NavLink to="/motor" className="navbar-brand" onClick={closeMenu}>
           <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
