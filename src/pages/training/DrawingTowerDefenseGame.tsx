@@ -46,7 +46,10 @@ interface SessionRecord {
 }
 
 const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 'vertical-line', 'horizontal-line'];
-const STROKE_WAIT_OPTIONS = [700, 1100, 1600] as const;
+const DEFAULT_JUDGE_DELAY_MS = 300;
+const STROKE_WAIT_OPTIONS = [220, DEFAULT_JUDGE_DELAY_MS, 350] as const;
+const RECOGNIZER_POINTS = 64;
+const RECOGNIZER_SIZE = 200;
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   Beginner: { label: '初級', enemyCount: 12, spawnIntervalSec: 2.4, maxConcurrentSpawns: 1 },
@@ -75,15 +78,15 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const isDrawingRef = useRef(false);
   const metricsRef = useRef({ defeated: 0, hp: 3, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
   const phaseRef = useRef<GamePhase>('menu');
-  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: 80, strictness: 45, strokeWaitMs: 1100 });
+  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: 80, strictness: 45, strokeWaitMs: DEFAULT_JUDGE_DELAY_MS });
   const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
 
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
   const [speed, setSpeed] = useState(80);
   const [strictness, setStrictness] = useState(45);
-  const [strokeWaitMs, setStrokeWaitMs] = useState(1100);
-  const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(1100);
+  const [strokeWaitMs, setStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
+  const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [hp, setHp] = useState(3);
   const [defeated, setDefeated] = useState(0);
   const [spawned, setSpawned] = useState(0);
@@ -142,7 +145,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     const h = app.renderer.height;
     const bg = new Graphics();
     bg.rect(0, 0, w, h).fill(0x080d1f);
-    bg.rect(0, h * 0.76, w, 5).fill(0xffd166);
     for (let i = 0; i < 150; i += 1) {
       const x = ((i * 97) % Math.max(1, w)) + (((i * 37) % 11) / 10);
       const y = ((i * 53) % Math.max(1, h)) + (((i * 19) % 7) / 10);
@@ -326,7 +328,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           const spawnBatch = cfg.maxConcurrentSpawns > 1 && Math.random() > 0.45 ? cfg.maxConcurrentSpawns : 1;
           for (let i = 0; i < spawnBatch && metrics.spawned < cfg.enemyCount; i += 1) spawnEnemy(app);
         }
-        const defenseY = app.renderer.height * 0.76;
+        const defenseY = app.renderer.height;
         for (const enemy of [...enemiesRef.current]) {
           enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
@@ -464,12 +466,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <input
                   className="rounds-custom-input"
                   type="number"
-                  min="300"
-                  max="3000"
-                  step="100"
+                  min="180"
+                  max="600"
+                  step="10"
                   value={customStrokeWaitMs}
                   onChange={(event) => {
-                    const value = clamp(Number(event.target.value), 300, 3000);
+                    const value = clamp(Number(event.target.value), 180, 600);
                     setCustomStrokeWaitMs(value);
                     setStrokeWaitMs(value);
                   }}
@@ -517,46 +519,188 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 }
 
 function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null {
-  const points = flattenStrokes(strokes);
-  if (points.length < 6) return null;
+  const usableStrokes = strokes.filter((stroke) => stroke.length >= 2);
+  if (flattenStrokes(usableStrokes).length < 6) return null;
+
+  const candidate = normalizeGesture(usableStrokes);
+  let best: { shape: ShapeId; score: number } | null = null;
+
+  for (const template of GESTURE_TEMPLATES) {
+    for (const variant of template.variants) {
+      const strokePenalty = Math.abs(usableStrokes.length - template.strokeCount) * 0.08;
+      const distanceScore = pathDistance(candidate, variant) / (RECOGNIZER_SIZE * 0.48);
+      const score = Math.max(0, 1 - distanceScore - strokePenalty);
+      if (!best || score > best.score) {
+        best = { shape: template.shape, score };
+      }
+    }
+  }
+
+  const threshold = 0.42 + strictness * 0.0025;
+  return best && best.score >= threshold ? best.shape : null;
+}
+
+interface GestureTemplate {
+  shape: ShapeId;
+  strokeCount: number;
+  variants: Point[][];
+}
+
+const GESTURE_TEMPLATES: GestureTemplate[] = createGestureTemplates();
+
+function createGestureTemplates(): GestureTemplate[] {
+  const rawTemplates: Array<{ shape: ShapeId; strokes: Point[][] }> = [
+    {
+      shape: 'circle',
+      strokes: [sampleEllipse(0, 0, 50, 50, 48)],
+    },
+    {
+      shape: 'square',
+      strokes: [[
+        { x: -48, y: -48 },
+        { x: 48, y: -48 },
+        { x: 48, y: 48 },
+        { x: -48, y: 48 },
+        { x: -48, y: -48 },
+      ]],
+    },
+    {
+      shape: 'triangle',
+      strokes: [[
+        { x: 0, y: -54 },
+        { x: 52, y: 46 },
+        { x: -52, y: 46 },
+        { x: 0, y: -54 },
+      ]],
+    },
+    {
+      shape: 'cross',
+      strokes: [
+        [{ x: -50, y: -50 }, { x: 50, y: 50 }],
+        [{ x: 50, y: -50 }, { x: -50, y: 50 }],
+      ],
+    },
+    {
+      shape: 'cross',
+      strokes: [[
+        { x: -50, y: -50 },
+        { x: 50, y: 50 },
+        { x: 50, y: -50 },
+        { x: -50, y: 50 },
+      ]],
+    },
+    {
+      shape: 'vertical-line',
+      strokes: [[{ x: 0, y: -55 }, { x: 0, y: 55 }]],
+    },
+    {
+      shape: 'horizontal-line',
+      strokes: [[{ x: -55, y: 0 }, { x: 55, y: 0 }]],
+    },
+  ];
+
+  return rawTemplates.map((template) => ({
+    shape: template.shape,
+    strokeCount: template.strokes.length,
+    variants: generateStrokeVariants(template.strokes).map(normalizeGesture),
+  }));
+}
+
+function generateStrokeVariants(strokes: Point[][]): Point[][][] {
+  const orders = permutations(strokes);
+  const variants: Point[][][] = [];
+  orders.forEach((orderedStrokes) => {
+    const directionCount = 2 ** orderedStrokes.length;
+    for (let mask = 0; mask < directionCount; mask += 1) {
+      variants.push(orderedStrokes.map((stroke, index) => {
+        const shouldReverse = (mask & (1 << index)) !== 0;
+        return shouldReverse ? [...stroke].reverse() : stroke;
+      }));
+    }
+  });
+  return variants;
+}
+
+function permutations<T>(items: T[]): T[][] {
+  if (items.length <= 1) return [items];
+  const result: T[][] = [];
+  items.forEach((item, index) => {
+    const rest = [...items.slice(0, index), ...items.slice(index + 1)];
+    permutations(rest).forEach((permutation) => result.push([item, ...permutation]));
+  });
+  return result;
+}
+
+function normalizeGesture(strokes: Point[][]): Point[] {
+  const points = resamplePath(strokes.flatMap((stroke) => stroke), RECOGNIZER_POINTS);
   const box = getBox(points);
   const width = Math.max(1, box.maxX - box.minX);
   const height = Math.max(1, box.maxY - box.minY);
-  const diagonal = Math.max(1, Math.hypot(width, height));
-  const simplified = simplify(points, diagonal * (0.025 + strictness / 2600));
-  const path = strokesPathLength(strokes);
-  const endDistance = distance(points[0], points[points.length - 1]);
-  const straightness = endDistance / Math.max(path, 1);
-  const aspect = width / height;
-  const tolerance = 1 - strictness / 100;
-  const closed = endDistance < diagonal * (0.24 + tolerance * 0.42);
-  const cornerCount = countCorners(simplified);
-  const fillRatio = polygonArea(points) / Math.max(1, width * height);
-  const radialCv = radialCoefficientOfVariation(points, box);
+  const scale = RECOGNIZER_SIZE / Math.max(width, height);
+  const scaled = points.map((point) => ({
+    x: (point.x - box.minX) * scale,
+    y: (point.y - box.minY) * scale,
+  }));
+  const center = centroid(scaled);
+  return scaled.map((point) => ({
+    x: point.x - center.x,
+    y: point.y - center.y,
+  }));
+}
 
-  if (straightness > 0.78 - tolerance * 0.2) {
-    if (height > width * (1.7 - tolerance)) return 'vertical-line';
-    if (width > height * (1.7 - tolerance)) return 'horizontal-line';
+function resamplePath(points: Point[], targetCount: number): Point[] {
+  if (points.length === 0) return [];
+  const interval = pathLength(points) / Math.max(1, targetCount - 1);
+  const result: Point[] = [{ ...points[0] }];
+  let accumulated = 0;
+  let previous = points[0];
+
+  for (let i = 1; i < points.length; i += 1) {
+    let current = points[i];
+    let segmentLength = distance(previous, current);
+    while (segmentLength > 0 && accumulated + segmentLength >= interval) {
+      const ratio = (interval - accumulated) / segmentLength;
+      const inserted = {
+        x: previous.x + ratio * (current.x - previous.x),
+        y: previous.y + ratio * (current.y - previous.y),
+      };
+      result.push(inserted);
+      previous = inserted;
+      segmentLength = distance(previous, current);
+      accumulated = 0;
+    }
+    accumulated += segmentLength;
+    previous = current;
   }
 
-  if (looksLikeCross(strokes, points, box, tolerance)) return 'cross';
+  while (result.length < targetCount) {
+    result.push({ ...points[points.length - 1] });
+  }
+  return result.slice(0, targetCount);
+}
 
-  if (!closed) {
-    return null;
+function pathDistance(a: Point[], b: Point[]): number {
+  const count = Math.min(a.length, b.length);
+  if (count === 0) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < count; i += 1) {
+    sum += distance(a[i], b[i]);
   }
+  return sum / count;
+}
 
-  if (cornerCount <= 4 && fillRatio < 0.66 + tolerance * 0.08 && Math.abs(aspect - 1) < 1.0 + tolerance * 0.5) {
-    return 'triangle';
+function centroid(points: Point[]): Point {
+  const sum = points.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 });
+  return { x: sum.x / Math.max(1, points.length), y: sum.y / Math.max(1, points.length) };
+}
+
+function sampleEllipse(cx: number, cy: number, rx: number, ry: number, count: number): Point[] {
+  const points: Point[] = [];
+  for (let i = 0; i <= count; i += 1) {
+    const angle = (Math.PI * 2 * i) / count;
+    points.push({ x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry });
   }
-  if (cornerCount >= 3 && cornerCount <= 8 && fillRatio > 0.58 - tolerance * 0.08 && fillRatio < 1.08 && Math.abs(aspect - 1) < 0.52 + tolerance * 0.38) {
-    return 'square';
-  }
-  if (fillRatio > 0.46 - tolerance * 0.1 && fillRatio < 0.95 + tolerance * 0.08 && radialCv < 0.28 + tolerance * 0.12 && Math.abs(aspect - 1) < 0.55 + tolerance * 0.35) {
-    return 'circle';
-  }
-  if (cornerCount <= 4 && fillRatio < 0.76 + tolerance * 0.08) return 'triangle';
-  if (cornerCount <= 9 && Math.abs(aspect - 1) < 0.75 + tolerance * 0.35) return 'square';
-  return null;
+  return points;
 }
 
 function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
