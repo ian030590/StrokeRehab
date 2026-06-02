@@ -465,112 +465,164 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
       {phase === 'menu' && (
         <div className="drawing-defense-panel">
-          <div className="module-config-panel config-modal-panel">
-            <h1 className="section-title">畫畫塔防</h1>
-            <p className="section-subtitle">依照最前方敵人畫板上的圖形，在畫面上描繪相同圖形來消滅敵人。</p>
-
-            <div className="config-section">
-              <div className="config-label">難度設定</div>
-              <div className="difficulty-selector">
-                {Object.entries(DIFFICULTIES).map(([key, value]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`diff-btn ${difficulty === key ? 'active' : ''}`}
-                    onClick={() => setDifficulty(key as Difficulty)}
-                  >
-                    <span className="diff-btn-label">{value.label}</span>
-                    <span className="diff-btn-desc">{value.description}</span>
-                  </button>
-                ))}
+          <div className="drawing-defense-config">
+            <header className="drawing-defense-config-header">
+              <div>
+                <span className="drawing-defense-config-label">訓練設定</span>
+                <h1>畫畫塔防</h1>
               </div>
-            </div>
-
-            <div className="config-section">
-              <div className="config-label">速度與辨識</div>
-              <div className="difficulty-selector">
-                {ENEMY_SPEED_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={`diff-btn ${speed === option ? 'active' : ''}`}
-                    onClick={() => setSpeed(option)}
-                  >
-                    <span className="diff-btn-label">{option} px/s</span>
-                    <span className="diff-btn-desc">敵人速度</span>
-                  </button>
-                ))}
-                <label className={`diff-btn ${isCustomSpeed ? 'active' : ''}`} style={{ cursor: 'default', alignItems: 'stretch' }}>
-                  <span className="diff-btn-label">自訂</span>
-                  <span className="diff-btn-desc">{speed} px/s</span>
-                  <input
-                    className="rounds-custom-input drawing-defense-speed-input"
-                    type="number"
-                    min="10"
-                    max="170"
-                    step="5"
-                    value={customSpeed}
-                    onChange={(event) => {
-                      const value = clamp(Number(event.target.value), 10, 170);
-                      setCustomSpeed(value);
-                      setSpeed(value);
-                    }}
-                    onFocus={() => setSpeed(customSpeed)}
-                    aria-label="自訂敵人速度"
-                  />
-                </label>
-                <label className="diff-btn" style={{ cursor: 'default', alignItems: 'stretch' }}>
-                  <span className="diff-btn-label">辨識嚴格度</span>
-                  <span className="diff-btn-desc">{strictness}%</span>
-                  <input type="range" min="10" max="90" step="5" value={strictness} onChange={(event) => setStrictness(Number(event.target.value))} />
-                </label>
+              <div className="drawing-defense-config-stats">
+                <span><strong>{activeConfig.enemyCount}</strong> 敵人</span>
+                <span><strong>3</strong> HP</span>
+                <span><strong>{speed}</strong> px/s</span>
               </div>
-            </div>
+            </header>
 
-            <div className="config-section">
-              <div className="config-label">收筆等待</div>
-              <div className="rounds-selector">
-                {STROKE_WAIT_OPTIONS.map((wait) => (
-                  <button
-                    key={wait}
-                    type="button"
-                    className={`rounds-btn ${strokeWaitMs === wait ? 'active' : ''}`}
-                    onClick={() => setStrokeWaitMs(wait)}
+            <div className="drawing-defense-config-body">
+              <section className="drawing-defense-setting">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>難度</h2>
+                    <p>{activeConfig.description}</p>
+                  </div>
+                  <span>{activeConfig.label}</span>
+                </div>
+                <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
+                  {Object.entries(DIFFICULTIES).map(([key, value]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
+                      onClick={() => setDifficulty(key as Difficulty)}
+                    >
+                      <span className="drawing-defense-option-title">{value.label}</span>
+                      <span className="drawing-defense-option-meta">{value.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="drawing-defense-setting">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>敵人速度</h2>
+                    <p>{speed} px/s</p>
+                  </div>
+                  <span>{isCustomSpeed ? '自訂' : '預設'}</span>
+                </div>
+                <div className="drawing-defense-option-grid drawing-defense-speed-grid">
+                  {ENEMY_SPEED_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`drawing-defense-option ${speed === option ? 'active' : ''}`}
+                      onClick={() => setSpeed(option)}
+                    >
+                      <span className="drawing-defense-option-title">{option}</span>
+                      <span className="drawing-defense-option-meta">px/s</span>
+                    </button>
+                  ))}
+                  <label
+                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomSpeed ? 'active' : ''}`}
+                    onClick={() => setSpeed(customSpeed)}
                   >
-                    {wait / 1000}s
-                  </button>
-                ))}
+                    <span className="drawing-defense-option-title">自訂</span>
+                    <input
+                      className="drawing-defense-number-input"
+                      type="number"
+                      min="10"
+                      max="170"
+                      step="5"
+                      value={customSpeed}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 10, 170);
+                        setCustomSpeed(value);
+                        setSpeed(value);
+                      }}
+                      onFocus={() => setSpeed(customSpeed)}
+                      aria-label="自訂敵人速度"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="drawing-defense-setting">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>辨識嚴格度</h2>
+                    <p>{strictness}%</p>
+                  </div>
+                </div>
                 <input
-                  className="rounds-custom-input"
-                  type="number"
-                  min="180"
-                  max="600"
-                  step="10"
-                  value={customStrokeWaitMs}
-                  onChange={(event) => {
-                    const value = clamp(Number(event.target.value), 180, 600);
-                    setCustomStrokeWaitMs(value);
-                    setStrokeWaitMs(value);
-                  }}
-                  aria-label="自訂收筆等待毫秒"
+                  className="drawing-defense-slider"
+                  type="range"
+                  min="10"
+                  max="90"
+                  step="5"
+                  value={strictness}
+                  onChange={(event) => setStrictness(Number(event.target.value))}
                 />
-                <span>ms</span>
+              </section>
+
+              <section className="drawing-defense-setting">
+                <div className="drawing-defense-setting-header">
+                  <div>
+                    <h2>收筆等待</h2>
+                    <p>{strokeWaitMs} ms</p>
+                  </div>
+                </div>
+                <div className="drawing-defense-option-grid drawing-defense-wait-grid">
+                  {STROKE_WAIT_OPTIONS.map((wait) => (
+                    <button
+                      key={wait}
+                      type="button"
+                      className={`drawing-defense-option ${strokeWaitMs === wait ? 'active' : ''}`}
+                      onClick={() => setStrokeWaitMs(wait)}
+                    >
+                      <span className="drawing-defense-option-title">{wait / 1000}s</span>
+                    </button>
+                  ))}
+                  <label
+                    className={`drawing-defense-option drawing-defense-option-custom ${!STROKE_WAIT_OPTIONS.includes(strokeWaitMs as typeof STROKE_WAIT_OPTIONS[number]) ? 'active' : ''}`}
+                    onClick={() => setStrokeWaitMs(customStrokeWaitMs)}
+                  >
+                    <span className="drawing-defense-option-title">自訂</span>
+                    <input
+                      className="drawing-defense-number-input"
+                      type="number"
+                      min="180"
+                      max="600"
+                      step="10"
+                      value={customStrokeWaitMs}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 180, 600);
+                        setCustomStrokeWaitMs(value);
+                        setStrokeWaitMs(value);
+                      }}
+                      onFocus={() => setStrokeWaitMs(customStrokeWaitMs)}
+                      aria-label="自訂收筆等待毫秒"
+                    />
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            <div className="drawing-defense-config-footer">
+              <div className="drawing-defense-config-summary">
+                <strong>{activeConfig.label}</strong>
+                <span>{speed} px/s</span>
+                <span>{strictness}%</span>
+                <span>{strokeWaitMs} ms</span>
               </div>
-            </div>
-
-            <div className="config-actions">
-              <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5,3 19,12 5,21" />
-                </svg>
-                開始訓練
-                <span className="ready-dot" />
-              </button>
-              <button className="btn btn-ghost btn-lg" onClick={onExit}>取消</button>
-            </div>
-
-            <div className="config-summary">
-              難度 <strong>{activeConfig.label}</strong> · 敵人 <strong>{activeConfig.enemyCount}</strong> · 速度 <strong>{speed} px/s</strong>
+              <div className="drawing-defense-config-actions">
+                <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                  開始訓練
+                </button>
+                <button className="btn btn-ghost btn-lg" onClick={onExit}>取消</button>
+              </div>
             </div>
           </div>
         </div>

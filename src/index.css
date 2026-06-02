@@ -1849,6 +1849,252 @@ body #webgazer-calibrate-container #calibration-point {
   line-height: 1.7;
 }
 
+.drawing-defense-config {
+  width: min(940px, calc(100vw - 48px));
+  max-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(194, 198, 212, 0.92);
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 48px rgba(26, 28, 30, 0.18);
+  text-align: left;
+}
+
+.drawing-defense-config-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 28px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawing-defense-config-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.drawing-defense-config h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.drawing-defense-config-stats,
+.drawing-defense-config-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drawing-defense-config-stats span,
+.drawing-defense-config-summary span,
+.drawing-defense-config-summary strong {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.drawing-defense-config-stats strong,
+.drawing-defense-config-summary strong {
+  color: var(--accent-dark);
+}
+
+.drawing-defense-config-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 28px;
+  padding: 6px 28px 2px;
+  overflow-y: auto;
+}
+
+.drawing-defense-setting {
+  min-width: 0;
+  padding: 22px 0;
+  border-bottom: 1px solid rgba(194, 198, 212, 0.72);
+}
+
+.drawing-defense-setting-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.drawing-defense-setting-header h2 {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.drawing-defense-setting-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.drawing-defense-setting-header > span {
+  flex: 0 0 auto;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-m);
+  background: rgba(0, 94, 184, 0.08);
+  color: var(--accent-dark);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.drawing-defense-option-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.drawing-defense-option-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.drawing-defense-speed-grid,
+.drawing-defense-wait-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.drawing-defense-option {
+  min-width: 0;
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: var(--font-family);
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.drawing-defense-option:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+}
+
+.drawing-defense-option.active {
+  border-color: var(--accent);
+  background: rgba(0, 94, 184, 0.07);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.drawing-defense-option-title {
+  width: 100%;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.drawing-defense-option-meta {
+  width: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.drawing-defense-option.active .drawing-defense-option-title {
+  color: var(--accent-dark);
+}
+
+.drawing-defense-option-custom {
+  cursor: pointer;
+}
+
+.drawing-defense-number-input {
+  width: 100%;
+  height: 30px;
+  margin-top: 3px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: #FFFFFF;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+}
+
+.drawing-defense-number-input:focus {
+  border-color: var(--accent);
+}
+
+.drawing-defense-number-input::-webkit-outer-spin-button,
+.drawing-defense-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.drawing-defense-slider {
+  width: 100%;
+  height: 34px;
+  accent-color: var(--accent);
+}
+
+.drawing-defense-config-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 28px;
+  border-top: 1px solid var(--border);
+  background: rgba(249, 249, 252, 0.96);
+}
+
+.drawing-defense-config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.drawing-defense-config-actions .btn {
+  border-radius: var(--radius-m);
+}
+
 .drawing-defense-panel-compact {
   gap: 14px;
 }
@@ -1939,6 +2185,45 @@ body #webgazer-calibrate-container #calibration-point {
 
   .drawing-defense-panel h1 {
     font-size: 30px;
+  }
+
+  .drawing-defense-config {
+    width: min(100%, calc(100vw - 24px));
+    max-height: min(90vh, 760px);
+  }
+
+  .drawing-defense-config-header,
+  .drawing-defense-config-footer {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+  }
+
+  .drawing-defense-config h1 {
+    font-size: 28px;
+  }
+
+  .drawing-defense-config-body {
+    grid-template-columns: 1fr;
+    padding: 2px 18px 0;
+  }
+
+  .drawing-defense-option-grid-three,
+  .drawing-defense-speed-grid,
+  .drawing-defense-wait-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drawing-defense-setting {
+    padding: 18px 0;
+  }
+
+  .drawing-defense-config-actions {
+    width: 100%;
+  }
+
+  .drawing-defense-config-actions .btn {
+    flex: 1 1 140px;
   }
 
   .drawing-defense-actions {
