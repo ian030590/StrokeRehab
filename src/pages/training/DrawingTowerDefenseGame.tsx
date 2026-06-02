@@ -903,6 +903,7 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   if (looksLikeCircle(rawPoints, strictness)) return 'circle';
   const box = getBox(rawPoints);
   const tolerance = shapeTolerance(strictness);
+  if (looksLikeIntersectingCross(usableStrokes, box, tolerance)) return 'cross';
   if (looksLikeTriangle(usableStrokes, rawPoints, box, tolerance)) return 'triangle';
   if (looksLikeCross(usableStrokes, rawPoints, box, tolerance)) return 'cross';
   if (looksLikeSquare(rawPoints, box, tolerance)) return 'square';
@@ -1260,6 +1261,42 @@ function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typ
   return quadrants.size >= 4 && positive > 1 && negative > 1 && Math.min(positive, negative) / Math.max(positive, negative) > 0.12 - tolerance * 0.08;
 }
 
+function looksLikeIntersectingCross(strokes: Point[][], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const maxSize = Math.max(width, height);
+  const center = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
+  const strokeLines = strokes
+    .map(getStrokeLineFeatures)
+    .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.58 - tolerance * 0.16);
+  const segmentLines = getSimplifiedStrokeSegments(strokes, Math.max(4, maxSize * 0.04), Math.max(12, maxSize * 0.22));
+  const diagonalLines = [...strokeLines, ...segmentLines]
+    .filter((line) => isDiagonal(line.angle, tolerance) && distance(line.first, line.last) >= maxSize * (0.36 - tolerance * 0.06));
+  const centerLimit = maxSize * (0.26 + tolerance * 0.08);
+  const minInternalRatio = 0.04 - tolerance * 0.015;
+
+  for (let i = 0; i < diagonalLines.length - 1; i += 1) {
+    for (let j = i + 1; j < diagonalLines.length; j += 1) {
+      const first = diagonalLines[i];
+      const second = diagonalLines[j];
+      const diff = angleDifference(first.angle, second.angle);
+      if (diff < 48 - tolerance * 12 || diff > 132 + tolerance * 12) continue;
+
+      const intersection = lineIntersection(first.first, first.last, second.first, second.last);
+      if (!intersection) continue;
+      if (distance(intersection, center) > centerLimit) continue;
+      if (!pointInsideSegment(intersection, first.first, first.last, maxSize * 0.04)) continue;
+      if (!pointInsideSegment(intersection, second.first, second.last, maxSize * 0.04)) continue;
+      if (!pointIsInternalToSegment(intersection, first.first, first.last, minInternalRatio)) continue;
+      if (!pointIsInternalToSegment(intersection, second.first, second.last, minInternalRatio)) continue;
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
 interface StrokeLineFeatures {
   angle: number;
   first: Point;
@@ -1395,7 +1432,7 @@ function edgeCoverage(points: Point[], start: Point, end: Point, margin: number)
     occupied.add(clamp(Math.floor(projection * bins), 0, bins - 1));
   });
 
-  if (![...occupied].some((bin) => bin > 0 && bin < bins - 1)) return 0;
+  if ([...occupied].filter((bin) => bin > 0 && bin < bins - 1).length < 2) return 0;
   return occupied.size / bins;
 }
 
@@ -1423,6 +1460,42 @@ function hasUprightTriangleAnchors(points: Point[], box: ReturnType<typeof getBo
   const lowerRight = points.some((point) => point.x >= box.maxX - sideLimit && point.y >= lowerBand);
 
   return topApex && lowerLeft && lowerRight;
+}
+
+function lineIntersection(aStart: Point, aEnd: Point, bStart: Point, bEnd: Point): Point | null {
+  const denominator =
+    (aStart.x - aEnd.x) * (bStart.y - bEnd.y) -
+    (aStart.y - aEnd.y) * (bStart.x - bEnd.x);
+  if (Math.abs(denominator) < 0.01) return null;
+
+  const aCross = aStart.x * aEnd.y - aStart.y * aEnd.x;
+  const bCross = bStart.x * bEnd.y - bStart.y * bEnd.x;
+  return {
+    x: (aCross * (bStart.x - bEnd.x) - (aStart.x - aEnd.x) * bCross) / denominator,
+    y: (aCross * (bStart.y - bEnd.y) - (aStart.y - aEnd.y) * bCross) / denominator,
+  };
+}
+
+function pointInsideSegment(point: Point, start: Point, end: Point, margin: number): boolean {
+  return (
+    point.x >= Math.min(start.x, end.x) - margin &&
+    point.x <= Math.max(start.x, end.x) + margin &&
+    point.y >= Math.min(start.y, end.y) - margin &&
+    point.y <= Math.max(start.y, end.y) + margin
+  );
+}
+
+function pointIsInternalToSegment(point: Point, start: Point, end: Point, minRatio: number): boolean {
+  const ratio = segmentProjectionRatio(point, start, end);
+  return ratio >= minRatio && ratio <= 1 - minRatio;
+}
+
+function segmentProjectionRatio(point: Point, start: Point, end: Point): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared < 1) return 0;
+  return ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
 }
 
 function normalizeAngle(angle: number): number {
