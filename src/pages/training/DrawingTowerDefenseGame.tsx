@@ -38,6 +38,7 @@ interface SessionRecord {
   Difficulty: Difficulty;
   Enemy_Speed: number;
   Recognition_Strictness: number;
+  Stroke_Wait_Milliseconds: number;
   Total_Duration_Seconds: number;
   Enemies_Defeated: number;
   HP_Remaining: number;
@@ -45,6 +46,7 @@ interface SessionRecord {
 }
 
 const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 'vertical-line', 'horizontal-line'];
+const STROKE_WAIT_OPTIONS = [700, 1100, 1600] as const;
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   Beginner: { label: '初級', enemyCount: 12, spawnIntervalSec: 2.4, maxConcurrentSpawns: 1 },
@@ -68,20 +70,24 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const enemiesRef = useRef<Enemy[]>([]);
   const drawingLayerRef = useRef<Graphics | null>(null);
   const pathRef = useRef<Point[]>([]);
+  const strokesRef = useRef<Point[][]>([]);
+  const recognitionTimerRef = useRef<number | null>(null);
   const isDrawingRef = useRef(false);
   const metricsRef = useRef({ defeated: 0, hp: 3, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
   const phaseRef = useRef<GamePhase>('menu');
-  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: 80, strictness: 45 });
+  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: 80, strictness: 45, strokeWaitMs: 1100 });
   const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
 
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
   const [speed, setSpeed] = useState(80);
   const [strictness, setStrictness] = useState(45);
+  const [strokeWaitMs, setStrokeWaitMs] = useState(1100);
+  const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(1100);
   const [hp, setHp] = useState(3);
   const [defeated, setDefeated] = useState(0);
   const [spawned, setSpawned] = useState(0);
-  const [recognized, setRecognized] = useState<string>('尚未作答');
+  const [recognized, setRecognized] = useState<string>('撠雿?');
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
@@ -92,14 +98,20 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, []);
 
   useEffect(() => {
-    configRef.current = { difficulty, speed, strictness };
-  }, [difficulty, speed, strictness]);
+    configRef.current = { difficulty, speed, strictness, strokeWaitMs };
+  }, [difficulty, speed, strictness, strokeWaitMs]);
 
   useEffect(() => {
     jsPsychRef.current = initJsPsych();
   }, []);
 
   const clearPixiState = useCallback(() => {
+    if (recognitionTimerRef.current !== null) {
+      window.clearTimeout(recognitionTimerRef.current);
+      recognitionTimerRef.current = null;
+    }
+    pathRef.current = [];
+    strokesRef.current = [];
     enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
     enemiesRef.current = [];
     drawingLayerRef.current?.clear();
@@ -112,6 +124,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       Difficulty: configRef.current.difficulty,
       Enemy_Speed: configRef.current.speed,
       Recognition_Strictness: configRef.current.strictness,
+      Stroke_Wait_Milliseconds: configRef.current.strokeWaitMs,
       Total_Duration_Seconds: Number(metrics.elapsed.toFixed(1)),
       Enemies_Defeated: metrics.defeated,
       HP_Remaining: metrics.hp,
@@ -128,20 +141,22 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     const w = app.renderer.width;
     const h = app.renderer.height;
     const bg = new Graphics();
-    bg.rect(0, 0, w, h).fill(0xf6f7f8);
-    bg.rect(0, 0, w, h * 0.23).fill(0xe7edf4);
-    bg.rect(0, h * 0.23, w, h * 0.55).fill(0xffffff);
-    bg.rect(0, h * 0.78, w, h * 0.22).fill(0xf3f5f1);
-    bg.rect(0, h * 0.76, w, 6).fill(0xba1a1a);
+    bg.rect(0, 0, w, h).fill(0x080d1f);
+    bg.rect(0, h * 0.76, w, 5).fill(0xffd166);
+    for (let i = 0; i < 150; i += 1) {
+      const x = ((i * 97) % Math.max(1, w)) + (((i * 37) % 11) / 10);
+      const y = ((i * 53) % Math.max(1, h)) + (((i * 19) % 7) / 10);
+      const radius = i % 9 === 0 ? 1.8 : i % 5 === 0 ? 1.3 : 0.8;
+      const alpha = i % 7 === 0 ? 0.95 : 0.55;
+      bg.circle(x, y, radius).fill({ color: 0xffffff, alpha });
+    }
     app.stage.addChild(bg);
 
     const labels = [
-      { text: '敵人生成區', y: 18 },
-      { text: '移動路徑', y: h * 0.39 },
-      { text: '防線區', y: h * 0.82 },
+      { text: '蝘餃?頝臬?', y: h * 0.39 },
     ];
     labels.forEach((label) => {
-      const text = new Text({ text: label.text, style: { fill: 0x424752, fontSize: 15, fontWeight: '700' } });
+      const text = new Text({ text: label.text, style: { fill: 0xdbeafe, fontSize: 15, fontWeight: '700' } });
       text.x = 20;
       text.y = label.y;
       app.stage.addChild(text);
@@ -180,13 +195,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
       node: new Container(),
     };
-    const body = new Graphics();
-    body.circle(0, 0, 24).fill(0x005eb8);
-    body.rect(-18, 18, 36, 42).fill(0x8ba88e);
+    const monster = new Text({ text: '?', style: { fontSize: 42 } });
+    monster.anchor.set(0.5);
+    monster.x = 0;
+    monster.y = -6;
     const board = new Graphics();
-    board.roundRect(-34, -6, 68, 50, 6).fill(0xffffff).stroke({ color: 0xc2c6d4, width: 2 });
-    drawShape(enemy.shape, board, 0, 19, 54);
-    enemy.node.addChild(body, board);
+    board.roundRect(-34, 18, 68, 50, 6).fill(0xffffff).stroke({ color: 0xc2c6d4, width: 2 });
+    drawShape(enemy.shape, board, 0, 43, 54);
+    enemy.node.addChild(monster, board);
     enemy.node.x = enemy.x;
     enemy.node.y = enemy.y;
     app.stage.addChild(enemy.node);
@@ -199,11 +215,17 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     const layer = drawingLayerRef.current;
     if (!layer) return;
     layer.clear();
-    const points = pathRef.current;
-    if (points.length < 2) return;
-    layer.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i += 1) {
-      layer.lineTo(points[i].x, points[i].y);
+    const drawStroke = (points: Point[]) => {
+      if (points.length < 2) return;
+      layer.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i += 1) {
+        layer.lineTo(points[i].x, points[i].y);
+      }
+    };
+    strokesRef.current.forEach(drawStroke);
+    drawStroke(pathRef.current);
+    if (strokesRef.current.length === 0 && pathRef.current.length < 2) {
+      return;
     }
     layer.stroke({ color: 0x005eb8, width: 7, alpha: 0.9, cap: 'round', join: 'round' });
   }, []);
@@ -211,19 +233,29 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const handlePointerEnd = useCallback(() => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
-    const recognition = recognizeShape(pathRef.current, configRef.current.strictness);
-    setRecognized(recognition ? SHAPE_LABEL[recognition] : '未辨識');
-    const target = enemiesRef.current[0];
-    if (recognition && target && recognition === target.shape) {
-      target.node.destroy({ children: true });
-      enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== target.id);
-      metricsRef.current.defeated += 1;
-      setDefeated(metricsRef.current.defeated);
+    if (pathRef.current.length > 1) {
+      strokesRef.current.push(pathRef.current);
     }
-    window.setTimeout(() => {
-      drawingLayerRef.current?.clear();
-      pathRef.current = [];
-    }, 180);
+    pathRef.current = [];
+    if (recognitionTimerRef.current !== null) {
+      window.clearTimeout(recognitionTimerRef.current);
+    }
+    recognitionTimerRef.current = window.setTimeout(() => {
+      recognitionTimerRef.current = null;
+      const recognition = recognizeShape(strokesRef.current, configRef.current.strictness);
+      setRecognized(recognition ? SHAPE_LABEL[recognition] : '未辨識');
+      const target = enemiesRef.current[0];
+      if (recognition && target && recognition === target.shape) {
+        target.node.destroy({ children: true });
+        enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== target.id);
+        metricsRef.current.defeated += 1;
+        setDefeated(metricsRef.current.defeated);
+      }
+      window.setTimeout(() => {
+        strokesRef.current = [];
+        drawingLayerRef.current?.clear();
+      }, 650);
+    }, configRef.current.strokeWaitMs);
   }, []);
 
   const startGame = useCallback(() => {
@@ -237,7 +269,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setDefeated(0);
     setSpawned(0);
     setResult(null);
-    setRecognized('尚未作答');
+    setRecognized('撠雿?');
     setPhase('playing');
   }, [clearPixiState, drawLayout, setPhase]);
 
@@ -349,6 +381,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     const onPointerDown = (event: PointerEvent) => {
       if (phaseRef.current !== 'playing') return;
       event.preventDefault();
+      if (recognitionTimerRef.current !== null) {
+        window.clearTimeout(recognitionTimerRef.current);
+        recognitionTimerRef.current = null;
+      }
       overlay.setPointerCapture(event.pointerId);
       isDrawingRef.current = true;
       pathRef.current = [toPoint(event)];
@@ -385,7 +421,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       <div ref={overlayRef} className="drawing-defense-input" />
       <div className="drawing-defense-hud">
         <div><strong>HP</strong> {hp}/3</div>
-        <div><strong>消滅</strong> {defeated}</div>
+        <div><strong>瘨?</strong> {defeated}</div>
         <div><strong>敵人</strong> {progressText}</div>
         <div><strong>辨識</strong> {recognized}</div>
         {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>}
@@ -412,6 +448,36 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               辨識嚴格度 {strictness}%
               <input type="range" min="10" max="90" step="5" value={strictness} onChange={(event) => setStrictness(Number(event.target.value))} />
             </label>
+            <div className="drawing-defense-wait-options">
+              <span>收筆等待</span>
+              <div>
+                {STROKE_WAIT_OPTIONS.map((wait) => (
+                  <button
+                    key={wait}
+                    type="button"
+                    className={`rounds-btn ${strokeWaitMs === wait ? 'active' : ''}`}
+                    onClick={() => setStrokeWaitMs(wait)}
+                  >
+                    {wait / 1000}s
+                  </button>
+                ))}
+                <input
+                  className="rounds-custom-input"
+                  type="number"
+                  min="300"
+                  max="3000"
+                  step="100"
+                  value={customStrokeWaitMs}
+                  onChange={(event) => {
+                    const value = clamp(Number(event.target.value), 300, 3000);
+                    setCustomStrokeWaitMs(value);
+                    setStrokeWaitMs(value);
+                  }}
+                  aria-label="自訂收筆等待毫秒"
+                />
+                <span>ms</span>
+              </div>
+            </div>
           </div>
           <div className="drawing-defense-actions">
             <button className="btn btn-primary btn-lg" onClick={startGame}>開始遊戲</button>
@@ -437,6 +503,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             <span>消滅敵人：{result.Enemies_Defeated}</span>
             <span>剩餘 HP：{result.HP_Remaining}/3</span>
             <span>嚴格度：{result.Recognition_Strictness}%</span>
+            <span>收筆等待：{result.Stroke_Wait_Milliseconds} ms</span>
           </div>
           <div className="drawing-defense-actions">
             <button className="btn btn-primary btn-lg" onClick={downloadResult}>下載成績 CSV</button>
@@ -449,40 +516,65 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   );
 }
 
-function recognizeShape(points: Point[], strictness: number): ShapeId | null {
-  const simplified = simplify(points, 10 - strictness / 18);
+function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null {
+  const points = flattenStrokes(strokes);
   if (points.length < 6) return null;
   const box = getBox(points);
   const width = Math.max(1, box.maxX - box.minX);
   const height = Math.max(1, box.maxY - box.minY);
-  const path = pathLength(points);
+  const diagonal = Math.max(1, Math.hypot(width, height));
+  const simplified = simplify(points, diagonal * (0.025 + strictness / 2600));
+  const path = strokesPathLength(strokes);
   const endDistance = distance(points[0], points[points.length - 1]);
-  const diagonal = Math.hypot(width, height);
   const straightness = endDistance / Math.max(path, 1);
   const aspect = width / height;
   const tolerance = 1 - strictness / 100;
-  const closed = endDistance < diagonal * (0.18 + tolerance * 0.34);
+  const closed = endDistance < diagonal * (0.24 + tolerance * 0.42);
   const cornerCount = countCorners(simplified);
+  const fillRatio = polygonArea(points) / Math.max(1, width * height);
+  const radialCv = radialCoefficientOfVariation(points, box);
 
   if (straightness > 0.78 - tolerance * 0.2) {
     if (height > width * (1.7 - tolerance)) return 'vertical-line';
     if (width > height * (1.7 - tolerance)) return 'horizontal-line';
   }
 
-  if (looksLikeCross(points, box, tolerance)) return 'cross';
+  if (looksLikeCross(strokes, points, box, tolerance)) return 'cross';
 
-  if (closed && Math.abs(aspect - 1) < 0.38 + tolerance * 0.34) {
-    if (cornerCount <= 2 + Math.round(tolerance * 2) && Math.abs(path / Math.max(width, height) - Math.PI * 2) < 2.2 + tolerance) return 'circle';
-    if (cornerCount <= 4) return 'triangle';
-    if (cornerCount <= 7) return 'square';
+  if (!closed) {
+    return null;
   }
 
-  if (closed && cornerCount <= 4 && Math.abs(aspect - 1) < 0.75 + tolerance * 0.35) return 'triangle';
-  if (closed && cornerCount <= 8 && Math.abs(aspect - 1) < 0.55 + tolerance * 0.4) return 'square';
+  if (cornerCount <= 4 && fillRatio < 0.66 + tolerance * 0.08 && Math.abs(aspect - 1) < 1.0 + tolerance * 0.5) {
+    return 'triangle';
+  }
+  if (cornerCount >= 3 && cornerCount <= 8 && fillRatio > 0.58 - tolerance * 0.08 && fillRatio < 1.08 && Math.abs(aspect - 1) < 0.52 + tolerance * 0.38) {
+    return 'square';
+  }
+  if (fillRatio > 0.46 - tolerance * 0.1 && fillRatio < 0.95 + tolerance * 0.08 && radialCv < 0.28 + tolerance * 0.12 && Math.abs(aspect - 1) < 0.55 + tolerance * 0.35) {
+    return 'circle';
+  }
+  if (cornerCount <= 4 && fillRatio < 0.76 + tolerance * 0.08) return 'triangle';
+  if (cornerCount <= 9 && Math.abs(aspect - 1) < 0.75 + tolerance * 0.35) return 'square';
   return null;
 }
 
-function looksLikeCross(points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  const lineStrokes = strokes
+    .map(getStrokeLineFeatures)
+    .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.68 - tolerance * 0.18);
+  if (lineStrokes.length >= 2) {
+    for (let i = 0; i < lineStrokes.length; i += 1) {
+      for (let j = i + 1; j < lineStrokes.length; j += 1) {
+        const diff = angleDifference(lineStrokes[i].angle, lineStrokes[j].angle);
+        const bothDiagonal = isDiagonal(lineStrokes[i].angle, tolerance) && isDiagonal(lineStrokes[j].angle, tolerance);
+        if (bothDiagonal && diff > 55 - tolerance * 18 && diff < 125 + tolerance * 18) {
+          return true;
+        }
+      }
+    }
+  }
+
   const cx = (box.minX + box.maxX) / 2;
   const cy = (box.minY + box.maxY) / 2;
   const quadrants = new Set<string>();
@@ -497,6 +589,46 @@ function looksLikeCross(points: Point[], box: ReturnType<typeof getBox>, toleran
   }
   points.forEach((point) => quadrants.add(`${point.x > cx ? 'r' : 'l'}${point.y > cy ? 'b' : 't'}`));
   return quadrants.size >= 4 && positive > 2 && negative > 2 && Math.min(positive, negative) / Math.max(positive, negative) > 0.18 - tolerance * 0.1;
+}
+
+interface StrokeLineFeatures {
+  angle: number;
+  straightness: number;
+}
+
+function flattenStrokes(strokes: Point[][]): Point[] {
+  return strokes.flatMap((stroke) => stroke);
+}
+
+function strokesPathLength(strokes: Point[][]): number {
+  return strokes.reduce((sum, stroke) => sum + pathLength(stroke), 0);
+}
+
+function getStrokeLineFeatures(stroke: Point[]): StrokeLineFeatures | null {
+  if (stroke.length < 2) return null;
+  const first = stroke[0];
+  const last = stroke[stroke.length - 1];
+  const length = pathLength(stroke);
+  if (length < 12) return null;
+  const angle = normalizeAngle(Math.atan2(last.y - first.y, last.x - first.x) * 180 / Math.PI);
+  return {
+    angle,
+    straightness: distance(first, last) / Math.max(1, length),
+  };
+}
+
+function normalizeAngle(angle: number): number {
+  const normalized = ((angle % 180) + 180) % 180;
+  return normalized;
+}
+
+function angleDifference(a: number, b: number): number {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 180 - diff);
+}
+
+function isDiagonal(angle: number, tolerance: number): boolean {
+  return Math.abs(angle - 45) < 28 + tolerance * 14 || Math.abs(angle - 135) < 28 + tolerance * 14;
 }
 
 function simplify(points: Point[], epsilon: number): Point[] {
@@ -564,12 +696,32 @@ function getBox(points: Point[]) {
   );
 }
 
+function polygonArea(points: Point[]): number {
+  if (points.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const next = points[(i + 1) % points.length];
+    area += points[i].x * next.y - next.x * points[i].y;
+  }
+  return Math.abs(area) / 2;
+}
+
+function radialCoefficientOfVariation(points: Point[], box: ReturnType<typeof getBox>): number {
+  const cx = (box.minX + box.maxX) / 2;
+  const cy = (box.minY + box.maxY) / 2;
+  const distances = points.map((point) => Math.hypot(point.x - cx, point.y - cy));
+  const mean = distances.reduce((sum, value) => sum + value, 0) / Math.max(1, distances.length);
+  const variance = distances.reduce((sum, value) => sum + (value - mean) ** 2, 0) / Math.max(1, distances.length);
+  return Math.sqrt(variance) / Math.max(1, mean);
+}
+
 function toCsv(records: SessionRecord[]): string {
   const headers: (keyof SessionRecord)[] = [
     'Participant_ID',
     'Difficulty',
     'Enemy_Speed',
     'Recognition_Strictness',
+    'Stroke_Wait_Milliseconds',
     'Total_Duration_Seconds',
     'Enemies_Defeated',
     'HP_Remaining',
@@ -582,4 +734,9 @@ function toCsv(records: SessionRecord[]): string {
 function csvCell(value: unknown): string {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
 }

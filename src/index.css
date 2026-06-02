@@ -1865,6 +1865,30 @@ body #webgazer-calibrate-container #calibration-point {
   accent-color: var(--accent);
 }
 
+.drawing-defense-wait-options {
+  display: grid;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.drawing-defense-wait-options > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drawing-defense-wait-options .rounds-btn {
+  width: 64px;
+}
+
+.drawing-defense-wait-options .rounds-custom-input {
+  width: 96px;
+}
+
 .drawing-defense-actions {
   display: flex;
   justify-content: center;
