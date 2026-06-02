@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useT } from "../../i18n";
 
 const VIEWBOX_SIZE = 600;
 
@@ -24,6 +25,18 @@ const DENSITIES = {
   standard: { label: "標準", spacing: 28 },
   dense: { label: "高密度", spacing: 20 },
 } as const;
+
+const OUTLINE_LABELS_EN: Record<keyof typeof OUTLINES, string> = {
+  star: "Star",
+  cat: "Cat",
+  leaf: "Leaf",
+};
+
+const DENSITY_LABELS_EN: Record<keyof typeof DENSITIES, string> = {
+  wide: "Low density",
+  standard: "Standard",
+  dense: "High density",
+};
 
 type OutlineId = keyof typeof OUTLINES;
 type DensityId = keyof typeof DENSITIES;
@@ -51,6 +64,7 @@ function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
 export default function ConnectDotsGame() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang } = useT();
   const initialOutline = normalizeOutline(searchParams.get("shape"));
   const density = normalizeDensity(searchParams.get("density"));
   const [outlineId, setOutlineId] = useState<OutlineId>(initialOutline);
@@ -60,6 +74,11 @@ export default function ConnectDotsGame() {
 
   const outline = OUTLINES[outlineId];
   const densityPreset = DENSITIES[density];
+  const text = lang === "en"
+    ? { title: "Connect the Dots", redraw: "Redraw", next: "Next", back: "Back", complete: "Complete" }
+    : { title: "連點遊戲", redraw: "重畫", next: "下一題", back: "返回", complete: "完成" };
+  const outlineLabel = lang === "en" ? OUTLINE_LABELS_EN[outlineId] : outline.label;
+  const densityLabel = lang === "en" ? DENSITY_LABELS_EN[density] : densityPreset.label;
   const boardRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
@@ -200,13 +219,13 @@ export default function ConnectDotsGame() {
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f8fafc", color: "#0f172a", overflow: "auto" }}>
       <header style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", borderBottom: "1px solid #dbe3ef", background: "#ffffff" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24 }}>連點遊戲</h1>
-          <p style={{ margin: "4px 0 0", color: "#64748b" }}>{outline.label} / {densityPreset.label} / {progressText}</p>
+          <h1 style={{ margin: 0, fontSize: 24 }}>{text.title}</h1>
+          <p style={{ margin: "4px 0 0", color: "#64748b" }}>{outlineLabel} / {densityLabel} / {progressText}</p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" onClick={clearDrawing} style={toolbarButtonStyle}>重畫</button>
-          <button type="button" onClick={goNextOutline} style={toolbarButtonStyle}>下一題</button>
-          <button type="button" onClick={() => navigate("/cognitive")} style={toolbarButtonStyle}>返回</button>
+          <button type="button" onClick={clearDrawing} style={toolbarButtonStyle}>{text.redraw}</button>
+          <button type="button" onClick={goNextOutline} style={toolbarButtonStyle}>{text.next}</button>
+          <button type="button" onClick={() => navigate("/cognitive")} style={toolbarButtonStyle}>{text.back}</button>
         </div>
       </header>
 
@@ -255,7 +274,7 @@ export default function ConnectDotsGame() {
           />
           {isComplete && (
             <div style={{ position: "absolute", right: 18, bottom: 18, padding: "10px 14px", borderRadius: 6, background: "#16a34a", color: "#ffffff", fontWeight: 700 }}>
-              完成
+              {text.complete}
             </div>
           )}
         </section>

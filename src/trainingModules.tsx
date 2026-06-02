@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { HEALTH_EXERCISE_VIDEOS } from "./healthExerciseVideos";
 
 export type TrainingCategory = "motor" | "cognitive" | "language";
+export type ModuleLanguage = "zh" | "en";
 
 export type TrainingModuleId =
   | "writing-defense"
@@ -38,6 +39,103 @@ export interface TrainingModuleCardData {
   tags: readonly string[];
   settings: readonly ModuleSettingGroup[];
 }
+
+const PLAYABLE_MODULE_IDS = new Set<TrainingModuleId>([
+  "writing-defense",
+  "healthy-movement",
+  "connect-dots",
+  "chinese-crossword",
+]);
+
+const DEVICE_TAGS: Record<ModuleLanguage, readonly string[]> = {
+  zh: ["電腦", "平板"],
+  en: ["Computer", "Tablet"],
+};
+
+type OptionCopy = { label: string; description?: string };
+type SettingCopy = { label: string; options?: Record<string, OptionCopy> };
+type ModuleCopy = {
+  title: string;
+  description: string;
+  settings?: Record<string, SettingCopy>;
+};
+
+const EN_MODULE_COPY: Partial<Record<TrainingModuleId, ModuleCopy>> = {
+  "writing-defense": {
+    title: "Writing Defense",
+    description: "Draw the target shape with a mouse, tablet touch, or pen display to defeat incoming enemies.",
+    settings: {
+      difficulty: {
+        label: "Image Difficulty",
+        options: {
+          beginner: { label: "Beginner", description: "Simple shapes: circle, triangle, square, and lines" },
+          intermediate: { label: "Intermediate", description: "Medium shapes: heart, star, oval, and hexagon" },
+          advanced: { label: "Advanced", description: "Chinese characters: 天, 古, 元, 右, 左, 夫, 吉" },
+        },
+      },
+      speed: {
+        label: "Enemy Speed",
+        options: {
+          low: { label: "Slow", description: "Enemies move and appear at a slower pace" },
+          moderate: { label: "Standard", description: "Enemies advance at a steady pace" },
+          high: { label: "Fast", description: "Enemies move and appear more quickly" },
+        },
+      },
+      duration: {
+        label: "Game Time",
+        options: {
+          "1": { label: "1 minute" },
+          "2": { label: "2 minutes" },
+          "3": { label: "3 minutes" },
+          "5": { label: "5 minutes" },
+        },
+      },
+    },
+  },
+  "healthy-movement": {
+    title: "Healthy Movement",
+    description: "Browse health exercise YouTube videos, choose one, and follow along. More videos can be added later.",
+    settings: {
+      video: { label: "Exercise Video" },
+    },
+  },
+  "connect-dots": {
+    title: "Connect the Dots",
+    description: "Connect numbered sample points from a hidden outline to train visual search, sequencing, and hand-eye control.",
+    settings: {
+      shape: {
+        label: "Outline Shape",
+        options: {
+          star: { label: "Star", description: "Angular outline with clear turns" },
+          cat: { label: "Cat", description: "Curved outline for continuous control practice" },
+          leaf: { label: "Leaf", description: "Symmetric curves for smooth tracing" },
+        },
+      },
+      density: {
+        label: "Dot Density",
+        options: {
+          wide: { label: "Low", description: "Larger spacing, easier to learn" },
+          standard: { label: "Standard", description: "Samples about every 28 px" },
+          dense: { label: "High", description: "Samples about every 20 px" },
+        },
+      },
+    },
+  },
+  "chinese-crossword": {
+    title: "Chinese Crossword",
+    description: "Place Chinese idioms into a crossword grid and fill characters using pinyin and definitions.",
+    settings: {
+      level: {
+        label: "Puzzle Difficulty",
+        options: {
+          standard: { label: "Standard", description: "About 8 intersecting words" },
+          easy: { label: "Easy", description: "Smaller grid with more focused clues" },
+          challenge: { label: "Challenge", description: "More words and intersections" },
+        },
+      },
+    },
+  },
+};
 
 const intensityOptions: readonly ModuleSettingOption[] = [
   { value: "low", label: "低強度", description: "速度慢，適合暖身或初次練習" },
@@ -146,7 +244,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <circle cx="11" cy="11" r="2" />
       </>
     ),
-    tags: ["動作控制", "書寫", "精細動作", "反應遊戲", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "difficulty", label: "圖像難度", options: difficultyOptions },
       { id: "speed", label: "敵人速度", options: writingSpeedOptions },
@@ -166,7 +264,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M12 17v4" />
       </>,
     ),
-    tags: ["健康操", "YouTube影片", "動作訓練", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "video", label: "健康操影片", options: healthExerciseVideoOptions },
     ],
@@ -189,7 +287,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M13.8 17.2 9.2 17.8" />
       </>,
     ),
-    tags: ["視覺搜尋", "序列規劃", "手眼協調", "繪圖操作", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "shape", label: "輪廓圖形", options: connectDotsShapeOptions },
       { id: "density", label: "點位密度", options: dotDensityOptions },
@@ -214,7 +312,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M11 17h1" />
       </>,
     ),
-    tags: ["中文詞彙", "語意提取", "工作記憶", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "level", label: "題目難度", options: crosswordLevelOptions },
     ],
@@ -232,7 +330,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M11 8v6" />
       </>,
     ),
-    tags: ["空間注意", "方位辨識", "忽略干擾", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "load", label: "任務負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -252,7 +350,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M7 17h10" />
       </>,
     ),
-    tags: ["注意力", "規則切換", "反應控制", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "load", label: "任務負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -274,7 +372,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M17 16v4" />
       </>,
     ),
-    tags: ["工作記憶", "配對", "更新", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "load", label: "記憶負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -294,7 +392,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M16 8l-8 8" />
       </>,
     ),
-    tags: ["抑制控制", "反應時間", "準確度", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "load", label: "任務負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -314,7 +412,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M8 12h5" />
       </>,
     ),
-    tags: ["詞彙", "命名", "口語輸出", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -336,7 +434,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M12 17v4" />
       </>,
     ),
-    tags: ["命名", "生活語彙", "提示淡化", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -357,7 +455,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M17 10l3 2-3 2" />
       </>,
     ),
-    tags: ["句型", "語序", "表達", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -377,7 +475,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M20 7a8 8 0 0 1 0 10" />
       </>,
     ),
-    tags: ["聽理解", "指令反應", "功能溝通", "電腦遊戲", "平板遊戲"],
+    tags: DEVICE_TAGS.zh,
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -387,6 +485,53 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
   },
 ];
 
-export function getTrainingModules(category: TrainingCategory) {
-  return TRAINING_MODULES.filter((module) => module.category === category);
+export function getTrainingModules(category: TrainingCategory, lang: ModuleLanguage = "zh") {
+  return TRAINING_MODULES
+    .filter((module) => module.category === category && PLAYABLE_MODULE_IDS.has(module.id))
+    .map((module) => localizeModule(module, lang));
+}
+
+function localizeModule(module: TrainingModuleCardData, lang: ModuleLanguage): TrainingModuleCardData {
+  if (lang === "zh") {
+    return {
+      ...module,
+      tags: DEVICE_TAGS.zh,
+    };
+  }
+
+  const moduleCopy = EN_MODULE_COPY[module.id];
+  return {
+    ...module,
+    title: moduleCopy?.title ?? module.title,
+    description: moduleCopy?.description ?? module.description,
+    tags: DEVICE_TAGS.en,
+    settings: module.settings.map((setting) => {
+      const settingCopy = moduleCopy?.settings?.[setting.id];
+      return {
+        ...setting,
+        label: settingCopy?.label ?? setting.label,
+        options: localizeOptions(module.id, setting, settingCopy),
+      };
+    }),
+  };
+}
+
+function localizeOptions(
+  moduleId: TrainingModuleId,
+  setting: ModuleSettingGroup,
+  settingCopy?: SettingCopy,
+): readonly ModuleSettingOption[] {
+  if (moduleId === "healthy-movement" && setting.id === "video") {
+    return HEALTH_EXERCISE_VIDEOS.map((video) => ({
+      value: video.id,
+      label: video.titleEn ?? video.title,
+      description: `${video.providerEn ?? video.provider}${video.durationLabelEn || video.durationLabel ? ` / ${video.durationLabelEn ?? video.durationLabel}` : ""} / ${video.audienceEn ?? video.audience}`,
+    }));
+  }
+
+  return setting.options.map((option) => ({
+    ...option,
+    label: settingCopy?.options?.[option.value]?.label ?? option.label,
+    description: settingCopy?.options?.[option.value]?.description ?? option.description,
+  }));
 }

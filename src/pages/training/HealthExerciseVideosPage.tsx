@@ -2,11 +2,33 @@ import type { CSSProperties } from "react";
 import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { HEALTH_EXERCISE_VIDEOS, getHealthExerciseVideo } from "../../healthExerciseVideos";
+import { useT } from "../../i18n";
 
 export default function HealthExerciseVideosPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { lang } = useT();
   const selectedVideo = getHealthExerciseVideo(searchParams.get("video"));
+  const text = lang === "en"
+    ? {
+        title: "Healthy Movement",
+        subtitle: "Health exercise YouTube videos",
+        openVideo: "Open Video",
+        back: "Back to Motor Training",
+        youtube: "YouTube",
+      }
+    : {
+        title: "健康動一動",
+        subtitle: "健康操 YouTube 影片",
+        openVideo: "開啟影片",
+        back: "返回動作訓練",
+        youtube: "YouTube",
+      };
+  const selectedTitle = lang === "en" ? selectedVideo.titleEn ?? selectedVideo.title : selectedVideo.title;
+  const selectedProvider = lang === "en" ? selectedVideo.providerEn ?? selectedVideo.provider : selectedVideo.provider;
+  const selectedAudience = lang === "en" ? selectedVideo.audienceEn ?? selectedVideo.audience : selectedVideo.audience;
+  const selectedDescription = lang === "en" ? selectedVideo.descriptionEn ?? selectedVideo.description : selectedVideo.description;
+  const selectedDuration = lang === "en" ? selectedVideo.durationLabelEn ?? selectedVideo.durationLabel : selectedVideo.durationLabel;
 
   const videoId = useMemo(() => {
     const url = new URL(selectedVideo.youtubeUrl);
@@ -22,9 +44,9 @@ export default function HealthExerciseVideosPage() {
       <div className="training-page-stack">
         <header className="training-page-header">
           <h1 id="health-exercise-title" className="section-title fade-in-up">
-            健康動一動
+            {text.title}
           </h1>
-          <p className="section-subtitle fade-in-up">健康操 YouTube 影片</p>
+          <p className="section-subtitle fade-in-up">{text.subtitle}</p>
         </header>
 
         <section style={layoutStyle}>
@@ -34,17 +56,17 @@ export default function HealthExerciseVideosPage() {
                 ▶
               </div>
               <div style={{ color: "#ffffff", fontWeight: 800, fontSize: 18 }}>
-                {videoId ? `YouTube ID: ${videoId}` : "YouTube"}
+                {videoId ? `${text.youtube} ID: ${videoId}` : text.youtube}
               </div>
             </div>
             <div style={{ display: "grid", gap: 12 }}>
               <div>
-                <p style={eyebrowStyle}>{selectedVideo.provider}</p>
-                <h2 style={{ margin: "2px 0 0", fontSize: 28 }}>{selectedVideo.title}</h2>
+                <p style={eyebrowStyle}>{selectedProvider}</p>
+                <h2 style={{ margin: "2px 0 0", fontSize: 28 }}>{selectedTitle}</h2>
               </div>
-              <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>{selectedVideo.description}</p>
+              <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>{selectedDescription}</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {[selectedVideo.audience, selectedVideo.durationLabel, ...selectedVideo.tags]
+                {[selectedAudience, selectedDuration]
                   .filter(Boolean)
                   .map((tag) => (
                     <span key={tag} style={pillStyle}>{tag}</span>
@@ -52,10 +74,10 @@ export default function HealthExerciseVideosPage() {
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
                 <a href={selectedVideo.youtubeUrl} target="_blank" rel="noreferrer" style={primaryButtonStyle}>
-                  開啟影片
+                  {text.openVideo}
                 </a>
                 <button type="button" onClick={() => navigate("/motor")} style={secondaryButtonStyle}>
-                  返回動作訓練
+                  {text.back}
                 </button>
               </div>
             </div>
@@ -75,8 +97,10 @@ export default function HealthExerciseVideosPage() {
                     background: isSelected ? "#eff6ff" : "#ffffff",
                   }}
                 >
-                  <span style={{ fontWeight: 800, fontSize: 17 }}>{video.title}</span>
-                  <span style={{ color: "#64748b", lineHeight: 1.5 }}>{video.provider} / {video.audience}</span>
+                  <span style={{ fontWeight: 800, fontSize: 17 }}>{lang === "en" ? video.titleEn ?? video.title : video.title}</span>
+                  <span style={{ color: "#64748b", lineHeight: 1.5 }}>
+                    {lang === "en" ? video.providerEn ?? video.provider : video.provider} / {lang === "en" ? video.audienceEn ?? video.audience : video.audience}
+                  </span>
                 </button>
               );
             })}

@@ -4,6 +4,7 @@ import type { TrainingCategory, TrainingModuleId } from "../trainingModules";
 import TrainingModuleCard from "../components/TrainingModuleCard";
 import { useNavigate } from "react-router-dom";
 import ModuleSettingsModal from "../components/ModuleSettingsModal";
+import { useT } from "../i18n";
 
 interface TrainingModulesPageProps {
   category: TrainingCategory;
@@ -16,7 +17,8 @@ export default function TrainingModulesPage({
   title,
   subtitle,
 }: TrainingModulesPageProps) {
-  const modules = getTrainingModules(category);
+  const { lang } = useT();
+  const modules = getTrainingModules(category, lang);
   const [expandedModuleId, setExpandedModuleId] = useState<TrainingModuleId | null>(null);
   const navigate = useNavigate();
 

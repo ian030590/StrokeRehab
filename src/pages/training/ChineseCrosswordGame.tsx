@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import idiomDataRaw from "./data/chinese-crossword/idioms.json?raw";
+import { useT } from "../../i18n";
 
 type Direction = "across" | "down";
 type PuzzleLevel = "standard" | "easy" | "challenge";
@@ -32,10 +33,10 @@ interface CrosswordPuzzle {
 
 const IDIOMS = JSON.parse(idiomDataRaw) as IdiomEntry[];
 
-const LEVELS: Record<PuzzleLevel, { label: string; size: number; targetWords: number; candidatePool: number }> = {
-  standard: { label: "標準", size: 13, targetWords: 8, candidatePool: 42 },
-  easy: { label: "入門", size: 11, targetWords: 6, candidatePool: 32 },
-  challenge: { label: "挑戰", size: 15, targetWords: 10, candidatePool: 56 },
+const LEVELS: Record<PuzzleLevel, { label: string; labelEn: string; size: number; targetWords: number; candidatePool: number }> = {
+  standard: { label: "標準", labelEn: "Standard", size: 13, targetWords: 8, candidatePool: 42 },
+  easy: { label: "入門", labelEn: "Easy", size: 11, targetWords: 6, candidatePool: 32 },
+  challenge: { label: "挑戰", labelEn: "Challenge", size: 15, targetWords: 10, candidatePool: 56 },
 };
 
 function normalizeLevel(value: string | null): PuzzleLevel {
@@ -245,12 +246,40 @@ function buildPuzzle(level: PuzzleLevel): CrosswordPuzzle {
 export default function ChineseCrosswordGame() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang } = useT();
   const level = normalizeLevel(searchParams.get("level"));
   const [puzzleSeed, setPuzzleSeed] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showCheck, setShowCheck] = useState(false);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const puzzle = useMemo(() => buildPuzzle(level), [level, puzzleSeed]);
+  const text = lang === "en"
+    ? {
+        title: "Chinese Crossword",
+        checkedStatus: (correct: number) => `${correct} correct cells`,
+        status: (filled: number, clueCount: number) => `${filled} cells filled / ${clueCount} clues`,
+        check: "Check",
+        newPuzzle: "New Puzzle",
+        back: "Back",
+        complete: "Complete",
+        clues: "Clues",
+        across: "Across",
+        down: "Down",
+        cellLabel: (row: number, col: number) => `Row ${row}, column ${col}`,
+      }
+    : {
+        title: "中文填字遊戲",
+        checkedStatus: (correct: number) => `${correct} 格正確`,
+        status: (filled: number, clueCount: number) => `${filled} 格已填 / ${clueCount} 題`,
+        check: "檢查",
+        newPuzzle: "新題目",
+        back: "返回",
+        complete: "完成",
+        clues: "提示",
+        across: "橫",
+        down: "直",
+        cellLabel: (row: number, col: number) => `第 ${row} 列第 ${col} 欄`,
+      };
 
   const filledCount = puzzle.playableKeys.filter((key) => answers[key]).length;
   const correctCount = puzzle.playableKeys.filter((key) => {
@@ -283,13 +312,15 @@ export default function ChineseCrosswordGame() {
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#f1f5f9", color: "#0f172a", overflow: "auto" }}>
       <header style={{ minHeight: 72, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "12px 24px", borderBottom: "1px solid #d5dde8", background: "#ffffff" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24 }}>中文填字遊戲</h1>
-          <p style={{ margin: "4px 0 0", color: "#64748b" }}>{LEVELS[level].label} / {filledCount} 格已填 / {showCheck ? `${correctCount} 格正確` : `${puzzle.clues.length} 題`}</p>
+          <h1 style={{ margin: 0, fontSize: 24 }}>{text.title}</h1>
+          <p style={{ margin: "4px 0 0", color: "#64748b" }}>
+            {lang === "en" ? LEVELS[level].labelEn : LEVELS[level].label} / {showCheck ? text.checkedStatus(correctCount) : text.status(filledCount, puzzle.clues.length)}
+          </p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" onClick={() => setShowCheck(true)} style={toolbarButtonStyle}>檢查</button>
-          <button type="button" onClick={resetPuzzle} style={toolbarButtonStyle}>新題目</button>
-          <button type="button" onClick={() => navigate("/cognitive")} style={toolbarButtonStyle}>返回</button>
+          <button type="button" onClick={() => setShowCheck(true)} style={toolbarButtonStyle}>{text.check}</button>
+          <button type="button" onClick={resetPuzzle} style={toolbarButtonStyle}>{text.newPuzzle}</button>
+          <button type="button" onClick={() => navigate("/cognitive")} style={toolbarButtonStyle}>{text.back}</button>
         </div>
       </header>
 
@@ -327,7 +358,7 @@ export default function ChineseCrosswordGame() {
                       ref={(element) => {
                         inputRefs.current[key] = element;
                       }}
-                      aria-label={`第 ${rowIndex + 1} 列第 ${colIndex + 1} 欄`}
+                      aria-label={text.cellLabel(rowIndex + 1, colIndex + 1)}
                       value={answers[key] ?? ""}
                       onChange={(event) => updateAnswer(key, event.target.value)}
                       onFocus={(event) => event.currentTarget.select()}
@@ -351,18 +382,18 @@ export default function ChineseCrosswordGame() {
           </div>
           {solved && (
             <div style={{ marginTop: 16, padding: "10px 16px", background: "#16a34a", color: "#ffffff", borderRadius: 6, fontWeight: 800 }}>
-              完成
+              {text.complete}
             </div>
           )}
         </section>
 
         <aside style={{ background: "#ffffff", border: "1px solid #d5dde8", borderRadius: 8, padding: 18, boxShadow: "0 12px 28px rgba(15, 23, 42, 0.08)" }}>
-          <h2 style={{ margin: "0 0 12px", fontSize: 20 }}>提示</h2>
+          <h2 style={{ margin: "0 0 12px", fontSize: 20 }}>{text.clues}</h2>
           <div style={{ display: "grid", gap: 12 }}>
             {puzzle.clues.map((clue) => (
               <div key={`${clue.number}-${clue.direction}-${clue.entry.word}`} style={{ borderBottom: "1px solid #e2e8f0", paddingBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontWeight: 800 }}>
-                  <span>{clue.number}. {clue.direction === "across" ? "橫" : "直"}</span>
+                  <span>{clue.number}. {clue.direction === "across" ? text.across : text.down}</span>
                   <span style={{ color: "#64748b" }}>{clue.entry.pinyin}</span>
                 </div>
                 <p style={{ margin: "6px 0 0", color: "#334155", lineHeight: 1.5 }}>{clue.entry.definition}</p>

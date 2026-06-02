@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Application, Graphics, Text } from "pixi.js";
+import { Application, Graphics } from "pixi.js";
+import { useT } from "../../i18n";
 
 type Difficulty = "beginner" | "intermediate" | "advanced";
 type PixiShapeKind =
@@ -52,19 +53,33 @@ const SPEED_PRESETS = {
   high: { enemySpeed: 0.25, spawnRate: 1500 },
 };
 
-const DIFFICULTY_LABELS = {
-  beginner: "初級",
-  intermediate: "中級",
-  advanced: "高級",
-};
-
-const SPEED_LABELS = {
-  low: "慢速",
-  moderate: "標準",
-  high: "快速",
-};
-
 type SpeedLevel = keyof typeof SPEED_PRESETS;
+
+const DIFFICULTY_LABELS: Record<"zh" | "en", Record<Difficulty, string>> = {
+  zh: {
+    beginner: "初級",
+    intermediate: "中級",
+    advanced: "高級",
+  },
+  en: {
+    beginner: "Beginner",
+    intermediate: "Intermediate",
+    advanced: "Advanced",
+  },
+};
+
+const SPEED_LABELS: Record<"zh" | "en", Record<SpeedLevel, string>> = {
+  zh: {
+    low: "慢速",
+    moderate: "標準",
+    high: "快速",
+  },
+  en: {
+    low: "Slow",
+    moderate: "Standard",
+    high: "Fast",
+  },
+};
 
 interface Enemy {
   id: number;
@@ -75,164 +90,135 @@ interface Enemy {
 }
 
 function ShapeTargetCanvas({ shape }: { shape: ShapeTarget }) {
+  if (shape.type === "text") {
+    return (
+      <div
+        aria-label={shape.label}
+        role="img"
+        style={{
+          width: TARGET_WIDTH,
+          height: TARGET_HEIGHT,
+          color: "#000000",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "sans-serif",
+          fontSize: 42,
+          fontWeight: 700,
+          lineHeight: 1,
+        }}
+      >
+        {shape.value}
+      </div>
+    );
+  }
+
+  return <PixiShapeCanvas kind={shape.kind} label={shape.label} />;
+}
+
+function PixiShapeCanvas({ kind, label }: { kind: PixiShapeKind; label: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-
     let cancelled = false;
-    let initialized = false;
-    const app = new Application();
+    let app: Application | null = null;
 
-    const init = async () => {
-      await app.init({
+    const mountPixiShape = async () => {
+      const pixiApp = new Application();
+      await pixiApp.init({
         width: TARGET_WIDTH,
         height: TARGET_HEIGHT,
         backgroundAlpha: 0,
         antialias: true,
-        resolution: window.devicePixelRatio || 1,
         autoDensity: true,
+        autoStart: false,
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
       });
 
-      initialized = true;
       if (cancelled) {
-        app.destroy(true, { children: true });
+        pixiApp.destroy({ removeView: true }, { children: true });
         return;
       }
 
-      const canvas = app.canvas as HTMLCanvasElement;
-      canvas.style.display = "block";
+      const host = hostRef.current;
+      if (!host) {
+        pixiApp.destroy({ removeView: true }, { children: true });
+        return;
+      }
+
+      const canvas = pixiApp.canvas as HTMLCanvasElement;
       canvas.style.width = `${TARGET_WIDTH}px`;
       canvas.style.height = `${TARGET_HEIGHT}px`;
-      host.innerHTML = "";
-      host.appendChild(canvas);
-      drawTargetShape(app, shape);
+      canvas.style.display = "block";
+
+      pixiApp.stage.addChild(createPixiShapeGraphics(kind));
+      host.replaceChildren(canvas);
+      pixiApp.render();
+      app = pixiApp;
     };
 
-    init().catch((error) => {
-      console.error("PixiJS target shape failed:", error);
-    });
+    void mountPixiShape();
 
     return () => {
       cancelled = true;
-      host.innerHTML = "";
-      if (initialized) {
-        app.destroy(true, { children: true });
-      }
+      hostRef.current?.replaceChildren();
+      app?.destroy({ removeView: true }, { children: true });
     };
-  }, [shape]);
+  }, [kind]);
 
   return (
     <div
       ref={hostRef}
-      aria-label={shape.label}
+      aria-label={label}
       role="img"
       style={{ width: TARGET_WIDTH, height: TARGET_HEIGHT }}
     />
   );
 }
 
-function drawTargetShape(app: Application, shape: ShapeTarget) {
-  app.stage.removeChildren();
-
-  if (shape.type === "text") {
-    const text = new Text({
-      text: shape.value,
-      style: {
-        fontFamily: "sans-serif",
-        fontSize: 42,
-        fontWeight: "700",
-        fill: TARGET_COLOR,
-      },
-    });
-    text.anchor.set(0.5);
-    text.x = TARGET_WIDTH / 2;
-    text.y = TARGET_HEIGHT / 2;
-    app.stage.addChild(text);
-    return;
-  }
-
-  const gfx = new Graphics();
-  app.stage.addChild(gfx);
-  drawPixiShape(gfx, shape.kind);
-}
-
-function drawPixiShape(gfx: Graphics, kind: PixiShapeKind) {
-  const cx = TARGET_WIDTH / 2;
-  const cy = TARGET_HEIGHT / 2;
-  const stroke = { color: TARGET_COLOR, width: 5 };
+function createPixiShapeGraphics(kind: PixiShapeKind) {
+  const graphics = new Graphics();
+  const outline = { color: TARGET_COLOR, width: 5 };
+  const thickLine = { color: TARGET_COLOR, width: 7 };
 
   switch (kind) {
     case "circle":
-      gfx.circle(cx, cy, 18).stroke(stroke);
+      graphics.circle(36, 28, 18).stroke(outline);
       break;
     case "triangle":
-      gfx.moveTo(cx, 9).lineTo(58, 47).lineTo(14, 47).lineTo(cx, 9).stroke(stroke);
+      graphics.poly([36, 9, 58, 47, 14, 47], true).stroke(outline);
       break;
     case "square":
-      gfx.rect(18, 10, 36, 36).stroke(stroke);
+      graphics.rect(18, 10, 36, 36).stroke(outline);
       break;
     case "vertical-line":
-      gfx.moveTo(cx, 8).lineTo(cx, 48).stroke({ color: TARGET_COLOR, width: 7 });
+      graphics.moveTo(36, 8).lineTo(36, 48).stroke(thickLine);
       break;
     case "horizontal-line":
-      gfx.moveTo(14, cy).lineTo(58, cy).stroke({ color: TARGET_COLOR, width: 7 });
+      graphics.moveTo(14, 28).lineTo(58, 28).stroke(thickLine);
       break;
     case "heart":
-      drawClosedPointShape(gfx, createHeartPoints(cx, cy + 3, 1.35), true);
+      graphics
+        .moveTo(36, 48)
+        .bezierCurveTo(17, 34, 10, 23, 17, 15)
+        .bezierCurveTo(23, 8, 32, 13, 36, 20)
+        .bezierCurveTo(40, 13, 49, 8, 55, 15)
+        .bezierCurveTo(62, 23, 55, 34, 36, 48)
+        .closePath()
+        .fill(TARGET_COLOR);
       break;
     case "star":
-      drawClosedPointShape(gfx, createStarPoints(cx, cy, 21, 9), true);
+      graphics.poly([36, 7, 42, 21, 57, 22, 45, 32, 49, 47, 36, 39, 23, 47, 27, 32, 15, 22, 30, 21], true).fill(TARGET_COLOR);
       break;
     case "oval":
-      gfx.ellipse(cx, cy, 24, 16).stroke(stroke);
+      graphics.ellipse(36, 28, 24, 16).stroke(outline);
       break;
     case "hexagon":
-      drawClosedPointShape(gfx, createRegularPolygonPoints(cx, cy, 23, 6), false);
+      graphics.poly([36, 6, 56, 17, 56, 39, 36, 50, 16, 39, 16, 17], true).stroke(outline);
       break;
   }
-}
 
-function drawClosedPointShape(
-  gfx: Graphics,
-  points: { x: number; y: number }[],
-  filled: boolean,
-) {
-  if (points.length === 0) return;
-  gfx.moveTo(points[0].x, points[0].y);
-  points.slice(1).forEach((point) => gfx.lineTo(point.x, point.y));
-  gfx.lineTo(points[0].x, points[0].y);
-
-  if (filled) {
-    gfx.fill({ color: TARGET_COLOR });
-  } else {
-    gfx.stroke({ color: TARGET_COLOR, width: 5 });
-  }
-}
-
-function createRegularPolygonPoints(cx: number, cy: number, radius: number, sides: number) {
-  return Array.from({ length: sides }, (_, index) => {
-    const angle = -Math.PI / 2 + (index * Math.PI * 2) / sides;
-    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
-  });
-}
-
-function createStarPoints(cx: number, cy: number, outerRadius: number, innerRadius: number) {
-  return Array.from({ length: 10 }, (_, index) => {
-    const radius = index % 2 === 0 ? outerRadius : innerRadius;
-    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
-    return { x: cx + Math.cos(angle) * radius, y: cy + Math.sin(angle) * radius };
-  });
-}
-
-function createHeartPoints(cx: number, cy: number, scale: number) {
-  return Array.from({ length: 48 }, (_, index) => {
-    const t = (index / 48) * Math.PI * 2;
-    const x = 16 * Math.pow(Math.sin(t), 3);
-    const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-    return { x: cx + x * scale, y: cy + y * scale };
-  });
+  return graphics;
 }
 
 const normalizeDifficulty = (value: string | null): Difficulty => {
@@ -262,12 +248,50 @@ const createEnemy = (difficulty: Difficulty, enemySpeed: number): Enemy => {
 export default function WritingDefenseGame() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang } = useT();
 
   const difficulty = normalizeDifficulty(searchParams.get("difficulty"));
   const speedLevel = normalizeSpeed(searchParams.get("speed"));
   const { enemySpeed, spawnRate } = SPEED_PRESETS[speedLevel];
   const durationStr = searchParams.get("duration") || "3";
   const duration = parseInt(durationStr, 10) * 60; // in seconds
+  const text = lang === "en" ? {
+    title: "Writing Defense",
+    imageDifficulty: "Image Difficulty",
+    speed: "Speed",
+    time: "Time",
+    score: "Score",
+    missed: "Missed",
+    drawHint: "Draw the target shape anywhere on the screen...",
+    startLead: "Enemies are approaching with target cards!",
+    startSub: "Draw the shape on their card to defeat them.",
+    startGame: "Start Game",
+    backToModules: "Back to Modules",
+    gameOver: "Game Over",
+    totalScore: "Total Score",
+    playAgain: "Play Again",
+    finishTraining: "End Training",
+    hit: "Perfect!",
+    miss: "Not recognized",
+  } : {
+    title: "書寫保衛戰",
+    imageDifficulty: "圖像難度",
+    speed: "速度",
+    time: "時間",
+    score: "得分",
+    missed: "錯過",
+    drawHint: "在螢幕任何地方畫出圖形...",
+    startLead: "外星人軍團帶著卡片入侵了！",
+    startSub: "在螢幕上描繪出他們卡片上的形狀來擊退他們。",
+    startGame: "開始遊戲",
+    backToModules: "返回模組列表",
+    gameOver: "遊戲結束",
+    totalScore: "總得分",
+    playAgain: "再玩一次",
+    finishTraining: "結束訓練",
+    hit: "完美！",
+    miss: "未辨識",
+  };
 
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -338,10 +362,24 @@ export default function WritingDefenseGame() {
   }, [difficulty, enemySpeed, isPlaying, spawnRate]);
 
   useEffect(() => {
-    if (canvasRef.current) {
+    let frameId: number | null = null;
+
+    const setupCanvas = () => {
       const canvas = canvasRef.current;
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
+      if (!canvas) return;
+
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (width <= 0 || height <= 0) {
+        frameId = window.requestAnimationFrame(setupCanvas);
+        return;
+      }
+
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.lineCap = "round";
@@ -350,7 +388,17 @@ export default function WritingDefenseGame() {
         ctx.strokeStyle = "white";
         ctxRef.current = ctx;
       }
-    }
+    };
+
+    frameId = window.requestAnimationFrame(setupCanvas);
+    window.addEventListener("resize", setupCanvas);
+
+    return () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", setupCanvas);
+    };
   }, []);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
@@ -413,13 +461,13 @@ export default function WritingDefenseGame() {
       
       if (isHit) {
         setScore((s) => s + 1);
-        showFeedback("完美！", "#4ade80", targetEnemy.x, targetEnemy.y);
+        showFeedback(text.hit, "#4ade80", targetEnemy.x, targetEnemy.y);
         const newEnemies = [...prev];
         newEnemies.splice(lowestIndex, 1);
         ctxRef.current?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
         return newEnemies;
       } else {
-        showFeedback("未辨識", "#f87171", targetEnemy.x, targetEnemy.y);
+        showFeedback(text.miss, "#f87171", targetEnemy.x, targetEnemy.y);
         ctxRef.current?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
         return prev;
       }
@@ -447,11 +495,11 @@ export default function WritingDefenseGame() {
     setIsPlaying(true);
     setScore(0);
     setMissed(0);
-    setEnemies([]);
+    setEnemies([createEnemy(difficulty, enemySpeed)]);
     setTimeLeft(duration);
     setIsGameOver(false);
     setFeedback(null);
-    spawnTimerRef.current = spawnRate;
+    spawnTimerRef.current = 0;
   };
 
   return (
@@ -460,12 +508,14 @@ export default function WritingDefenseGame() {
       {/* HUD */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '20px', display: 'flex', justifyContent: 'space-between', color: 'white', zIndex: 10, background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)', pointerEvents: 'none' }}>
         <div>
-          <h2 style={{ margin: 0 }}>書寫保衛戰</h2>
-          <p style={{ margin: 0, opacity: 0.8 }}>圖像難度: {DIFFICULTY_LABELS[difficulty]} | 速度: {SPEED_LABELS[speedLevel]} | 時間: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</p>
+          <h2 style={{ margin: 0 }}>{text.title}</h2>
+          <p style={{ margin: 0, opacity: 0.8 }}>
+            {text.imageDifficulty}: {DIFFICULTY_LABELS[lang][difficulty]} | {text.speed}: {SPEED_LABELS[lang][speedLevel]} | {text.time}: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+          </p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <h3 style={{ margin: 0, color: '#4ade80' }}>得分: {score}</h3>
-          <p style={{ margin: 0, color: '#f87171' }}>錯過: {missed}</p>
+          <h3 style={{ margin: 0, color: '#4ade80' }}>{text.score}: {score}</h3>
+          <p style={{ margin: 0, color: '#f87171' }}>{text.missed}: {missed}</p>
         </div>
       </div>
 
@@ -547,7 +597,7 @@ export default function WritingDefenseGame() {
 
       {/* Drawing Canvas */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 5 }}>
-        <p style={{ position: 'absolute', top: '100px', left: '20px', color: 'rgba(255,255,255,0.5)', margin: 0, pointerEvents: 'none', fontSize: '1.2rem' }}>在螢幕任何地方畫出圖形...</p>
+        <p style={{ position: 'absolute', top: '100px', left: '20px', color: 'rgba(255,255,255,0.5)', margin: 0, pointerEvents: 'none', fontSize: '1.2rem' }}>{text.drawHint}</p>
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
@@ -565,15 +615,15 @@ export default function WritingDefenseGame() {
       {!isPlaying && !isGameOver && (
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
           <div style={{ textAlign: 'center', color: 'white' }}>
-            <h1 style={{ fontSize: '4rem', marginBottom: '20px', color: '#60a5fa' }}>書寫保衛戰</h1>
-            <p style={{ marginBottom: '10px', fontSize: '1.5rem' }}>外星人軍團帶著卡片入侵了！</p>
-            <p style={{ marginBottom: '40px', fontSize: '1.2rem', color: '#9ca3af' }}>在螢幕上描繪出他們卡片上的形狀來擊退他們。</p>
+            <h1 style={{ fontSize: '4rem', marginBottom: '20px', color: '#60a5fa' }}>{text.title}</h1>
+            <p style={{ marginBottom: '10px', fontSize: '1.5rem' }}>{text.startLead}</p>
+            <p style={{ marginBottom: '40px', fontSize: '1.2rem', color: '#9ca3af' }}>{text.startSub}</p>
             <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.5)', transition: 'transform 0.2s' }} onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}>
-              開始遊戲
+              {text.startGame}
             </button>
             <br />
             <button onClick={() => navigate('/motor')} style={{ marginTop: '20px', padding: '10px 20px', fontSize: '1.2rem', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-              返回模組列表
+              {text.backToModules}
             </button>
           </div>
         </div>
@@ -582,17 +632,17 @@ export default function WritingDefenseGame() {
       {isGameOver && (
         <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20 }}>
           <div style={{ textAlign: 'center', color: 'white' }}>
-            <h1 style={{ fontSize: '5rem', marginBottom: '10px' }}>遊戲結束</h1>
+            <h1 style={{ fontSize: '5rem', marginBottom: '10px' }}>{text.gameOver}</h1>
             <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '30px', borderRadius: '15px', marginBottom: '40px', minWidth: '350px' }}>
-              <h2 style={{ fontSize: '3rem', color: '#4ade80', margin: '0 0 10px 0' }}>總得分: {score}</h2>
-              <h3 style={{ fontSize: '2rem', color: '#f87171', margin: 0 }}>錯過: {missed}</h3>
+              <h2 style={{ fontSize: '3rem', color: '#4ade80', margin: '0 0 10px 0' }}>{text.totalScore}: {score}</h2>
+              <h3 style={{ fontSize: '2rem', color: '#f87171', margin: 0 }}>{text.missed}: {missed}</h3>
             </div>
             <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
               <button onClick={startGame} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: 'none', backgroundColor: '#3b82f6', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
-                再玩一次
+                {text.playAgain}
               </button>
               <button onClick={() => navigate('/motor')} style={{ padding: '15px 40px', fontSize: '1.5rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.5)', backgroundColor: 'transparent', color: 'white', cursor: 'pointer', transition: 'background-color 0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                結束訓練
+                {text.finishTraining}
               </button>
             </div>
           </div>

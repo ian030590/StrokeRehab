@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingModuleCardData } from "../trainingModules";
+import { useT } from "../i18n";
 
 interface ModuleSettingsModalProps {
   module: TrainingModuleCardData;
@@ -18,7 +19,11 @@ export default function ModuleSettingsModal({
   onClose,
   onApply,
 }: ModuleSettingsModalProps) {
+  const { t, lang } = useT();
   const [values, setValues] = useState<Record<string, string>>(() => getDefaultValues(module));
+  const modalText = lang === "en"
+    ? { title: "Module Settings", close: "Close settings", current: "Current settings" }
+    : { title: "模組設定", close: "關閉設定", current: "目前設定" };
 
   useEffect(() => {
     setValues(getDefaultValues(module));
@@ -49,10 +54,10 @@ export default function ModuleSettingsModal({
       >
         <div className="config-modal-header">
           <div>
-            <p className="config-eyebrow">模組設定</p>
+            <p className="config-eyebrow">{modalText.title}</p>
             <h2 id="module-settings-title">{module.title}</h2>
           </div>
-          <button className="btn btn-ghost btn-icon" type="button" aria-label="關閉設定" onClick={onClose}>
+          <button className="btn btn-ghost btn-icon" type="button" aria-label={modalText.close} onClick={onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />
@@ -100,15 +105,15 @@ export default function ModuleSettingsModal({
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <polygon points="5,3 19,12 5,21" />
             </svg>
-            套用設定
+            {t("btn.startTraining")}
           </button>
           <button className="btn btn-ghost btn-lg" type="button" onClick={onClose}>
-            取消
+            {t("btn.cancel")}
           </button>
         </div>
 
         <div className="config-summary">
-          目前設定 <strong>{summary}</strong>
+          {modalText.current} <strong>{summary}</strong>
         </div>
 
         {/* Preload text glyphs for WritingDefenseGame to prevent in-game stutter */}
