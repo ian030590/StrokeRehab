@@ -541,7 +541,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
 function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null {
   const usableStrokes = strokes.filter((stroke) => stroke.length >= 2);
-  if (flattenStrokes(usableStrokes).length < 6) return null;
+  const rawPoints = flattenStrokes(usableStrokes);
+  if (rawPoints.length < 6) return null;
+
+  if (looksLikeCircle(rawPoints, strictness)) return 'circle';
 
   const candidate = normalizeGesture(usableStrokes);
   let best: { shape: ShapeId; score: number } | null = null;
@@ -559,6 +562,38 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
 
   const threshold = 0.42 + strictness * 0.0025;
   return best && best.score >= threshold ? best.shape : null;
+}
+
+function looksLikeCircle(points: Point[], strictness: number): boolean {
+  if (points.length < 12) return false;
+  const box = getBox(points);
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const maxSize = Math.max(width, height);
+  const minSize = Math.min(width, height);
+  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.45) return false;
+
+  const strictnessRatio = strictness / 100;
+  const closedness = distance(points[0], points[points.length - 1]) / Math.max(1, maxSize);
+  const area = polygonArea(points);
+  const areaRatio = area / Math.max(1, width * height);
+  const perimeter = pathLength(points) + distance(points[points.length - 1], points[0]);
+  const circularity = 4 * Math.PI * area / Math.max(1, perimeter * perimeter);
+  const radialVariation = radialCoefficientOfVariation(points, box);
+  const simplified = simplify(points, Math.max(4, maxSize * 0.045));
+  const corners = countCorners(simplified);
+  const closureLimit = 0.5 - strictnessRatio * 0.18;
+  const radialLimit = 0.42 - strictnessRatio * 0.14;
+  const circularityFloor = 0.58 + strictness * 0.0012;
+
+  return (
+    closedness <= closureLimit &&
+    areaRatio >= 0.48 &&
+    areaRatio <= 0.95 &&
+    circularity >= circularityFloor &&
+    radialVariation <= radialLimit &&
+    (corners >= 5 || simplified.length >= 7)
+  );
 }
 
 interface GestureTemplate {
