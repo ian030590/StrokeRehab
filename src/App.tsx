@@ -1,47 +1,27 @@
-import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { Navbar } from './components/Navbar';
 
-const MotorTrainingPage = lazy(() => import('./pages/MotorTrainingPage'));
-const CognitiveTrainingPage = lazy(() => import('./pages/CognitiveTrainingPage'));
-const LanguageTrainingPage = lazy(() => import('./pages/LanguageTrainingPage'));
-const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
-const CreditsPage = lazy(() => import('./pages/CreditsPage'));
-const RelatedLinksPage = lazy(() => import('./pages/RelatedLinksPage'));
-const WritingDefenseGame = lazy(() => import('./pages/training/WritingDefenseGame'));
-const HealthExerciseVideosPage = lazy(() => import('./pages/HealthExerciseVideosPage'));
-const ConnectDotsGame = lazy(() => import('./pages/training/ConnectDotsGame'));
-const ChineseCrosswordGame = lazy(() => import('./pages/training/ChineseCrosswordGame'));
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import NavBar from './components/NavBar';
+import Dashboard from './pages/Dashboard';
+import SpeechTherapy from './pages/SpeechTherapy';
+import CognitiveTherapy from './pages/CognitiveTherapy';
+import MotorTherapy from './pages/MotorTherapy';
 
-export function App() {
+function App() {
   return (
-    <Suspense fallback={<div className="app-loading" />}>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/motor" replace />} />
-          <Route path="/motor" element={<MotorTrainingPage />} />
-          <Route path="/cognitive" element={<CognitiveTrainingPage />} />
-          <Route path="/language" element={<LanguageTrainingPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/credits" element={<CreditsPage />} />
-          <Route path="/links" element={<RelatedLinksPage />} />
-          <Route path="/training/writing-defense" element={<WritingDefenseGame />} />
-          <Route path="/training/healthy-movement" element={<HealthExerciseVideosPage />} />
-          <Route path="/training/connect-dots" element={<ConnectDotsGame />} />
-          <Route path="/training/chinese-crossword" element={<ChineseCrosswordGame />} />
-        </Route>
-
-        <Route path="*" element={<Navigate to="/motor" replace />} />
-      </Routes>
-    </Suspense>
+    <Router>
+      <div className="app-container">
+        <NavBar />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/speech" element={<SpeechTherapy />} />
+            <Route path="/cognitive" element={<CognitiveTherapy />} />
+            <Route path="/motor" element={<MotorTherapy />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
   );
 }
 
-function AppLayout() {
-  return (
-    <div className="app-layout">
-      <Navbar />
-      <Outlet />
-    </div>
-  );
-}
+export default App;

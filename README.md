@@ -1,47 +1,73 @@
-# Stroke Trainer
+# React + TypeScript + Vite
 
-Stroke Trainer 是一個基於 React + Vite 建構的中風復健訓練 Web 應用程式。目前提供動作、認知與語言三類訓練入口，並以卡片方式呈現每個訓練模組與可調整設定。
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## 頁面
+Currently, two official plugins are available:
 
-- 動作訓練
-- 認知訓練
-- 語言訓練
-- 設定
-- 致謝
-- 相關網站
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## 訓練模組
+## React Compiler
 
-### 動作訓練
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-- 上肢觸碰訓練
-- 手部序列訓練
-- 坐站重心轉移
-- 步態節奏訓練
+## Expanding the ESLint configuration
 
-### 認知訓練
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-- 空間注意訓練
-- 注意力切換訓練
-- 工作記憶配對
-- 抑制反應訓練
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-### 語言訓練
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
 
-- 詞彙提取訓練
-- 日常命名訓練
-- 句型組合訓練
-- 聽理解反應訓練
-
-## 開發
-
-```bash
-npm install
-npm run dev
-npm run build
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-## 免責聲明
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-本應用為復健訓練與互動練習用途，不作為醫療診斷、治療替代或復健成效保證。若需要個別化治療建議，請尋求專業醫療協助。
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
