@@ -1799,15 +1799,15 @@ body #webgazer-calibrate-container #calibration-point {
   gap: 10px;
   flex-wrap: wrap;
   max-width: min(720px, calc(100vw - 32px));
-  padding: 10px 12px;
-  border: 1px solid rgba(194, 198, 212, 0.9);
+  padding: 8px 10px;
+  border: 1px solid rgba(194, 198, 212, 0.32);
   border-radius: var(--radius-m);
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-ambient);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.28);
+  color: rgba(26, 28, 30, 0.62);
+  box-shadow: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
 }
 
 .drawing-defense-hud div {
@@ -1817,6 +1817,15 @@ body #webgazer-calibrate-container #calibration-point {
   gap: 6px;
   font-size: 14px;
   white-space: nowrap;
+}
+
+.drawing-defense-hud strong {
+  color: rgba(26, 28, 30, 0.72);
+}
+
+.drawing-defense-hud .btn {
+  pointer-events: auto;
+  opacity: 0.78;
 }
 
 .drawing-defense-panel {
