@@ -48,9 +48,9 @@ export default function TrainingModulesPage({
             module={expandedModule}
             onClose={() => setExpandedModuleId(null)}
             onApply={(summary, values) => {
-              if (expandedModule.id === "writing-defense") {
+              if (expandedModule.id === "writing-defense" || expandedModule.id === "connect-dots" || expandedModule.id === "chinese-crossword") {
                 const params = new URLSearchParams(values);
-                navigate(`/training/writing-defense?${params.toString()}`);
+                navigate(`/training/${expandedModule.id}?${params.toString()}`);
               } else {
                 alert(`準備啟動 [${expandedModule.title}]\n\n${summary}`);
               }

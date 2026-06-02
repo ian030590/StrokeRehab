@@ -4,6 +4,8 @@ export type TrainingCategory = "motor" | "cognitive" | "language";
 
 export type TrainingModuleId =
   | "writing-defense"
+  | "connect-dots"
+  | "chinese-crossword"
   | "spatial-attention"
   | "attention-switch"
   | "memory-match"
@@ -60,11 +62,6 @@ const writingSpeedOptions: readonly ModuleSettingOption[] = [
   { value: "high", label: "快速", description: "敵人移動與出現節奏較快" },
 ];
 
-const deviceOptions: readonly ModuleSettingOption[] = [
-  { value: "tablet", label: "平板電腦", description: "需觸控螢幕拖曳或滑鼠按壓作畫" },
-  { value: "trackpad", label: "觸控板", description: "免按壓，手指在觸控板滑動即可作畫" },
-];
-
 const sideOptions: readonly ModuleSettingOption[] = [
   { value: "left", label: "左側" },
   { value: "right", label: "右側" },
@@ -81,6 +78,24 @@ const cognitiveLoadOptions: readonly ModuleSettingOption[] = [
   { value: "simple", label: "單一任務", description: "一次只處理一種刺激" },
   { value: "mixed", label: "混合任務", description: "需要在兩種規則間切換" },
   { value: "dual", label: "雙重任務", description: "加入記憶或抑制反應需求" },
+];
+
+const connectDotsShapeOptions: readonly ModuleSettingOption[] = [
+  { value: "star", label: "星星", description: "折線輪廓，轉折清楚" },
+  { value: "cat", label: "貓咪", description: "曲線輪廓，適合練習連續控制" },
+  { value: "leaf", label: "葉子", description: "對稱曲線，練習平滑描繪" },
+];
+
+const dotDensityOptions: readonly ModuleSettingOption[] = [
+  { value: "wide", label: "低密度", description: "點距較大，適合熟悉操作" },
+  { value: "standard", label: "標準", description: "約每 28px 取樣一點" },
+  { value: "dense", label: "高密度", description: "約每 20px 取樣一點" },
+];
+
+const crosswordLevelOptions: readonly ModuleSettingOption[] = [
+  { value: "standard", label: "標準", description: "約 8 個詞彙交錯" },
+  { value: "easy", label: "入門", description: "格數較少，提示較集中" },
+  { value: "challenge", label: "挑戰", description: "更多詞彙與交叉點" },
 ];
 
 const languageLevelOptions: readonly ModuleSettingOption[] = [
@@ -114,7 +129,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
     id: "writing-defense",
     category: "motor",
     title: "書寫保衛戰",
-    description: "透過觸控板或觸控螢幕畫出對應的圖案，擊退不斷逼近的敵人。訓練手部精細動作與反應時間。",
+    description: "透過滑鼠、平板觸控或繪圖螢幕畫出對應的圖案，擊退不斷逼近的敵人。訓練手部精細動作與反應時間。",
     icon: icon(
       <>
         <path d="M12 19l7-7 3 3-7 7-3-3z" />
@@ -123,12 +138,59 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <circle cx="11" cy="11" r="2" />
       </>
     ),
-    tags: ["動作控制", "書寫", "精細動作", "反應遊戲"],
+    tags: ["動作控制", "書寫", "精細動作", "反應遊戲", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "difficulty", label: "圖像難度", options: difficultyOptions },
       { id: "speed", label: "敵人速度", options: writingSpeedOptions },
       { id: "duration", label: "遊戲時間", options: durationOptions },
-      { id: "device", label: "使用設備", options: deviceOptions },
+    ],
+  },
+  {
+    id: "connect-dots",
+    category: "cognitive",
+    title: "連點遊戲",
+    description: "依照序號連接輪廓取樣點，在視覺搜尋、順序規劃與手眼協調間建立穩定連結。",
+    icon: icon(
+      <>
+        <circle cx="5" cy="6" r="2" />
+        <circle cx="12" cy="4" r="2" />
+        <circle cx="19" cy="8" r="2" />
+        <circle cx="16" cy="17" r="2" />
+        <circle cx="7" cy="18" r="2" />
+        <path d="M6.8 5.6 10.2 4.4" />
+        <path d="M13.8 4.8 17.2 7.2" />
+        <path d="M18.2 9.8 16.8 15.2" />
+        <path d="M13.8 17.2 9.2 17.8" />
+      </>,
+    ),
+    tags: ["視覺搜尋", "序列規劃", "手眼協調", "繪圖操作", "電腦遊戲", "平板遊戲"],
+    settings: [
+      { id: "shape", label: "輪廓圖形", options: connectDotsShapeOptions },
+      { id: "density", label: "點位密度", options: dotDensityOptions },
+    ],
+  },
+  {
+    id: "chinese-crossword",
+    category: "cognitive",
+    title: "中文填字遊戲",
+    description: "把成語詞庫交錯排成填字格，依照拼音與解釋填入中文字，訓練語意提取、注意力與工作記憶。",
+    icon: icon(
+      <>
+        <rect x="4" y="4" width="5" height="5" rx="1" />
+        <rect x="9" y="4" width="5" height="5" rx="1" />
+        <rect x="14" y="4" width="5" height="5" rx="1" />
+        <rect x="9" y="9" width="5" height="5" rx="1" />
+        <rect x="9" y="14" width="5" height="5" rx="1" />
+        <path d="M6 7h1" />
+        <path d="M11 7h1" />
+        <path d="M16 7h1" />
+        <path d="M11 12h1" />
+        <path d="M11 17h1" />
+      </>,
+    ),
+    tags: ["中文詞彙", "語意提取", "工作記憶", "電腦遊戲", "平板遊戲"],
+    settings: [
+      { id: "level", label: "題目難度", options: crosswordLevelOptions },
     ],
   },
   {
@@ -144,7 +206,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M11 8v6" />
       </>,
     ),
-    tags: ["空間注意", "方位辨識", "忽略干擾"],
+    tags: ["空間注意", "方位辨識", "忽略干擾", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "load", label: "任務負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -164,7 +226,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M7 17h10" />
       </>,
     ),
-    tags: ["注意力", "規則切換", "反應控制"],
+    tags: ["注意力", "規則切換", "反應控制", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "load", label: "任務負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -186,7 +248,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M17 16v4" />
       </>,
     ),
-    tags: ["工作記憶", "配對", "更新"],
+    tags: ["工作記憶", "配對", "更新", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "load", label: "記憶負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -206,7 +268,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M16 8l-8 8" />
       </>,
     ),
-    tags: ["抑制控制", "反應時間", "準確度"],
+    tags: ["抑制控制", "反應時間", "準確度", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "load", label: "任務負荷", options: cognitiveLoadOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -226,7 +288,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M8 12h5" />
       </>,
     ),
-    tags: ["詞彙", "命名", "口語輸出"],
+    tags: ["詞彙", "命名", "口語輸出", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -248,7 +310,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M12 17v4" />
       </>,
     ),
-    tags: ["命名", "生活語彙", "提示淡化"],
+    tags: ["命名", "生活語彙", "提示淡化", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -269,7 +331,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M17 10l3 2-3 2" />
       </>,
     ),
-    tags: ["句型", "語序", "表達"],
+    tags: ["句型", "語序", "表達", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },
@@ -289,7 +351,7 @@ export const TRAINING_MODULES: readonly TrainingModuleCardData[] = [
         <path d="M20 7a8 8 0 0 1 0 10" />
       </>,
     ),
-    tags: ["聽理解", "指令反應", "功能溝通"],
+    tags: ["聽理解", "指令反應", "功能溝通", "電腦遊戲", "平板遊戲"],
     settings: [
       { id: "level", label: "語料層級", options: languageLevelOptions },
       { id: "duration", label: "訓練時間", options: durationOptions },

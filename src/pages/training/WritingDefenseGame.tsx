@@ -20,9 +20,6 @@ type ShapeTarget =
 const TARGET_WIDTH = 72;
 const TARGET_HEIGHT = 56;
 const TARGET_COLOR = 0x000000;
-const TRACKPAD_START_X_RATIO = 0.5;
-const TRACKPAD_START_Y_RATIO = 2 / 3;
-const TRACKPAD_SENSITIVITY = 1.1;
 
 const SHAPES: Record<Difficulty, readonly ShapeTarget[]> = {
   beginner: [
@@ -280,20 +277,12 @@ export default function WritingDefenseGame() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; color: string; x: number; y: number } | null>(null);
   
-  const device = searchParams.get("device") || "tablet";
-  const hoverMode = device === "trackpad";
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const spawnTimerRef = useRef<number>(0);
   const drawingTimeoutRef = useRef<number | null>(null);
-  const strokeTimeoutRef = useRef<number | null>(null);
   const feedbackTimeoutRef = useRef<number | null>(null);
-  const trackpadCursorRef = useRef<{ x: number; y: number } | null>(null);
-  const trackpadLastPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const trackpadSessionActiveRef = useRef(false);
   
   const [isDrawing, setIsDrawing] = useState(false);
-  const [trackpadCursor, setTrackpadCursor] = useState<{ x: number; y: number } | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 
   useEffect(() => {
@@ -364,27 +353,7 @@ export default function WritingDefenseGame() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!hoverMode || isPlaying) return;
-    if (document.pointerLockElement === canvasRef.current) {
-      document.exitPointerLock();
-    }
-    setTrackpadCursor(null);
-    trackpadCursorRef.current = null;
-    trackpadLastPointerRef.current = null;
-    trackpadSessionActiveRef.current = false;
-  }, [hoverMode, isPlaying]);
-
-  useEffect(() => {
-    return () => {
-      if (document.pointerLockElement === canvasRef.current) {
-        document.exitPointerLock();
-      }
-    };
-  }, []);
-
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (hoverMode) return;
     if (!ctxRef.current || !isPlaying) return;
     setIsDrawing(true);
     if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
@@ -398,32 +367,14 @@ export default function WritingDefenseGame() {
     if (!ctxRef.current || !isPlaying) return;
     e.preventDefault();
 
-    if (hoverMode) {
-      if ("touches" in e) return;
-      drawWithTrackpad(e);
-
-      if (strokeTimeoutRef.current) clearTimeout(strokeTimeoutRef.current);
-      strokeTimeoutRef.current = window.setTimeout(() => {
-        setIsDrawing(false);
-      }, 150); // Small pause lifts the pen
-
-      if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
-      drawingTimeoutRef.current = window.setTimeout(() => {
-        setIsDrawing(false);
-        trackpadSessionActiveRef.current = false;
-        resetTrackpadCursor(false);
-        handleRecognition();
-      }, 800); // Longer pause triggers recognition
-    } else {
-      const { offsetX, offsetY } = getCoordinates(e);
-      if (!isDrawing) return;
-      ctxRef.current.lineTo(offsetX, offsetY);
-      ctxRef.current.stroke();
-    }
+    const { offsetX, offsetY } = getCoordinates(e);
+    if (!isDrawing) return;
+    ctxRef.current.lineTo(offsetX, offsetY);
+    ctxRef.current.stroke();
   };
 
   const stopDrawing = () => {
-    if (hoverMode || !isDrawing) return;
+    if (!isDrawing) return;
     setIsDrawing(false);
     
     if (drawingTimeoutRef.current) clearTimeout(drawingTimeoutRef.current);
@@ -492,81 +443,6 @@ export default function WritingDefenseGame() {
     };
   };
 
-  const resetTrackpadCursor = (activateSession: boolean) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-
-    const cursor = {
-      x: canvas.width * TRACKPAD_START_X_RATIO,
-      y: canvas.height * TRACKPAD_START_Y_RATIO,
-    };
-    trackpadCursorRef.current = cursor;
-    trackpadLastPointerRef.current = null;
-    trackpadSessionActiveRef.current = activateSession;
-    setTrackpadCursor(cursor);
-    return cursor;
-  };
-
-  const getTrackpadMovement = (e: React.MouseEvent) => {
-    const nativeEvent = e.nativeEvent;
-    const movementX = Number.isFinite(nativeEvent.movementX) ? nativeEvent.movementX : 0;
-    const movementY = Number.isFinite(nativeEvent.movementY) ? nativeEvent.movementY : 0;
-
-    if (movementX !== 0 || movementY !== 0 || document.pointerLockElement === canvasRef.current) {
-      return { dx: movementX, dy: movementY };
-    }
-
-    const current = getCoordinates(e);
-    const last = trackpadLastPointerRef.current;
-    trackpadLastPointerRef.current = { x: current.offsetX, y: current.offsetY };
-    if (!last) return { dx: 0, dy: 0 };
-    return {
-      dx: current.offsetX - last.x,
-      dy: current.offsetY - last.y,
-    };
-  };
-
-  const drawWithTrackpad = (e: React.MouseEvent) => {
-    const ctx = ctxRef.current;
-    const canvas = canvasRef.current;
-    if (!ctx || !canvas) return;
-
-    let cursor = trackpadCursorRef.current;
-    if (!trackpadSessionActiveRef.current || !cursor) {
-      cursor = resetTrackpadCursor(true);
-    }
-    if (!cursor) return;
-
-    const { dx, dy } = getTrackpadMovement(e);
-    const nextCursor = {
-      x: Math.max(0, Math.min(canvas.width, cursor.x + dx * TRACKPAD_SENSITIVITY)),
-      y: Math.max(0, Math.min(canvas.height, cursor.y + dy * TRACKPAD_SENSITIVITY)),
-    };
-
-    if (!isDrawing) {
-      setIsDrawing(true);
-      ctx.beginPath();
-      ctx.moveTo(cursor.x, cursor.y);
-    }
-
-    ctx.lineTo(nextCursor.x, nextCursor.y);
-    ctx.stroke();
-    trackpadCursorRef.current = nextCursor;
-    setTrackpadCursor(nextCursor);
-  };
-
-  const requestTrackpadPointerLock = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hoverMode) return;
-
-    const request = canvas.requestPointerLock();
-    if (request && "catch" in request) {
-      request.catch(() => {
-        // Pointer Lock can fail outside a trusted browser gesture; fallback still draws with relative movement.
-      });
-    }
-  };
-
   const startGame = () => {
     setIsPlaying(true);
     setScore(0);
@@ -576,10 +452,6 @@ export default function WritingDefenseGame() {
     setIsGameOver(false);
     setFeedback(null);
     spawnTimerRef.current = spawnRate;
-    if (hoverMode) {
-      resetTrackpadCursor(false);
-      window.setTimeout(requestTrackpadPointerLock, 0);
-    }
   };
 
   return (
@@ -687,24 +559,6 @@ export default function WritingDefenseGame() {
           onTouchEnd={stopDrawing}
           style={{ width: '100%', height: '100%', touchAction: 'none', cursor: 'crosshair' }}
         />
-        {hoverMode && isPlaying && trackpadCursor && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              left: `${trackpadCursor.x}px`,
-              top: `${trackpadCursor.y}px`,
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              border: '2px solid rgba(96, 165, 250, 0.95)',
-              backgroundColor: 'rgba(255,255,255,0.18)',
-              boxShadow: '0 0 12px rgba(96, 165, 250, 0.9)',
-              transform: 'translate(-50%, -50%)',
-              pointerEvents: 'none',
-            }}
-          />
-        )}
       </div>
 
       {/* Overlays */}

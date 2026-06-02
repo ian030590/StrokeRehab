@@ -9,6 +9,8 @@ const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((mo
 const CreditsPage = lazy(() => import('./pages/CreditsPage'));
 const RelatedLinksPage = lazy(() => import('./pages/RelatedLinksPage'));
 const WritingDefenseGame = lazy(() => import('./pages/training/WritingDefenseGame'));
+const ConnectDotsGame = lazy(() => import('./pages/training/ConnectDotsGame'));
+const ChineseCrosswordGame = lazy(() => import('./pages/training/ChineseCrosswordGame'));
 
 export function App() {
   return (
@@ -23,6 +25,8 @@ export function App() {
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/links" element={<RelatedLinksPage />} />
           <Route path="/training/writing-defense" element={<WritingDefenseGame />} />
+          <Route path="/training/connect-dots" element={<ConnectDotsGame />} />
+          <Route path="/training/chinese-crossword" element={<ChineseCrosswordGame />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/motor" replace />} />
