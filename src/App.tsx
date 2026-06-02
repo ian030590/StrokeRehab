@@ -9,7 +9,7 @@ const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((mo
 const CreditsPage = lazy(() => import('./pages/CreditsPage'));
 const RelatedLinksPage = lazy(() => import('./pages/RelatedLinksPage'));
 const WritingDefenseGame = lazy(() => import('./pages/training/WritingDefenseGame'));
-const HealthExerciseVideosPage = lazy(() => import('./pages/training/HealthExerciseVideosPage'));
+const HealthExerciseVideosPage = lazy(() => import('./pages/HealthExerciseVideosPage'));
 const ConnectDotsGame = lazy(() => import('./pages/training/ConnectDotsGame'));
 const ChineseCrosswordGame = lazy(() => import('./pages/training/ChineseCrosswordGame'));
 
