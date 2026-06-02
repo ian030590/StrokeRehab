@@ -1755,6 +1755,9 @@ body #webgazer-calibrate-container #calibration-point {
   height: 100vh;
   overflow: hidden;
   background: #f6f7f8;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
   touch-action: none;
 }
 

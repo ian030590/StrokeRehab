@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js';
 import { initJsPsych } from 'jspsych';
 import { downloadCsvFile } from '../../utils/downloadFile';
@@ -50,6 +50,9 @@ const DEFAULT_JUDGE_DELAY_MS = 300;
 const STROKE_WAIT_OPTIONS = [220, DEFAULT_JUDGE_DELAY_MS, 350] as const;
 const RECOGNIZER_POINTS = 64;
 const RECOGNIZER_SIZE = 200;
+const starSkyBackgroundStyle: CSSProperties = {
+  backgroundImage: `url(${import.meta.env.BASE_URL}assets/StarSky.png)`,
+};
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   Beginner: { label: '初級', enemyCount: 12, spawnIntervalSec: 2.4, maxConcurrentSpawns: 1 },
@@ -161,14 +164,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     const w = app.renderer.width;
     const h = app.renderer.height;
     const bg = new Graphics();
-    bg.rect(0, 0, w, h).fill(0x080d1f);
-    for (let i = 0; i < 150; i += 1) {
-      const x = ((i * 97) % Math.max(1, w)) + (((i * 37) % 11) / 10);
-      const y = ((i * 53) % Math.max(1, h)) + (((i * 19) % 7) / 10);
-      const radius = i % 9 === 0 ? 1.8 : i % 5 === 0 ? 1.3 : 0.8;
-      const alpha = i % 7 === 0 ? 0.95 : 0.55;
-      bg.circle(x, y, radius).fill({ color: 0xffffff, alpha });
-    }
+    bg.rect(0, 0, w, h).fill({ color: 0x050816, alpha: 0.22 });
     app.stage.addChild(bg);
 
     const labels = [
@@ -323,7 +319,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       const host = pixiHostRef.current;
       if (!host) return;
       await app.init({
-        backgroundColor: 0xf6f7f8,
+        backgroundAlpha: 0,
         antialias: true,
         autoDensity: true,
         resolution: window.devicePixelRatio || 1,
@@ -439,7 +435,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   };
 
   return (
-    <div className={`drawing-defense drawing-defense-phase-${phase}`}>
+    <div className={`drawing-defense drawing-defense-phase-${phase}`} style={starSkyBackgroundStyle}>
       <div ref={pixiHostRef} className="drawing-defense-stage" />
       <div ref={overlayRef} className="drawing-defense-input" />
       {phase !== 'results' && <div className="drawing-defense-hud">
