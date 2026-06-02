@@ -901,7 +901,11 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   if (rawPoints.length < 6) return null;
 
   if (looksLikeCircle(rawPoints, strictness)) return 'circle';
-  if (looksLikeCross(usableStrokes, rawPoints, getBox(rawPoints), crossTolerance(strictness))) return 'cross';
+  const box = getBox(rawPoints);
+  const tolerance = shapeTolerance(strictness);
+  if (looksLikeCross(usableStrokes, rawPoints, box, tolerance)) return 'cross';
+  if (looksLikeSquare(rawPoints, box, tolerance)) return 'square';
+  if (looksLikeTriangle(usableStrokes, rawPoints, box, tolerance)) return 'triangle';
 
   const candidate = normalizeGesture(usableStrokes);
   let best: { shape: ShapeId; score: number } | null = null;
@@ -918,11 +922,14 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   }
 
   const threshold = 0.42 + strictness * 0.0025;
-  const adjustedThreshold = best?.shape === 'cross' ? threshold - 0.06 : threshold;
+  const adjustedThreshold =
+    best?.shape === 'cross' || best?.shape === 'square' || best?.shape === 'triangle'
+      ? threshold - 0.06
+      : threshold;
   return best && best.score >= adjustedThreshold ? best.shape : null;
 }
 
-function crossTolerance(strictness: number): number {
+function shapeTolerance(strictness: number): number {
   return 1 - clamp(strictness, 0, 100) / 100;
 }
 
@@ -983,6 +990,23 @@ function createGestureTemplates(): GestureTemplate[] {
       ]],
     },
     {
+      shape: 'square',
+      strokes: [
+        [{ x: -48, y: -48 }, { x: 48, y: -48 }],
+        [{ x: 48, y: -48 }, { x: 48, y: 48 }],
+        [{ x: 48, y: 48 }, { x: -48, y: 48 }],
+        [{ x: -48, y: 48 }, { x: -48, y: -48 }],
+      ],
+    },
+    {
+      shape: 'square',
+      strokes: [
+        [{ x: -48, y: -48 }, { x: -48, y: 48 }],
+        [{ x: -48, y: -48 }, { x: 48, y: -48 }, { x: 48, y: 48 }],
+        [{ x: -48, y: 48 }, { x: 48, y: 48 }],
+      ],
+    },
+    {
       shape: 'triangle',
       strokes: [[
         { x: 0, y: -54 },
@@ -990,6 +1014,14 @@ function createGestureTemplates(): GestureTemplate[] {
         { x: -52, y: 46 },
         { x: 0, y: -54 },
       ]],
+    },
+    {
+      shape: 'triangle',
+      strokes: [
+        [{ x: 0, y: -54 }, { x: 52, y: 46 }],
+        [{ x: 52, y: 46 }, { x: -52, y: 46 }],
+        [{ x: -52, y: 46 }, { x: 0, y: -54 }],
+      ],
     },
     {
       shape: 'cross',
@@ -1121,24 +1153,83 @@ function sampleEllipse(cx: number, cy: number, rx: number, ry: number, count: nu
   return points;
 }
 
-function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+function looksLikeSquare(points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  if (points.length < 8) return false;
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const maxSize = Math.max(width, height);
+  const minSize = Math.min(width, height);
+  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.45) return false;
+
+  const margin = Math.max(7, maxSize * (0.12 + tolerance * 0.06));
+  const coverage = getBoxSideCoverage(points, box, margin);
+  const sideCoverageFloor = 0.42 - tolerance * 0.08;
+
+  return (
+    coverage.left >= sideCoverageFloor &&
+    coverage.right >= sideCoverageFloor &&
+    coverage.top >= sideCoverageFloor &&
+    coverage.bottom >= sideCoverageFloor
+  );
+}
+
+function looksLikeTriangle(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  if (points.length < 6) return false;
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const maxSize = Math.max(width, height);
+  const minSize = Math.min(width, height);
+  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.38) return false;
+
+  const margin = Math.max(7, maxSize * (0.12 + tolerance * 0.05));
+  const coverage = getBoxSideCoverage(points, box, margin);
   const lineStrokes = strokes
     .map(getStrokeLineFeatures)
-    .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.68 - tolerance * 0.18);
+    .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.54 - tolerance * 0.14);
+  const horizontalBase = lineStrokes.some((stroke) => isHorizontal(stroke.angle, tolerance));
+  const diagonalStrokes = lineStrokes.filter((stroke) => isDiagonal(stroke.angle, tolerance));
+  const hasOpposingDiagonals = diagonalStrokes.some((first, index) => (
+    diagonalStrokes.slice(index + 1).some((second) => {
+      const diff = angleDifference(first.angle, second.angle);
+      return diff > 45 - tolerance * 12 && diff < 135 + tolerance * 12;
+    })
+  ));
+  if (hasOpposingDiagonals && (horizontalBase || coverage.bottom >= 0.32 - tolerance * 0.08)) {
+    return true;
+  }
+
+  const simplified = simplify(points, Math.max(5, maxSize * 0.06));
+  const corners = countCorners(simplified);
+  const areaRatio = polygonArea(points) / Math.max(1, width * height);
+
+  return (
+    corners >= 2 &&
+    corners <= 4 &&
+    areaRatio >= 0.2 &&
+    areaRatio <= 0.7 &&
+    coverage.bottom >= 0.28 - tolerance * 0.08 &&
+    coverage.top < 0.42 + tolerance * 0.08
+  );
+}
+
+function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  const center = { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 };
+  const lineStrokes = strokes
+    .map(getStrokeLineFeatures)
+    .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.56 - tolerance * 0.18);
   if (lineStrokes.length >= 2) {
     for (let i = 0; i < lineStrokes.length; i += 1) {
       for (let j = i + 1; j < lineStrokes.length; j += 1) {
         const diff = angleDifference(lineStrokes[i].angle, lineStrokes[j].angle);
         const bothDiagonal = isDiagonal(lineStrokes[i].angle, tolerance) && isDiagonal(lineStrokes[j].angle, tolerance);
-        if (bothDiagonal && diff > 55 - tolerance * 18 && diff < 125 + tolerance * 18) {
+        const bothCrossCenter = linePassesNearCenter(lineStrokes[i], center, box, tolerance) && linePassesNearCenter(lineStrokes[j], center, box, tolerance);
+        if (bothDiagonal && bothCrossCenter && diff > 42 - tolerance * 16 && diff < 138 + tolerance * 16) {
           return true;
         }
       }
     }
   }
 
-  const cx = (box.minX + box.maxX) / 2;
-  const cy = (box.minY + box.maxY) / 2;
   const quadrants = new Set<string>();
   let positive = 0;
   let negative = 0;
@@ -1149,12 +1240,14 @@ function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typ
     if (dx * dy > 0) positive += 1;
     else negative += 1;
   }
-  points.forEach((point) => quadrants.add(`${point.x > cx ? 'r' : 'l'}${point.y > cy ? 'b' : 't'}`));
-  return quadrants.size >= 4 && positive > 2 && negative > 2 && Math.min(positive, negative) / Math.max(positive, negative) > 0.18 - tolerance * 0.1;
+  points.forEach((point) => quadrants.add(`${point.x > center.x ? 'r' : 'l'}${point.y > center.y ? 'b' : 't'}`));
+  return quadrants.size >= 4 && positive > 1 && negative > 1 && Math.min(positive, negative) / Math.max(positive, negative) > 0.12 - tolerance * 0.08;
 }
 
 interface StrokeLineFeatures {
   angle: number;
+  first: Point;
+  last: Point;
   straightness: number;
 }
 
@@ -1175,6 +1268,8 @@ function getStrokeLineFeatures(stroke: Point[]): StrokeLineFeatures | null {
   const angle = normalizeAngle(Math.atan2(last.y - first.y, last.x - first.x) * 180 / Math.PI);
   return {
     angle,
+    first,
+    last,
     straightness: distance(first, last) / Math.max(1, length),
   };
 }
@@ -1190,7 +1285,51 @@ function angleDifference(a: number, b: number): number {
 }
 
 function isDiagonal(angle: number, tolerance: number): boolean {
-  return Math.abs(angle - 45) < 28 + tolerance * 14 || Math.abs(angle - 135) < 28 + tolerance * 14;
+  return Math.abs(angle - 45) < 34 + tolerance * 18 || Math.abs(angle - 135) < 34 + tolerance * 18;
+}
+
+function isHorizontal(angle: number, tolerance: number): boolean {
+  const limit = 22 + tolerance * 16;
+  return angle < limit || angle > 180 - limit;
+}
+
+function linePassesNearCenter(line: StrokeLineFeatures, center: Point, box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  const width = box.maxX - box.minX;
+  const height = box.maxY - box.minY;
+  const maxSize = Math.max(width, height);
+  const margin = maxSize * (0.08 + tolerance * 0.05);
+  const minX = Math.min(line.first.x, line.last.x) - margin;
+  const maxX = Math.max(line.first.x, line.last.x) + margin;
+  const minY = Math.min(line.first.y, line.last.y) - margin;
+  const maxY = Math.max(line.first.y, line.last.y) + margin;
+  if (center.x < minX || center.x > maxX || center.y < minY || center.y > maxY) return false;
+  return perpendicularDistance(center, line.first, line.last) <= maxSize * (0.16 + tolerance * 0.08);
+}
+
+function getBoxSideCoverage(points: Point[], box: ReturnType<typeof getBox>, margin: number) {
+  const width = Math.max(1, box.maxX - box.minX);
+  const height = Math.max(1, box.maxY - box.minY);
+  const left = points.filter((point) => Math.abs(point.x - box.minX) <= margin);
+  const right = points.filter((point) => Math.abs(point.x - box.maxX) <= margin);
+  const top = points.filter((point) => Math.abs(point.y - box.minY) <= margin);
+  const bottom = points.filter((point) => Math.abs(point.y - box.maxY) <= margin);
+  return {
+    left: axisCoverage(left, 'y', box.minY, height),
+    right: axisCoverage(right, 'y', box.minY, height),
+    top: axisCoverage(top, 'x', box.minX, width),
+    bottom: axisCoverage(bottom, 'x', box.minX, width),
+  };
+}
+
+function axisCoverage(points: Point[], axis: 'x' | 'y', start: number, span: number): number {
+  if (points.length < 3) return 0;
+  const bins = 6;
+  const occupied = new Set<number>();
+  points.forEach((point) => {
+    const ratio = (point[axis] - start) / Math.max(1, span);
+    occupied.add(clamp(Math.floor(ratio * bins), 0, bins - 1));
+  });
+  return occupied.size / bins;
 }
 
 function simplify(points: Point[], epsilon: number): Point[] {
