@@ -1765,14 +1765,14 @@ body #webgazer-calibrate-container #calibration-point {
 .drawing-defense-input {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
 }
 
 .drawing-defense-canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
 }
 
 .drawing-defense-input {
@@ -1782,6 +1782,11 @@ body #webgazer-calibrate-container #calibration-point {
 
 .drawing-defense-phase-results .drawing-defense-input {
   pointer-events: none;
+}
+
+.drawing-defense-results-container {
+  z-index: 7;
+  background: #FFFFFF;
 }
 
 .drawing-defense-hud {

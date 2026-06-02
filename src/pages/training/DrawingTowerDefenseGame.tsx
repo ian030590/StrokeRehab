@@ -544,14 +544,16 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       )}
 
       {phase === 'results' && result && (
-        <div className="drawing-defense-panel drawing-defense-results-panel">
+        <div className="experiment-container drawing-defense-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
             <h1>訓練完成！</h1>
-            <div className="results-score" style={{ color: result.Game_Result === 'Victory' ? 'var(--accent)' : 'var(--warning)' }}>
-              {result.Game_Result === 'Victory' ? '勝利' : '失敗'}
+            <div className="results-score">
+              {result.Enemies_Defeated}/{DIFFICULTIES[result.Difficulty].enemyCount}
             </div>
-            <div style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
-              使用者：<b style={{ color: 'var(--accent)' }}>{result.Participant_ID}</b>
+            <div style={{ display: 'flex', gap: 24, marginBottom: 24, color: 'var(--text-secondary)', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <span>使用者：<b style={{ color: 'var(--accent)' }}>{result.Participant_ID}</b></span>
+              <span>總時長：<b style={{ color: 'var(--accent)' }}>{result.Total_Duration_Seconds} 秒</b></span>
+              <span>剩餘 HP：<b style={{ color: 'var(--accent)' }}>{result.HP_Remaining}/3</b></span>
             </div>
 
             <table className="results-table">
@@ -563,16 +565,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               </thead>
               <tbody>
                 <tr>
-                  <td>總時長</td>
-                  <td>{result.Total_Duration_Seconds} 秒</td>
-                </tr>
-                <tr>
                   <td>消滅敵人</td>
                   <td style={{ fontWeight: 600, color: 'var(--accent)' }}>{result.Enemies_Defeated}</td>
                 </tr>
                 <tr>
-                  <td>剩餘 HP</td>
-                  <td>{result.HP_Remaining}/3</td>
+                  <td>總敵人數</td>
+                  <td>{DIFFICULTIES[result.Difficulty].enemyCount}</td>
                 </tr>
                 <tr>
                   <td>難度</td>
