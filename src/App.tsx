@@ -1,27 +1,37 @@
+import { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Navbar } from './components/Navbar';
 
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
-import NavBar from './components/NavBar';
-import Dashboard from './pages/Dashboard';
-import SpeechTherapy from './pages/SpeechTherapy';
-import CognitiveTherapy from './pages/CognitiveTherapy';
-import MotorTherapy from './pages/MotorTherapy';
+const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
+const TrainingPage = lazy(() => import('./pages/training/TrainingPage').then((module) => ({ default: module.TrainingPage })));
+const CreditsPage = lazy(() => import('./pages/credits/CreditsPage').then((module) => ({ default: module.CreditsPage })));
+const LinksPage = lazy(() => import('./pages/links/LinksPage').then((module) => ({ default: module.LinksPage })));
 
-function App() {
+export function App() {
   return (
-    <Router>
-      <div className="app-container">
-        <NavBar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/speech" element={<SpeechTherapy />} />
-            <Route path="/cognitive" element={<CognitiveTherapy />} />
-            <Route path="/motor" element={<MotorTherapy />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <Suspense fallback={<div className="app-loading" />}>
+      <Routes>
+        <Route path="/training" element={<TrainingPage />} />
+
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/links" element={<LinksPage />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 
-export default App;
+function AppLayout() {
+  return (
+    <div className="app-layout">
+      <Navbar />
+      <Outlet />
+    </div>
+  );
+}
