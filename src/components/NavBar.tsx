@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { ACTIVE_USER_CHANGED_EVENT, getActiveUser } from '../utils/settings';
 import { downloadAllTrainingRecordsCsv } from '../utils/trainingRecords';
 import { useT } from '../i18n';
@@ -9,8 +9,12 @@ const logoStyle = { width: 'auto', objectFit: 'contain' } as const;
 
 export function Navbar() {
   const { t } = useT();
+  const location = useLocation();
   const [user, setUser] = useState(getActiveUser);
   const [isOpen, setIsOpen] = useState(false);
+  const activeTrainingModule = location.pathname === '/training'
+    ? (new URLSearchParams(location.search).get('module') || 'motor-training')
+    : null;
 
   useEffect(() => {
     const syncUser = () => setUser(getActiveUser());
@@ -66,6 +70,27 @@ export function Navbar() {
               onClick={closeMenu}
             >
               {t('nav.trainingList')}
+            </NavLink>
+            <NavLink
+              to="/training?module=motor-training"
+              className={() => `navbar-link ${activeTrainingModule === 'motor-training' ? 'active' : ''}`}
+              onClick={closeMenu}
+            >
+              {t('home.module.motor.title')}
+            </NavLink>
+            <NavLink
+              to="/training?module=cognitive-training"
+              className={() => `navbar-link ${activeTrainingModule === 'cognitive-training' ? 'active' : ''}`}
+              onClick={closeMenu}
+            >
+              {t('home.module.cognitive.title')}
+            </NavLink>
+            <NavLink
+              to="/training?module=speech-training"
+              className={() => `navbar-link ${activeTrainingModule === 'speech-training' ? 'active' : ''}`}
+              onClick={closeMenu}
+            >
+              {t('home.module.speech.title')}
             </NavLink>
             <NavLink
               to="/settings"

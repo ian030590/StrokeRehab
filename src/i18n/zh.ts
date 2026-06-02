@@ -1,6 +1,6 @@
 export const zh = {
   // Navigation
-  'nav.trainingList': '復健訓練',
+  'nav.trainingList': '訓練分類',
   'nav.assessment': '評估',
   'nav.settings': '設定',
   'nav.credits': '致謝',
@@ -55,7 +55,7 @@ export const zh = {
   'home.enterUserName': '輸入使用者名稱',
   'home.calWarning': '⚠ 尚未校正螢幕 — 前往設定頁校正以確保準確度',
   'home.listTitle': '訓練清單',
-  'home.listSubtitle': '選擇您想進行的訓練項目',
+  'home.listSubtitle': '選擇動作、認知或言語訓練項目',
   
   // Modules
   'home.module.motor.title': '動作訓練',
@@ -395,7 +395,7 @@ export const zh = {
 
   // Links Page
   'links.title': '相關網站',
-  'links.subtitle': '其他實用的復健與相關資源網站',
+  'links.subtitle': '其他實用的訓練與相關資源網站',
   'links.strokeTrainer.title': 'Vision Trainer',
   'links.strokeTrainer.desc': '視覺能力訓練系統，提供多種視覺訓練項目',
 };

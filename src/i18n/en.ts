@@ -2,7 +2,7 @@ import type { TranslationKey } from './zh';
 
 export const en: Record<TranslationKey, string> = {
   // Navigation
-  'nav.trainingList': 'Rehab Training',
+  'nav.trainingList': 'Training Categories',
   'nav.assessment': 'Assessment',
   'nav.settings': 'Settings',
   'nav.credits': 'Credits',
@@ -57,7 +57,7 @@ export const en: Record<TranslationKey, string> = {
   'home.enterUserName': 'Enter user name',
   'home.calWarning': '⚠ Screen not calibrated — Go to settings to calibrate for accuracy',
   'home.listTitle': 'Training List',
-  'home.listSubtitle': 'Select a training module',
+  'home.listSubtitle': 'Choose motor, cognitive, or speech training',
   
   // Modules
   'home.module.motor.title': 'Motor Training',
@@ -396,7 +396,7 @@ export const en: Record<TranslationKey, string> = {
 
   // Links Page
   'links.title': 'Related Websites',
-  'links.subtitle': 'Other useful rehab and related resource websites',
+  'links.subtitle': 'Other useful training and related resource websites',
   'links.strokeTrainer.title': 'Vision Trainer',
   'links.strokeTrainer.desc': 'Visual training system with various exercises',
 };
