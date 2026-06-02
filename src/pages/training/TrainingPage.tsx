@@ -1,14 +1,11 @@
 import { useCallback, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { addUser, getActiveUser, getUsers, removeUser, setActiveUser } from '../../utils/settings';
-import { TrainingModuleCard } from '../home/TrainingModuleCard';
-import { TRAINING_MODULES } from '../home/trainingModules';
 import type { TrainingModuleId } from '../home/trainingModules';
 
 export function TrainingPage() {
   const { t } = useT();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedModuleId = searchParams.get('module');
   const moduleId: TrainingModuleId = requestedModuleId === 'cognitive-training'
@@ -46,14 +43,6 @@ export function TrainingPage() {
       removeUser(name);
       refreshUsers();
     }
-  };
-
-  const handleCardClick = (targetModuleId: TrainingModuleId) => {
-    if (!activeUser) {
-      alert(t('home.pleaseSelectUser'));
-      return;
-    }
-    navigate(`/training?module=${targetModuleId}`);
   };
 
   let titleKey: any = 'home.module.motor.title';
@@ -108,18 +97,6 @@ export function TrainingPage() {
 
       <h1 className="section-title fade-in-up">{t(titleKey)}</h1>
       <p className="section-subtitle fade-in-up">{t('home.listSubtitle')}</p>
-
-      <div className="training-grid">
-        {TRAINING_MODULES.map((module) => (
-          <TrainingModuleCard
-            key={module.id}
-            module={module}
-            expandedModule={moduleId}
-            onSelect={handleCardClick}
-            t={t}
-          />
-        ))}
-      </div>
     </div>
   );
 }
