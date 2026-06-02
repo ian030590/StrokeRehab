@@ -90,7 +90,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [hp, setHp] = useState(3);
   const [defeated, setDefeated] = useState(0);
   const [spawned, setSpawned] = useState(0);
-  const [recognized, setRecognized] = useState<string>('撠雿?');
+  const [recognized, setRecognized] = useState<string>('尚未辨識');
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
@@ -121,6 +121,17 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, []);
 
   const finishGame = useCallback((gameResult: GameResult) => {
+    if (phaseRef.current === 'results') return;
+    if (recognitionTimerRef.current !== null) {
+      window.clearTimeout(recognitionTimerRef.current);
+      recognitionTimerRef.current = null;
+    }
+    isDrawingRef.current = false;
+    pathRef.current = [];
+    strokesRef.current = [];
+    drawingLayerRef.current?.clear();
+    enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
+    enemiesRef.current = [];
     const metrics = metricsRef.current;
     const record: SessionRecord = {
       Participant_ID: getActiveUser() || 'Unknown',
@@ -155,7 +166,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     app.stage.addChild(bg);
 
     const labels = [
-      { text: '蝘餃?頝臬?', y: h * 0.39 },
+      { text: '畫出敵人板上的圖形', y: h * 0.39 },
     ];
     labels.forEach((label) => {
       const text = new Text({ text: label.text, style: { fill: 0xdbeafe, fontSize: 15, fontWeight: '700' } });
@@ -197,7 +208,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
       node: new Container(),
     };
-    const monster = new Text({ text: '?', style: { fontSize: 42 } });
+    const monster = new Text({ text: '👾', style: { fontSize: 42 } });
     monster.anchor.set(0.5);
     monster.x = 0;
     monster.y = -6;
@@ -271,7 +282,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setDefeated(0);
     setSpawned(0);
     setResult(null);
-    setRecognized('撠雿?');
+    setRecognized('尚未辨識');
     setPhase('playing');
   }, [clearPixiState, drawLayout, setPhase]);
 
@@ -328,7 +339,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           const spawnBatch = cfg.maxConcurrentSpawns > 1 && Math.random() > 0.45 ? cfg.maxConcurrentSpawns : 1;
           for (let i = 0; i < spawnBatch && metrics.spawned < cfg.enemyCount; i += 1) spawnEnemy(app);
         }
-        const defenseY = app.renderer.height;
+        const enemyBottomOffset = 68;
+        const defenseY = app.renderer.height - enemyBottomOffset;
         for (const enemy of [...enemiesRef.current]) {
           enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
@@ -337,8 +349,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             enemiesRef.current = enemiesRef.current.filter((item) => item.id !== enemy.id);
             metrics.hp = Math.max(0, metrics.hp - 1);
             setHp(metrics.hp);
-            if (metrics.hp <= 0) finishGame('Defeat');
           }
+        }
+        if (metrics.hp <= 0) {
+          finishGame('Defeat');
+          return;
         }
         if (metrics.spawned >= cfg.enemyCount && enemiesRef.current.length === 0 && metrics.hp > 0) {
           finishGame('Victory');
@@ -418,16 +433,16 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   };
 
   return (
-    <div className="drawing-defense">
+    <div className={`drawing-defense drawing-defense-phase-${phase}`}>
       <div ref={pixiHostRef} className="drawing-defense-stage" />
       <div ref={overlayRef} className="drawing-defense-input" />
-      <div className="drawing-defense-hud">
+      {phase !== 'results' && <div className="drawing-defense-hud">
         <div><strong>HP</strong> {hp}/3</div>
-        <div><strong>瘨?</strong> {defeated}</div>
+        <div><strong>消滅</strong> {defeated}</div>
         <div><strong>敵人</strong> {progressText}</div>
         <div><strong>辨識</strong> {recognized}</div>
         {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>}
-      </div>
+      </div>}
 
       {phase === 'menu' && (
         <div className="drawing-defense-panel">

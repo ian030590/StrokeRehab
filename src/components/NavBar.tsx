@@ -12,11 +12,16 @@ export function Navbar() {
   const location = useLocation();
   const [user, setUser] = useState(getActiveUser);
   const [isOpen, setIsOpen] = useState(false);
-  const activeTrainingModule = location.pathname === '/'
-    ? 'motor-training'
-    : location.pathname === '/training'
-    ? (new URLSearchParams(location.search).get('module') || 'motor-training')
-    : null;
+  const activeTrainingModule =
+    location.pathname === '/' || location.pathname === '/motor-training'
+      ? 'motor-training'
+      : location.pathname === '/cognitive-training'
+        ? 'cognitive-training'
+        : location.pathname === '/speech-training'
+          ? 'speech-training'
+          : location.pathname === '/training'
+            ? (new URLSearchParams(location.search).get('module') || 'motor-training')
+            : null;
 
   useEffect(() => {
     const syncUser = () => setUser(getActiveUser());
@@ -66,21 +71,21 @@ export function Navbar() {
         <div className={`navbar-menu ${isOpen ? 'is-open' : ''}`}>
           <div className="navbar-links">
             <NavLink
-              to="/"
+              to="/motor-training"
               className={() => `navbar-link ${activeTrainingModule === 'motor-training' ? 'active' : ''}`}
               onClick={closeMenu}
             >
               {t('home.module.motor.title')}
             </NavLink>
             <NavLink
-              to="/training?module=cognitive-training"
+              to="/cognitive-training"
               className={() => `navbar-link ${activeTrainingModule === 'cognitive-training' ? 'active' : ''}`}
               onClick={closeMenu}
             >
               {t('home.module.cognitive.title')}
             </NavLink>
             <NavLink
-              to="/training?module=speech-training"
+              to="/speech-training"
               className={() => `navbar-link ${activeTrainingModule === 'speech-training' ? 'active' : ''}`}
               onClick={closeMenu}
             >
