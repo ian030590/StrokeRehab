@@ -16,8 +16,9 @@ interface DrawingTowerDefenseGameProps {
 interface DifficultyConfig {
   label: string;
   enemyCount: number;
+  spawnMode: 'after-clear-delay' | 'after-clear' | 'fixed-interval';
   spawnIntervalSec: number;
-  maxConcurrentSpawns: number;
+  description: string;
 }
 
 interface Point {
@@ -48,6 +49,9 @@ interface SessionRecord {
 const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 'vertical-line', 'horizontal-line'];
 const DEFAULT_JUDGE_DELAY_MS = 300;
 const STROKE_WAIT_OPTIONS = [220, DEFAULT_JUDGE_DELAY_MS, 350] as const;
+const ENEMY_SPEED_OPTIONS = [30, 60, 90] as const;
+const DEFAULT_ENEMY_SPEED = 30;
+const DEFAULT_ENEMY_COUNT = 12;
 const RECOGNIZER_POINTS = 64;
 const RECOGNIZER_SIZE = 200;
 const starSkyBackgroundStyle: CSSProperties = {
@@ -55,9 +59,9 @@ const starSkyBackgroundStyle: CSSProperties = {
 };
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
-  Beginner: { label: '初級', enemyCount: 12, spawnIntervalSec: 2.4, maxConcurrentSpawns: 1 },
-  Intermediate: { label: '中級', enemyCount: 24, spawnIntervalSec: 1.55, maxConcurrentSpawns: 1 },
-  Advanced: { label: '高級', enemyCount: 42, spawnIntervalSec: 1.05, maxConcurrentSpawns: 2 },
+  Beginner: { label: '初級', enemyCount: DEFAULT_ENEMY_COUNT, spawnMode: 'after-clear-delay', spawnIntervalSec: 2, description: '消滅後 2 秒出現下一名' },
+  Intermediate: { label: '中級', enemyCount: DEFAULT_ENEMY_COUNT, spawnMode: 'after-clear', spawnIntervalSec: 0, description: '消滅後馬上出現下一名' },
+  Advanced: { label: '高級', enemyCount: DEFAULT_ENEMY_COUNT, spawnMode: 'fixed-interval', spawnIntervalSec: 3, description: '每 3 秒出現一名' },
 };
 
 const SHAPE_LABEL: Record<ShapeId, string> = {
@@ -81,12 +85,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const isDrawingRef = useRef(false);
   const metricsRef = useRef({ defeated: 0, hp: 3, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
   const phaseRef = useRef<GamePhase>('menu');
-  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: 80, strictness: 45, strokeWaitMs: DEFAULT_JUDGE_DELAY_MS });
+  const configRef = useRef({ difficulty: 'Beginner' as Difficulty, speed: DEFAULT_ENEMY_SPEED, strictness: 45, strokeWaitMs: DEFAULT_JUDGE_DELAY_MS });
   const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
 
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
-  const [speed, setSpeed] = useState(80);
+  const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
+  const [customSpeed, setCustomSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [strictness, setStrictness] = useState(45);
   const [strokeWaitMs, setStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
@@ -97,6 +102,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
+  const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -335,11 +341,22 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         const metrics = metricsRef.current;
         const cfg = DIFFICULTIES[configRef.current.difficulty];
         metrics.elapsed += dt;
-        metrics.spawnTimer += dt;
-        if (metrics.spawned < cfg.enemyCount && metrics.spawnTimer >= cfg.spawnIntervalSec) {
+        const noActiveEnemies = enemiesRef.current.length === 0;
+        if (cfg.spawnMode === 'fixed-interval' || noActiveEnemies) {
+          metrics.spawnTimer += dt;
+        } else {
           metrics.spawnTimer = 0;
-          const spawnBatch = cfg.maxConcurrentSpawns > 1 && Math.random() > 0.45 ? cfg.maxConcurrentSpawns : 1;
-          for (let i = 0; i < spawnBatch && metrics.spawned < cfg.enemyCount; i += 1) spawnEnemy(app);
+        }
+        if (metrics.spawned < cfg.enemyCount) {
+          const shouldSpawn =
+            metrics.spawned === 0 ||
+            (cfg.spawnMode === 'after-clear-delay' && noActiveEnemies && metrics.spawnTimer >= cfg.spawnIntervalSec) ||
+            (cfg.spawnMode === 'after-clear' && noActiveEnemies) ||
+            (cfg.spawnMode === 'fixed-interval' && metrics.spawnTimer >= cfg.spawnIntervalSec);
+          if (shouldSpawn) {
+            metrics.spawnTimer = 0;
+            spawnEnemy(app);
+          }
         }
         const enemyBottomOffset = 68;
         const defenseY = app.renderer.height - enemyBottomOffset;
@@ -463,7 +480,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     onClick={() => setDifficulty(key as Difficulty)}
                   >
                     <span className="diff-btn-label">{value.label}</span>
-                    <span className="diff-btn-desc">{value.enemyCount} 隻敵人</span>
+                    <span className="diff-btn-desc">{value.description}</span>
                   </button>
                 ))}
               </div>
@@ -472,10 +489,35 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             <div className="config-section">
               <div className="config-label">速度與辨識</div>
               <div className="difficulty-selector">
-                <label className="diff-btn" style={{ cursor: 'default', alignItems: 'stretch' }}>
-                  <span className="diff-btn-label">敵人速度</span>
+                {ENEMY_SPEED_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={`diff-btn ${speed === option ? 'active' : ''}`}
+                    onClick={() => setSpeed(option)}
+                  >
+                    <span className="diff-btn-label">{option} px/s</span>
+                    <span className="diff-btn-desc">敵人速度</span>
+                  </button>
+                ))}
+                <label className={`diff-btn ${isCustomSpeed ? 'active' : ''}`} style={{ cursor: 'default', alignItems: 'stretch' }}>
+                  <span className="diff-btn-label">自訂</span>
                   <span className="diff-btn-desc">{speed} px/s</span>
-                  <input type="range" min="45" max="170" step="5" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} />
+                  <input
+                    className="rounds-custom-input drawing-defense-speed-input"
+                    type="number"
+                    min="10"
+                    max="170"
+                    step="5"
+                    value={customSpeed}
+                    onChange={(event) => {
+                      const value = clamp(Number(event.target.value), 10, 170);
+                      setCustomSpeed(value);
+                      setSpeed(value);
+                    }}
+                    onFocus={() => setSpeed(customSpeed)}
+                    aria-label="自訂敵人速度"
+                  />
                 </label>
                 <label className="diff-btn" style={{ cursor: 'default', alignItems: 'stretch' }}>
                   <span className="diff-btn-label">辨識嚴格度</span>
