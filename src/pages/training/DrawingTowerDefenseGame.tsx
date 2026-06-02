@@ -199,20 +199,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
   const drawLayout = useCallback((app: Application) => {
     const w = app.renderer.width;
-    const h = app.renderer.height;
     const bg = new Graphics();
-    bg.rect(0, 0, w, h).fill({ color: 0x050816, alpha: 0.22 });
+    bg.rect(0, 0, w, app.renderer.height).fill({ color: 0x050816, alpha: 0.22 });
     app.stage.addChild(bg);
-
-    const labels = [
-      { text: '畫出敵人板上的圖形', y: h * 0.39 },
-    ];
-    labels.forEach((label) => {
-      const text = new Text({ text: label.text, style: { fill: 0xdbeafe, fontSize: 15, fontWeight: '700' } });
-      text.x = 20;
-      text.y = label.y;
-      app.stage.addChild(text);
-    });
 
     const drawing = new Graphics();
     app.stage.addChild(drawing);
