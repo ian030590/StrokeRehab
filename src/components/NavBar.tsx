@@ -12,7 +12,9 @@ export function Navbar() {
   const location = useLocation();
   const [user, setUser] = useState(getActiveUser);
   const [isOpen, setIsOpen] = useState(false);
-  const activeTrainingModule = location.pathname === '/training'
+  const activeTrainingModule = location.pathname === '/'
+    ? 'motor-training'
+    : location.pathname === '/training'
     ? (new URLSearchParams(location.search).get('module') || 'motor-training')
     : null;
 
@@ -64,7 +66,7 @@ export function Navbar() {
         <div className={`navbar-menu ${isOpen ? 'is-open' : ''}`}>
           <div className="navbar-links">
             <NavLink
-              to="/training?module=motor-training"
+              to="/"
               className={() => `navbar-link ${activeTrainingModule === 'motor-training' ? 'active' : ''}`}
               onClick={closeMenu}
             >
