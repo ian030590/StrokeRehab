@@ -903,9 +903,9 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   if (looksLikeCircle(rawPoints, strictness)) return 'circle';
   const box = getBox(rawPoints);
   const tolerance = shapeTolerance(strictness);
+  if (looksLikeTriangle(usableStrokes, rawPoints, box, tolerance)) return 'triangle';
   if (looksLikeCross(usableStrokes, rawPoints, box, tolerance)) return 'cross';
   if (looksLikeSquare(rawPoints, box, tolerance)) return 'square';
-  if (looksLikeTriangle(usableStrokes, rawPoints, box, tolerance)) return 'triangle';
 
   const candidate = normalizeGesture(usableStrokes);
   let best: { shape: ShapeId; score: number } | null = null;
@@ -1179,22 +1179,37 @@ function looksLikeTriangle(strokes: Point[][], points: Point[], box: ReturnType<
   const height = box.maxY - box.minY;
   const maxSize = Math.max(width, height);
   const minSize = Math.min(width, height);
-  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.38) return false;
+  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.32) return false;
 
   const margin = Math.max(7, maxSize * (0.12 + tolerance * 0.05));
   const coverage = getBoxSideCoverage(points, box, margin);
-  const lineStrokes = strokes
+  const squareCoverageFloor = 0.42 - tolerance * 0.08;
+  const squareLike = (
+    coverage.left >= squareCoverageFloor &&
+    coverage.right >= squareCoverageFloor &&
+    coverage.top >= squareCoverageFloor &&
+    coverage.bottom >= squareCoverageFloor
+  );
+  if (squareLike) return false;
+  if (hasTriangleOutline(strokes, points, box, tolerance)) return true;
+
+  const strokeLines = strokes
     .map(getStrokeLineFeatures)
     .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.54 - tolerance * 0.14);
-  const horizontalBase = lineStrokes.some((stroke) => isHorizontal(stroke.angle, tolerance));
-  const diagonalStrokes = lineStrokes.filter((stroke) => isDiagonal(stroke.angle, tolerance));
+  const segmentLines = getSimplifiedStrokeSegments(strokes, Math.max(4, maxSize * 0.045), Math.max(12, maxSize * 0.14));
+  const lineFeatures = [...strokeLines, ...segmentLines];
+  const hasAnchors = hasUprightTriangleAnchors(points, box, tolerance);
+  const horizontalBase = lineFeatures.some((stroke) => isHorizontal(stroke.angle, tolerance));
+  const diagonalStrokes = lineFeatures.filter((stroke) => isDiagonal(stroke.angle, tolerance));
   const hasOpposingDiagonals = diagonalStrokes.some((first, index) => (
     diagonalStrokes.slice(index + 1).some((second) => {
       const diff = angleDifference(first.angle, second.angle);
       return diff > 45 - tolerance * 12 && diff < 135 + tolerance * 12;
     })
   ));
-  if (hasOpposingDiagonals && (horizontalBase || coverage.bottom >= 0.32 - tolerance * 0.08)) {
+  const hasBase = horizontalBase || coverage.bottom >= 0.4 - tolerance * 0.05;
+
+  if (hasAnchors && hasOpposingDiagonals && hasBase) {
     return true;
   }
 
@@ -1203,12 +1218,13 @@ function looksLikeTriangle(strokes: Point[][], points: Point[], box: ReturnType<
   const areaRatio = polygonArea(points) / Math.max(1, width * height);
 
   return (
-    corners >= 2 &&
-    corners <= 4 &&
-    areaRatio >= 0.2 &&
-    areaRatio <= 0.7 &&
-    coverage.bottom >= 0.28 - tolerance * 0.08 &&
-    coverage.top < 0.42 + tolerance * 0.08
+    hasAnchors &&
+    hasBase &&
+    corners >= 1 &&
+    corners <= 5 &&
+    areaRatio >= 0.12 &&
+    areaRatio <= 0.75 &&
+    coverage.top < 0.58 + tolerance * 0.08
   );
 }
 
@@ -1272,6 +1288,141 @@ function getStrokeLineFeatures(stroke: Point[]): StrokeLineFeatures | null {
     last,
     straightness: distance(first, last) / Math.max(1, length),
   };
+}
+
+function getSimplifiedStrokeSegments(strokes: Point[][], epsilon: number, minLength: number): StrokeLineFeatures[] {
+  const segments: StrokeLineFeatures[] = [];
+  strokes.forEach((stroke) => {
+    const simplified = simplify(stroke, epsilon);
+    for (let i = 1; i < simplified.length; i += 1) {
+      const first = simplified[i - 1];
+      const last = simplified[i];
+      const segmentLength = distance(first, last);
+      if (segmentLength < minLength) continue;
+      segments.push({
+        angle: normalizeAngle(Math.atan2(last.y - first.y, last.x - first.x) * 180 / Math.PI),
+        first,
+        last,
+        straightness: 1,
+      });
+    }
+  });
+  return segments;
+}
+
+function hasTriangleOutline(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  const width = Math.max(1, box.maxX - box.minX);
+  const height = Math.max(1, box.maxY - box.minY);
+  const maxSize = Math.max(width, height);
+  const candidates = getTriangleVertexCandidates(strokes, points, maxSize, tolerance);
+  if (candidates.length < 3) return false;
+
+  const margin = Math.max(8, maxSize * (0.09 + tolerance * 0.05));
+  const minEdgeCoverage = 0.32 - tolerance * 0.07;
+  const minAreaRatio = 0.1 - tolerance * 0.02;
+  const maxAreaRatio = 0.78 + tolerance * 0.05;
+
+  for (let a = 0; a < candidates.length - 2; a += 1) {
+    for (let b = a + 1; b < candidates.length - 1; b += 1) {
+      for (let c = b + 1; c < candidates.length; c += 1) {
+        const first = candidates[a];
+        const second = candidates[b];
+        const third = candidates[c];
+        const areaRatio = triangleArea(first, second, third) / Math.max(1, width * height);
+        if (areaRatio < minAreaRatio || areaRatio > maxAreaRatio) continue;
+
+        const vertexBox = getBox([first, second, third]);
+        const vertexWidth = vertexBox.maxX - vertexBox.minX;
+        const vertexHeight = vertexBox.maxY - vertexBox.minY;
+        if (vertexWidth < width * 0.62 || vertexHeight < height * 0.62) continue;
+        if (Math.min(distance(first, second), distance(second, third), distance(third, first)) < maxSize * 0.18) continue;
+
+        const edgeCoverages = [
+          edgeCoverage(points, first, second, margin),
+          edgeCoverage(points, second, third, margin),
+          edgeCoverage(points, third, first, margin),
+        ];
+        if (edgeCoverages.every((coverage) => coverage >= minEdgeCoverage)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+function getTriangleVertexCandidates(strokes: Point[][], points: Point[], maxSize: number, tolerance: number): Point[] {
+  const epsilon = Math.max(4, maxSize * (0.04 + tolerance * 0.02));
+  const rawCandidates: Point[] = [];
+  strokes.forEach((stroke) => {
+    rawCandidates.push(...simplify(stroke, epsilon));
+  });
+  rawCandidates.push(...simplify(points, epsilon));
+
+  const clusterRadius = Math.max(8, maxSize * (0.1 + tolerance * 0.04));
+  return clusterPoints(rawCandidates, clusterRadius).slice(0, 9);
+}
+
+function clusterPoints(points: Point[], radius: number): Point[] {
+  const clusters: Array<{ x: number; y: number; count: number }> = [];
+  points.forEach((point) => {
+    const cluster = clusters.find((item) => distance(point, item) <= radius);
+    if (cluster) {
+      cluster.x = (cluster.x * cluster.count + point.x) / (cluster.count + 1);
+      cluster.y = (cluster.y * cluster.count + point.y) / (cluster.count + 1);
+      cluster.count += 1;
+    } else {
+      clusters.push({ x: point.x, y: point.y, count: 1 });
+    }
+  });
+  return clusters.map(({ x, y }) => ({ x, y }));
+}
+
+function edgeCoverage(points: Point[], start: Point, end: Point, margin: number): number {
+  const length = distance(start, end);
+  if (length < 1) return 0;
+  const bins = 7;
+  const occupied = new Set<number>();
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = length * length;
+
+  points.forEach((point) => {
+    const projection = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
+    if (projection < -0.04 || projection > 1.04) return;
+    if (perpendicularDistance(point, start, end) > margin) return;
+    occupied.add(clamp(Math.floor(projection * bins), 0, bins - 1));
+  });
+
+  if (![...occupied].some((bin) => bin > 0 && bin < bins - 1)) return 0;
+  return occupied.size / bins;
+}
+
+function hasUprightTriangleAnchors(points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
+  const width = Math.max(1, box.maxX - box.minX);
+  const height = Math.max(1, box.maxY - box.minY);
+  const centerX = (box.minX + box.maxX) / 2;
+  const topBand = box.minY + height * (0.18 + tolerance * 0.03);
+  const lowerBand = box.minY + height * (0.48 - tolerance * 0.08);
+  const centerLimit = width * (0.24 + tolerance * 0.08);
+  const apexSpreadLimit = width * (0.36 + tolerance * 0.08);
+  const sideLimit = width * (0.42 + tolerance * 0.06);
+  const topPoints = points.filter((point) => point.y <= topBand);
+  const topXs = topPoints.map((point) => point.x);
+  const topMinX = Math.min(...topXs);
+  const topMaxX = Math.max(...topXs);
+  const topAverageX = topXs.reduce((sum, x) => sum + x, 0) / Math.max(1, topXs.length);
+
+  const topApex = (
+    topPoints.length > 0 &&
+    topMaxX - topMinX <= apexSpreadLimit &&
+    Math.abs(topAverageX - centerX) <= centerLimit
+  );
+  const lowerLeft = points.some((point) => point.x <= box.minX + sideLimit && point.y >= lowerBand);
+  const lowerRight = points.some((point) => point.x >= box.maxX - sideLimit && point.y >= lowerBand);
+
+  return topApex && lowerLeft && lowerRight;
 }
 
 function normalizeAngle(angle: number): number {
@@ -1405,6 +1556,10 @@ function polygonArea(points: Point[]): number {
     area += points[i].x * next.y - next.x * points[i].y;
   }
   return Math.abs(area) / 2;
+}
+
+function triangleArea(a: Point, b: Point, c: Point): number {
+  return Math.abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2;
 }
 
 function radialCoefficientOfVariation(points: Point[], box: ReturnType<typeof getBox>): number {
