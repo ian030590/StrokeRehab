@@ -2365,6 +2365,12 @@ body #webgazer-calibrate-container #calibration-point {
   height: 100vh;
 }
 
+.cognitive-reference-phase-menu .cognitive-pixi-stage,
+.cognitive-reference-phase-paused .cognitive-pixi-stage,
+.cognitive-reference-phase-results .cognitive-pixi-stage {
+  pointer-events: none;
+}
+
 .cognitive-pixi-canvas {
   display: block;
   width: 100vw;

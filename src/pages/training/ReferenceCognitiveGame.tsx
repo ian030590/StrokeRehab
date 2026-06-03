@@ -388,40 +388,50 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
 
   useEffect(() => {
     let cancelled = false;
+    let initialized = false;
     const app = new Application();
-    appRef.current = app;
 
     const init = async () => {
       const host = pixiHostRef.current;
       if (!host) return;
-      await app.init({
-        backgroundAlpha: 0,
-        antialias: true,
-        autoDensity: true,
-        resolution: window.devicePixelRatio || 1,
-        resizeTo: host,
-      });
-      if (cancelled) return;
-      host.appendChild(app.canvas);
-      app.canvas.className = 'cognitive-pixi-canvas';
-      drawBackground(app);
-      app.ticker.add((ticker: Ticker) => {
-        if (phaseRef.current !== 'playing') return;
-        const dt = Math.min(ticker.deltaMS / 1000, 0.05);
-        metricsRef.current.elapsed += dt;
-        updateTimedState(stateRef.current, metricsRef.current.elapsed, renderRef.current, finishGameRef.current);
-        const limit = gameId === 'whack-a-mole' ? whackDurationSec : sessionLimitSec;
-        if (limit !== null && metricsRef.current.elapsed >= limit) {
-          finishGameRef.current(isAutoSuccess(stateRef.current) ? 'Victory' : 'Defeat');
+      try {
+        await app.init({
+          backgroundAlpha: 0,
+          antialias: true,
+          autoDensity: true,
+          resolution: window.devicePixelRatio || 1,
+          resizeTo: host,
+        });
+        initialized = true;
+        if (cancelled) {
+          app.destroy(true, { children: true });
           return;
         }
-        const nextSecond = Math.floor(metricsRef.current.elapsed);
-        if (lastHudSecondRef.current !== nextSecond) {
-          lastHudSecondRef.current = nextSecond;
-          syncHud();
-          if (stateRef.current?.kind === 'whack-a-mole') renderRef.current();
-        }
-      });
+        appRef.current = app;
+        host.appendChild(app.canvas);
+        app.canvas.className = 'cognitive-pixi-canvas';
+        drawBackground(app);
+        app.ticker.add((ticker: Ticker) => {
+          if (phaseRef.current !== 'playing') return;
+          const dt = Math.min(ticker.deltaMS / 1000, 0.05);
+          metricsRef.current.elapsed += dt;
+          updateTimedState(stateRef.current, metricsRef.current.elapsed, renderRef.current, finishGameRef.current);
+          const limit = gameId === 'whack-a-mole' ? whackDurationSec : sessionLimitSec;
+          if (limit !== null && metricsRef.current.elapsed >= limit) {
+            finishGameRef.current(isAutoSuccess(stateRef.current) ? 'Victory' : 'Defeat');
+            return;
+          }
+          const nextSecond = Math.floor(metricsRef.current.elapsed);
+          if (lastHudSecondRef.current !== nextSecond) {
+            lastHudSecondRef.current = nextSecond;
+            syncHud();
+            if (stateRef.current?.kind === 'whack-a-mole') renderRef.current();
+          }
+        });
+        if (phaseRef.current === 'playing') renderRef.current();
+      } catch (error) {
+        if (!cancelled) console.error('PixiJS init failed for cognitive game:', error);
+      }
     };
 
     void init();
@@ -430,8 +440,8 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     return () => {
       cancelled = true;
       window.removeEventListener('resize', handleResize);
-      app.destroy(true, { children: true });
-      appRef.current = null;
+      if (appRef.current === app) appRef.current = null;
+      if (initialized) app.destroy(true, { children: true });
     };
   }, [gameId, sessionLimitSec, syncHud, whackDurationSec]);
 
