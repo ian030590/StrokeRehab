@@ -1,4 +1,4 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js';
 import { initJsPsych } from 'jspsych';
 import { downloadCsvFile } from '../../utils/downloadFile';
@@ -8,7 +8,7 @@ type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type ShapeId = 'circle' | 'cross' | 'square' | 'triangle' | 'vertical-line' | 'horizontal-line';
 type GamePhase = 'menu' | 'playing' | 'paused' | 'results';
 type GameResult = 'Victory' | 'Defeat';
-type BackgroundMode = 'stars' | 'color';
+type BackgroundMode = 'stars' | 'color' | 'image';
 type GameDurationSeconds = number | null;
 
 interface DrawingTowerDefenseGameProps {
@@ -104,6 +104,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const strokesRef = useRef<Point[][]>([]);
   const enemyResultsRef = useRef<EnemyResult[]>([]);
   const recognitionTimerRef = useRef<number | null>(null);
+  const uploadedBackgroundUrlRef = useRef<string | null>(null);
   const isDrawingRef = useRef(false);
   const metricsRef = useRef({ defeated: 0, hp: DEFAULT_HP, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
   const phaseRef = useRef<GamePhase>('menu');
@@ -130,6 +131,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
   const [backgroundColor, setBackgroundColor] = useState<string>(BACKGROUND_COLOR_OPTIONS[0]);
+  const [uploadedBackgroundUrl, setUploadedBackgroundUrl] = useState<string | null>(null);
+  const [uploadedBackgroundName, setUploadedBackgroundName] = useState('未選擇圖像');
   const [hp, setHp] = useState(DEFAULT_HP);
   const [defeated, setDefeated] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -141,12 +144,17 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
   const gameDurationLabel = formatGameDuration(gameDurationSec);
-  const backgroundSummary = backgroundMode === 'stars' ? '星空' : backgroundColor;
-  const backgroundStyle = useMemo<CSSProperties>(() => (
-    backgroundMode === 'stars'
-      ? { backgroundImage: starSkyBackgroundImage }
-      : { backgroundImage: 'none', backgroundColor }
-  ), [backgroundColor, backgroundMode]);
+  const backgroundSummary =
+    backgroundMode === 'stars' ? '星空' : backgroundMode === 'color' ? backgroundColor : '自訂圖像';
+  const backgroundModeLabel =
+    backgroundMode === 'stars' ? '圖片' : backgroundMode === 'color' ? '顏色' : '自訂圖像';
+  const backgroundStyle = useMemo<CSSProperties>(() => {
+    if (backgroundMode === 'stars') return { backgroundImage: starSkyBackgroundImage };
+    if (backgroundMode === 'image' && uploadedBackgroundUrl) {
+      return { backgroundImage: `url("${uploadedBackgroundUrl}")` };
+    }
+    return { backgroundImage: 'none', backgroundColor };
+  }, [backgroundColor, backgroundMode, uploadedBackgroundUrl]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -159,6 +167,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
   useEffect(() => {
     jsPsychRef.current = initJsPsych();
+  }, []);
+
+  useEffect(() => () => {
+    if (uploadedBackgroundUrlRef.current) URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
   }, []);
 
   const clearPixiState = useCallback(() => {
@@ -377,6 +389,18 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     if (phaseRef.current === 'paused') setPhase('playing');
   }, [setPhase]);
 
+  const handleBackgroundImageUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    if (uploadedBackgroundUrlRef.current) URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
+    const imageUrl = URL.createObjectURL(file);
+    uploadedBackgroundUrlRef.current = imageUrl;
+    setUploadedBackgroundUrl(imageUrl);
+    setUploadedBackgroundName(file.name);
+    setBackgroundMode('image');
+    event.target.value = '';
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const app = new Application();
@@ -539,11 +563,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <div>
                 <span className="drawing-defense-config-label">訓練設定</span>
                 <h1>畫畫塔防</h1>
-              </div>
-              <div className="drawing-defense-config-stats">
-                <span><strong>{gameDurationLabel}</strong></span>
-                <span><strong>{maxHp}</strong> HP</span>
-                <span><strong>{speed}</strong> px/s</span>
               </div>
             </header>
 
@@ -776,7 +795,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     <h2>背景</h2>
                     <p>{backgroundSummary}</p>
                   </div>
-                  <span>{backgroundMode === 'stars' ? '圖片' : '顏色'}</span>
+                  <span>{backgroundModeLabel}</span>
                 </div>
                 <div className="drawing-defense-background-controls">
                   <button
@@ -823,6 +842,26 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       />
                     </div>
                   </div>
+                  <label
+                    className={`drawing-defense-background-card ${backgroundMode === 'image' ? 'active' : ''}`}
+                    onClick={() => {
+                      if (uploadedBackgroundUrl) setBackgroundMode('image');
+                    }}
+                  >
+                    <div className="drawing-defense-background-card-header">
+                      <span>自訂圖像</span>
+                      <strong>{uploadedBackgroundUrl ? '已上傳' : '未上傳'}</strong>
+                    </div>
+                    <span className="drawing-defense-option-meta">{uploadedBackgroundName}</span>
+                    <span className="drawing-defense-upload-action">選擇圖像</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handleBackgroundImageUpload}
+                      aria-label="上傳自訂背景圖像"
+                    />
+                  </label>
                 </div>
               </section>
             </div>

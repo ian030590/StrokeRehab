@@ -9,7 +9,7 @@
   --accent:        #005EB8; /* Medical Blue */
   --accent-dark:   #00478D; /* Primary */
   --accent-hover:  #005DB6; /* Surface Tint */
-  --success:       #8BA88E; /* Soft Sage */
+  --success:       #005EB8; /* Soft Sage */
   --error:         #BA1A1A; /* Error */
   --warning:       #D29922;
   --text-primary:  #1A1C1E; /* On-surface */
@@ -2113,7 +2113,7 @@ body #webgazer-calibrate-container #calibration-point {
 
 .drawing-defense-background-controls {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 
@@ -2128,6 +2128,20 @@ body #webgazer-calibrate-container #calibration-point {
   background: var(--bg-card);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.drawing-defense-upload-action {
+  width: fit-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  color: var(--accent-dark);
+  background: #FFFFFF;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .drawing-defense-background-card:hover {
