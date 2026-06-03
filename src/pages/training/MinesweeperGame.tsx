@@ -1,10 +1,11 @@
 import { type CSSProperties, type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { initJsPsych } from 'jspsych';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
 
-type MinesweeperPhase = 'menu' | 'playing' | 'results';
+type MinesweeperPhase = 'menu' | 'playing' | 'paused' | 'results';
 type MinesweeperDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
-type BoardSizeOption = 6 | 20 | 80 | 'custom';
+type BoardPresetId = 'compact' | 'classic-easy' | 'classic-medium' | 'classic-hard' | 'large' | 'dense' | 'custom';
 type GameResult = 'Victory' | 'Defeat';
 
 interface MinesweeperGameProps {
@@ -30,6 +31,7 @@ interface SessionRecord {
   Test_Date: string;
   Participant_ID: string;
   Difficulty: MinesweeperDifficulty;
+  Board_Preset: string;
   Mine_Density_Percent: number;
   Board_Size: string;
   Total_Cells: number;
@@ -48,9 +50,18 @@ const DIFFICULTIES: Record<MinesweeperDifficulty, DifficultyConfig> = {
   Advanced: { label: '高級', density: 0.24, description: '地雷密度 24%，挑戰高注意力' },
 };
 
-const BOARD_SIZE_OPTIONS = [6, 20, 80] as const;
+const BOARD_PRESETS: Record<Exclude<BoardPresetId, 'custom'>, { label: string; rows: number; cols: number; mines?: number; description: string }> = {
+  compact: { label: '6x6', rows: 6, cols: 6, description: '原有短局訓練盤' },
+  'classic-easy': { label: '9x9 / 10', rows: 9, cols: 9, mines: 10, description: 'reference 經典 Easy' },
+  'classic-medium': { label: '16x16 / 40', rows: 16, cols: 16, mines: 40, description: 'reference 經典 Medium' },
+  'classic-hard': { label: '16x30 / 99', rows: 16, cols: 30, mines: 99, description: 'reference 經典 Hard' },
+  large: { label: '20x20', rows: 20, cols: 20, description: '原有大盤推理' },
+  dense: { label: '80x80', rows: 80, cols: 80, description: '原有高密度掃描' },
+};
 const DEFAULT_DIFFICULTY: MinesweeperDifficulty = 'Beginner';
-const DEFAULT_BOARD_SIZE = 6;
+const DEFAULT_BOARD_PRESET: BoardPresetId = 'compact';
+const DEFAULT_BOARD_ROWS = BOARD_PRESETS[DEFAULT_BOARD_PRESET].rows;
+const DEFAULT_BOARD_COLS = BOARD_PRESETS[DEFAULT_BOARD_PRESET].cols;
 const DEFAULT_CUSTOM_BOARD_SIZE = 12;
 
 const NUMBER_COLORS = [
@@ -78,41 +89,54 @@ const DIRECTIONS = [
 
 export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  const elapsedMillisRef = useRef(0);
+  const playStartedAtRef = useRef<number>(Date.now());
+  const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
   const [phase, setPhase] = useState<MinesweeperPhase>('menu');
   const [difficulty, setDifficulty] = useState<MinesweeperDifficulty>(DEFAULT_DIFFICULTY);
-  const [boardSizeOption, setBoardSizeOption] = useState<BoardSizeOption>(DEFAULT_BOARD_SIZE);
+  const [boardPreset, setBoardPreset] = useState<BoardPresetId>(DEFAULT_BOARD_PRESET);
   const [customBoardSize, setCustomBoardSize] = useState(DEFAULT_CUSTOM_BOARD_SIZE);
-  const [board, setBoard] = useState<Cell[][]>(() => createEmptyBoard(DEFAULT_BOARD_SIZE));
-  const [boardSize, setBoardSize] = useState(DEFAULT_BOARD_SIZE);
-  const [mineCount, setMineCount] = useState(calculateMineCount(DEFAULT_BOARD_SIZE, DIFFICULTIES[DEFAULT_DIFFICULTY].density));
+  const [board, setBoard] = useState<Cell[][]>(() => createEmptyBoard(DEFAULT_BOARD_ROWS, DEFAULT_BOARD_COLS));
+  const [boardRows, setBoardRows] = useState(DEFAULT_BOARD_ROWS);
+  const [boardCols, setBoardCols] = useState(DEFAULT_BOARD_COLS);
+  const [mineCount, setMineCount] = useState(calculateMineCount(DEFAULT_BOARD_ROWS, DEFAULT_BOARD_COLS, DIFFICULTIES[DEFAULT_DIFFICULTY].density));
   const [minesGenerated, setMinesGenerated] = useState(false);
   const [flagMode, setFlagMode] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
-  const selectedBoardSize = boardSizeOption === 'custom' ? customBoardSize : boardSizeOption;
-  const selectedMineCount = calculateMineCount(selectedBoardSize, activeConfig.density);
-  const isCustomBoardSize = boardSizeOption === 'custom';
-  const boardMetrics = useMemo(() => getBoardMetrics(boardSize), [boardSize]);
+  const selectedBoardConfig = useMemo(() => getSelectedBoardConfig(boardPreset, customBoardSize, activeConfig.density), [activeConfig.density, boardPreset, customBoardSize]);
+  const selectedMineCount = selectedBoardConfig.mines;
+  const selectedDensityPercent = Math.round((selectedMineCount / Math.max(1, selectedBoardConfig.rows * selectedBoardConfig.cols)) * 100);
+  const isCustomBoardSize = boardPreset === 'custom';
+  const boardMetrics = useMemo(() => getBoardMetrics(boardRows, boardCols), [boardCols, boardRows]);
   const remainingMineEstimate = Math.max(0, mineCount - countFlags(board));
 
   const canvasStyle = useMemo<CSSProperties>(() => {
-    const dimension = `min(${boardMetrics.pixelSize}px, calc(100vw - 48px), calc(100vh - 148px))`;
-    return { width: dimension, height: dimension };
-  }, [boardMetrics.pixelSize]);
+    return {
+      width: `min(${boardMetrics.pixelWidth}px, calc(100vw - 48px))`,
+      aspectRatio: `${boardMetrics.pixelWidth} / ${boardMetrics.pixelHeight}`,
+      maxHeight: 'calc(100vh - 148px)',
+    };
+  }, [boardMetrics.pixelHeight, boardMetrics.pixelWidth]);
+
+  useEffect(() => {
+    jsPsychRef.current = initJsPsych();
+  }, []);
 
   const finishGame = useCallback((nextBoard: Cell[][], gameResult: GameResult) => {
-    const duration = Math.max(0, (Date.now() - startTimeRef.current) / 1000);
+    const duration = Math.max(0, (elapsedMillisRef.current + Date.now() - playStartedAtRef.current) / 1000);
+    elapsedMillisRef.current = duration * 1000;
     const stats = getBoardStats(nextBoard);
     const record: SessionRecord = {
       Test_Date: formatTestDate(new Date()),
       Participant_ID: getActiveUser() || 'Unknown',
       Difficulty: difficulty,
-      Mine_Density_Percent: Math.round(activeConfig.density * 100),
-      Board_Size: `${boardSize}x${boardSize}`,
-      Total_Cells: boardSize * boardSize,
+      Board_Preset: selectedBoardConfig.label,
+      Mine_Density_Percent: Math.round((mineCount / Math.max(1, boardRows * boardCols)) * 100),
+      Board_Size: `${boardRows}x${boardCols}`,
+      Total_Cells: boardRows * boardCols,
       Mines_Total: mineCount,
       Correctly_Flagged_Mines: stats.correctFlags,
       Incorrect_Flags: stats.incorrectFlags,
@@ -125,21 +149,31 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
     setElapsedSeconds(Math.floor(duration));
     setResult(record);
     setPhase('results');
-  }, [activeConfig.density, boardSize, difficulty, mineCount]);
+    try {
+      const jsPsychData = jsPsychRef.current?.data;
+      const writeData = jsPsychData?.write as unknown as ((data: Record<string, unknown>) => void) | undefined;
+      writeData?.call(jsPsychData, record as unknown as Record<string, unknown>);
+    } catch (error) {
+      console.warn('Unable to write minesweeper result to jsPsych data.', error);
+    }
+  }, [boardCols, boardRows, difficulty, mineCount, selectedBoardConfig.label]);
 
   const startGame = useCallback(() => {
-    const nextSize = clamp(Math.round(selectedBoardSize), 4, 100);
-    const nextMineCount = calculateMineCount(nextSize, activeConfig.density);
-    setBoardSize(nextSize);
+    const nextRows = selectedBoardConfig.rows;
+    const nextCols = selectedBoardConfig.cols;
+    const nextMineCount = selectedBoardConfig.mines;
+    setBoardRows(nextRows);
+    setBoardCols(nextCols);
     setMineCount(nextMineCount);
-    setBoard(createEmptyBoard(nextSize));
+    setBoard(createEmptyBoard(nextRows, nextCols));
     setMinesGenerated(false);
     setFlagMode(false);
     setElapsedSeconds(0);
     setResult(null);
-    startTimeRef.current = Date.now();
+    elapsedMillisRef.current = 0;
+    playStartedAtRef.current = Date.now();
     setPhase('playing');
-  }, [activeConfig.density, selectedBoardSize]);
+  }, [selectedBoardConfig]);
 
   const returnToMenu = useCallback(() => {
     setPhase('menu');
@@ -148,15 +182,29 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   }, []);
 
   const restartGame = useCallback(() => {
-    setBoard(createEmptyBoard(boardSize));
-    setMineCount(calculateMineCount(boardSize, activeConfig.density));
+    setBoard(createEmptyBoard(boardRows, boardCols));
+    setMineCount(selectedBoardConfig.mines);
     setMinesGenerated(false);
     setFlagMode(false);
     setElapsedSeconds(0);
     setResult(null);
-    startTimeRef.current = Date.now();
+    elapsedMillisRef.current = 0;
+    playStartedAtRef.current = Date.now();
     setPhase('playing');
-  }, [activeConfig.density, boardSize]);
+  }, [boardCols, boardRows, selectedBoardConfig.mines]);
+
+  const pauseGame = useCallback(() => {
+    if (phase !== 'playing') return;
+    elapsedMillisRef.current += Date.now() - playStartedAtRef.current;
+    setElapsedSeconds(Math.floor(elapsedMillisRef.current / 1000));
+    setPhase('paused');
+  }, [phase]);
+
+  const resumeGame = useCallback(() => {
+    if (phase !== 'paused') return;
+    playStartedAtRef.current = Date.now();
+    setPhase('playing');
+  }, [phase]);
 
   const toggleFlagAt = useCallback((x: number, y: number) => {
     if (phase !== 'playing') return;
@@ -194,19 +242,19 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   const handleCanvasPointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (phase !== 'playing') return;
     event.preventDefault();
-    const position = getCanvasCell(event, boardSize);
+    const position = getCanvasCell(event, boardRows, boardCols);
     if (!position) return;
     if (event.button === 2 || flagMode) {
       toggleFlagAt(position.x, position.y);
       return;
     }
     revealAt(position.x, position.y);
-  }, [boardSize, flagMode, phase, revealAt, toggleFlagAt]);
+  }, [boardCols, boardRows, flagMode, phase, revealAt, toggleFlagAt]);
 
   useEffect(() => {
     if (phase !== 'playing') return undefined;
     const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      setElapsedSeconds(Math.floor((elapsedMillisRef.current + Date.now() - playStartedAtRef.current) / 1000));
     }, 250);
     return () => window.clearInterval(timer);
   }, [phase]);
@@ -260,24 +308,25 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
                 <div className="drawing-defense-setting-header">
                   <div>
                     <h2>棋盤大小</h2>
-                    <p>{selectedBoardSize}x{selectedBoardSize}</p>
+                    <p>{selectedBoardConfig.rows}x{selectedBoardConfig.cols}</p>
                   </div>
                   <span>{isCustomBoardSize ? '自訂' : '預設'}</span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
-                  {BOARD_SIZE_OPTIONS.map((size) => (
+                <div className="drawing-defense-option-grid minesweeper-preset-grid">
+                  {Object.entries(BOARD_PRESETS).map(([id, preset]) => (
                     <button
-                      key={size}
+                      key={id}
                       type="button"
-                      className={`drawing-defense-option ${boardSizeOption === size ? 'active' : ''}`}
-                      onClick={() => setBoardSizeOption(size)}
+                      className={`drawing-defense-option ${boardPreset === id ? 'active' : ''}`}
+                      onClick={() => setBoardPreset(id as BoardPresetId)}
                     >
-                      <span className="drawing-defense-option-title">{size}x{size}</span>
+                      <span className="drawing-defense-option-title">{preset.label}</span>
+                      <span className="drawing-defense-option-meta">{preset.description}</span>
                     </button>
                   ))}
                   <label
                     className={`drawing-defense-option drawing-defense-option-custom ${isCustomBoardSize ? 'active' : ''}`}
-                    onClick={() => setBoardSizeOption('custom')}
+                    onClick={() => setBoardPreset('custom')}
                   >
                     <span className="drawing-defense-option-title">自訂</span>
                     <input
@@ -290,9 +339,9 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
                       onChange={(event) => {
                         const value = clamp(Number(event.target.value), 4, 100);
                         setCustomBoardSize(value);
-                        setBoardSizeOption('custom');
+                        setBoardPreset('custom');
                       }}
-                      onFocus={() => setBoardSizeOption('custom')}
+                      onFocus={() => setBoardPreset('custom')}
                       aria-label="自訂棋盤邊長"
                     />
                   </label>
@@ -303,8 +352,8 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
             <div className="drawing-defense-config-footer">
               <div className="drawing-defense-config-summary">
                 <strong>{activeConfig.label}</strong>
-                <span>{selectedBoardSize}x{selectedBoardSize}</span>
-                <span>{Math.round(activeConfig.density * 100)}% 密度</span>
+                <span>{selectedBoardConfig.label}</span>
+                <span>{selectedDensityPercent}% 密度</span>
                 <span>{selectedMineCount} 地雷</span>
               </div>
               <div className="drawing-defense-config-actions">
@@ -330,6 +379,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
             >
               {flagMode ? '標記模式中' : '標記模式'}
             </button>
+            <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>
             <button className="btn btn-sm btn-ghost" onClick={returnToMenu}>返回設定</button>
           </div>
           <div className="minesweeper-board-stage">
@@ -343,6 +393,18 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
             />
           </div>
         </>
+      )}
+
+      {phase === 'paused' && (
+        <div className="drawing-defense-panel drawing-defense-panel-compact">
+          <h1>遊戲暫停</h1>
+          <p>目前時間 {elapsedSeconds} 秒，棋盤會保留在目前狀態。</p>
+          <div className="drawing-defense-actions">
+            <button className="btn btn-primary btn-lg" onClick={resumeGame}>繼續遊戲</button>
+            <button className="btn btn-secondary btn-lg" onClick={restartGame}>重新開始</button>
+            <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回設定</button>
+          </div>
+        </div>
       )}
 
       {phase === 'results' && result && (
@@ -401,9 +463,9 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   );
 }
 
-function createEmptyBoard(size: number): Cell[][] {
-  return Array.from({ length: size }, (_, y) => (
-    Array.from({ length: size }, (_, x) => ({
+function createEmptyBoard(rows: number, cols: number): Cell[][] {
+  return Array.from({ length: rows }, (_, y) => (
+    Array.from({ length: cols }, (_, x) => ({
       x,
       y,
       mine: false,
@@ -418,13 +480,31 @@ function cloneBoard(board: Cell[][]): Cell[][] {
   return board.map((row) => row.map((cell) => ({ ...cell })));
 }
 
-function calculateMineCount(size: number, density: number): number {
-  const cells = size * size;
+function getSelectedBoardConfig(presetId: BoardPresetId, customBoardSize: number, density: number) {
+  if (presetId !== 'custom') {
+    const preset = BOARD_PRESETS[presetId];
+    return {
+      label: preset.label,
+      rows: preset.rows,
+      cols: preset.cols,
+      mines: preset.mines ?? calculateMineCount(preset.rows, preset.cols, density),
+    };
+  }
+  const size = clamp(Math.round(customBoardSize), 4, 100);
+  return {
+    label: `${size}x${size}`,
+    rows: size,
+    cols: size,
+    mines: calculateMineCount(size, size, density),
+  };
+}
+
+function calculateMineCount(rows: number, cols: number, density: number): number {
+  const cells = rows * cols;
   return clamp(Math.round(cells * density), 1, Math.max(1, cells - 9));
 }
 
 function generateMines(board: Cell[][], mineCount: number, safeX: number, safeY: number): Cell[][] {
-  const size = board.length;
   const candidates: Cell[] = [];
   board.forEach((row) => {
     row.forEach((cell) => {
@@ -488,20 +568,23 @@ function hasWon(board: Cell[][]): boolean {
 }
 
 function getNeighbors(board: Cell[][], x: number, y: number): Cell[] {
-  const size = board.length;
+  const rows = board.length;
+  const cols = board[0]?.length ?? 0;
   return DIRECTIONS.flatMap(([dx, dy]) => {
     const nextX = x + dx;
     const nextY = y + dy;
-    if (nextX < 0 || nextX >= size || nextY < 0 || nextY >= size) return [];
+    if (nextX < 0 || nextX >= cols || nextY < 0 || nextY >= rows) return [];
     return [board[nextY][nextX]];
   });
 }
 
-function getBoardMetrics(size: number) {
-  const cellSize = size <= 6 ? 72 : size <= 20 ? 34 : 12;
+function getBoardMetrics(rows: number, cols: number) {
+  const maxDimension = Math.max(rows, cols);
+  const cellSize = maxDimension <= 6 ? 72 : maxDimension <= 20 ? 34 : maxDimension <= 30 ? 22 : 12;
   return {
     cellSize,
-    pixelSize: cellSize * size,
+    pixelWidth: cellSize * cols,
+    pixelHeight: cellSize * rows,
   };
 }
 
@@ -511,12 +594,12 @@ function drawBoard(canvas: HTMLCanvasElement | null, board: Cell[][], metrics: R
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  canvas.width = metrics.pixelSize * dpr;
-  canvas.height = metrics.pixelSize * dpr;
+  canvas.width = metrics.pixelWidth * dpr;
+  canvas.height = metrics.pixelHeight * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, metrics.pixelSize, metrics.pixelSize);
+  ctx.clearRect(0, 0, metrics.pixelWidth, metrics.pixelHeight);
   ctx.fillStyle = '#F8FAFC';
-  ctx.fillRect(0, 0, metrics.pixelSize, metrics.pixelSize);
+  ctx.fillRect(0, 0, metrics.pixelWidth, metrics.pixelHeight);
 
   board.forEach((row) => {
     row.forEach((cell) => drawCell(ctx, cell, metrics.cellSize));
@@ -599,11 +682,11 @@ function drawMine(ctx: CanvasRenderingContext2D, x: number, y: number, cellSize:
   ctx.fill();
 }
 
-function getCanvasCell(event: PointerEvent<HTMLCanvasElement>, boardSize: number) {
+function getCanvasCell(event: PointerEvent<HTMLCanvasElement>, rows: number, cols: number) {
   const rect = event.currentTarget.getBoundingClientRect();
-  const x = Math.floor(((event.clientX - rect.left) / rect.width) * boardSize);
-  const y = Math.floor(((event.clientY - rect.top) / rect.height) * boardSize);
-  if (x < 0 || x >= boardSize || y < 0 || y >= boardSize) return null;
+  const x = Math.floor(((event.clientX - rect.left) / rect.width) * cols);
+  const y = Math.floor(((event.clientY - rect.top) / rect.height) * rows);
+  if (x < 0 || x >= cols || y < 0 || y >= rows) return null;
   return { x, y };
 }
 
@@ -627,6 +710,7 @@ function toCsv(records: SessionRecord[]): string {
     { label: '測驗日期', value: (record) => record.Test_Date },
     { label: 'Participant_ID', value: (record) => record.Participant_ID },
     { label: 'Difficulty', value: (record) => record.Difficulty },
+    { label: 'Board_Preset', value: (record) => record.Board_Preset },
     { label: 'Mine_Density_Percent', value: (record) => record.Mine_Density_Percent },
     { label: 'Board_Size', value: (record) => record.Board_Size },
     { label: 'Total_Cells', value: (record) => record.Total_Cells },
