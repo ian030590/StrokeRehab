@@ -65,11 +65,13 @@ const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 've
 const DEFAULT_JUDGE_DELAY_MS = 300;
 const STROKE_WAIT_OPTIONS = [220, DEFAULT_JUDGE_DELAY_MS, 350] as const;
 const HP_OPTIONS = [1, 3, 5] as const;
-const GAME_DURATION_OPTIONS = [10, 30, 60, null] as const;
+const GAME_DURATION_OPTIONS = [30, 60, 300, null] as const;
 const ENEMY_SPEED_OPTIONS = [5, 15, 30] as const;
 const DEFAULT_HP = 3;
 const DEFAULT_ENEMY_SPEED = 5;
+const DEFAULT_RECOGNITION_STRICTNESS = 20;
 const DEFAULT_GAME_DURATION_SECONDS: GameDurationSeconds = 30;
+const DEFAULT_CUSTOM_GAME_DURATION_SECONDS = 120;
 const ENEMY_VISUAL_HEIGHT = 98;
 const ENEMY_SPAWN_Y = -ENEMY_VISUAL_HEIGHT - 8;
 const BACKGROUND_COLOR_OPTIONS = ['#F6F7F8', '#E8F3FF', '#EAF7EF', '#FFF4E6', '#F3EAFE', '#111827'] as const;
@@ -110,7 +112,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     gameDurationSec: DEFAULT_GAME_DURATION_SECONDS,
     maxHp: DEFAULT_HP,
     speed: DEFAULT_ENEMY_SPEED,
-    strictness: 45,
+    strictness: DEFAULT_RECOGNITION_STRICTNESS,
     strokeWaitMs: DEFAULT_JUDGE_DELAY_MS,
   });
   const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
@@ -118,11 +120,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
   const [gameDurationSec, setGameDurationSec] = useState<GameDurationSeconds>(DEFAULT_GAME_DURATION_SECONDS);
+  const [customGameDurationSec, setCustomGameDurationSec] = useState(DEFAULT_CUSTOM_GAME_DURATION_SECONDS);
   const [maxHp, setMaxHp] = useState(DEFAULT_HP);
   const [customHp, setCustomHp] = useState(DEFAULT_HP);
   const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [customSpeed, setCustomSpeed] = useState(DEFAULT_ENEMY_SPEED);
-  const [strictness, setStrictness] = useState(45);
+  const [strictness, setStrictness] = useState(DEFAULT_RECOGNITION_STRICTNESS);
   const [strokeWaitMs, setStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
@@ -134,6 +137,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
+  const isPresetGameDuration = GAME_DURATION_OPTIONS.includes(gameDurationSec as typeof GAME_DURATION_OPTIONS[number]);
   const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
   const gameDurationLabel = formatGameDuration(gameDurationSec);
@@ -610,18 +614,20 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 </div>
               </section>
 
-              <section className="drawing-defense-setting">
+              <section className="drawing-defense-setting drawing-defense-setting-wide">
                 <div className="drawing-defense-setting-header">
                   <div>
                     <h2>遊戲時間</h2>
                     <p>{gameDurationLabel}</p>
                   </div>
-                  <span>{gameDurationSec === DEFAULT_GAME_DURATION_SECONDS ? '預設' : '選用'}</span>
+                  <span>
+                    {gameDurationSec === DEFAULT_GAME_DURATION_SECONDS ? '預設' : isPresetGameDuration ? '選用' : '自訂'}
+                  </span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
-                  {GAME_DURATION_OPTIONS.map((option) => (
+                <div className="drawing-defense-option-grid drawing-defense-duration-grid">
+                  {GAME_DURATION_OPTIONS.filter((option) => option !== null).map((option) => (
                     <button
-                      key={option ?? 'infinite'}
+                      key={option}
                       type="button"
                       className={`drawing-defense-option ${gameDurationSec === option ? 'active' : ''}`}
                       onClick={() => setGameDurationSec(option)}
@@ -629,6 +635,34 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       <span className="drawing-defense-option-title">{formatGameDuration(option)}</span>
                     </button>
                   ))}
+                  <label
+                    className={`drawing-defense-option drawing-defense-option-custom ${!isPresetGameDuration ? 'active' : ''}`}
+                    onClick={() => setGameDurationSec(customGameDurationSec)}
+                  >
+                    <span className="drawing-defense-option-title">自訂</span>
+                    <input
+                      className="drawing-defense-number-input"
+                      type="number"
+                      min="1"
+                      max="1800"
+                      step="1"
+                      value={customGameDurationSec}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 1800);
+                        setCustomGameDurationSec(value);
+                        setGameDurationSec(value);
+                      }}
+                      onFocus={() => setGameDurationSec(customGameDurationSec)}
+                      aria-label="自訂遊戲時間秒數"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`drawing-defense-option ${gameDurationSec === null ? 'active' : ''}`}
+                    onClick={() => setGameDurationSec(null)}
+                  >
+                    <span className="drawing-defense-option-title">無限模式</span>
+                  </button>
                 </div>
               </section>
 
