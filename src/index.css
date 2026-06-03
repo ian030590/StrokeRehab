@@ -2330,6 +2330,91 @@ body #webgazer-calibrate-container #calibration-point {
   font-weight: 700;
 }
 
+/* Minesweeper Cognitive Training */
+.minesweeper-game {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+}
+
+.minesweeper-phase-menu {
+  overflow-y: auto;
+}
+
+.minesweeper-hud {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  transform: translateX(-50%);
+  flex-wrap: wrap;
+}
+
+.minesweeper-hud div {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid rgba(100, 116, 139, 0.32);
+  border-radius: var(--radius-s);
+  background: #FFFFFF;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.minesweeper-hud strong {
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.minesweeper-board-stage {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 84px 24px 24px;
+  overflow: auto;
+}
+
+.minesweeper-canvas {
+  display: block;
+  flex: 0 0 auto;
+  border: 4px solid #111827;
+  border-radius: var(--radius-s);
+  background: #FFFFFF;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.minesweeper-canvas.flag-mode {
+  cursor: crosshair;
+}
+
+.minesweeper-results-container .results-table {
+  max-width: 720px;
+}
+
 @media (max-width: 720px) {
   .drawing-defense-hud {
     top: 8px;
