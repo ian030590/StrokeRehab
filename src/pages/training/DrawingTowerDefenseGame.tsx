@@ -9,6 +9,7 @@ type ShapeId = 'circle' | 'cross' | 'square' | 'triangle' | 'vertical-line' | 'h
 type GamePhase = 'menu' | 'playing' | 'paused' | 'results';
 type GameResult = 'Victory' | 'Defeat';
 type BackgroundMode = 'stars' | 'color';
+type GameDurationSeconds = number | null;
 
 interface DrawingTowerDefenseGameProps {
   onExit: () => void;
@@ -47,12 +48,13 @@ interface SessionRecord {
   Test_Date: string;
   Participant_ID: string;
   Difficulty: Difficulty;
-  Enemy_Count: number;
+  Game_Time_Seconds: GameDurationSeconds;
   Starting_HP: number;
   Enemy_Speed: number;
   Recognition_Strictness: number;
   Stroke_Wait_Milliseconds: number;
   Total_Duration_Seconds: number;
+  Enemies_Spawned: number;
   Enemies_Defeated: number;
   HP_Remaining: number;
   Game_Result: GameResult;
@@ -63,11 +65,11 @@ const SHAPES: readonly ShapeId[] = ['circle', 'cross', 'square', 'triangle', 've
 const DEFAULT_JUDGE_DELAY_MS = 300;
 const STROKE_WAIT_OPTIONS = [220, DEFAULT_JUDGE_DELAY_MS, 350] as const;
 const HP_OPTIONS = [1, 3, 5] as const;
-const ENEMY_COUNT_OPTIONS = [6, 12, 18] as const;
-const ENEMY_SPEED_OPTIONS = [30, 60, 90] as const;
+const GAME_DURATION_OPTIONS = [10, 30, 60, null] as const;
+const ENEMY_SPEED_OPTIONS = [5, 15, 30] as const;
 const DEFAULT_HP = 3;
-const DEFAULT_ENEMY_SPEED = 30;
-const DEFAULT_ENEMY_COUNT = 12;
+const DEFAULT_ENEMY_SPEED = 5;
+const DEFAULT_GAME_DURATION_SECONDS: GameDurationSeconds = 30;
 const ENEMY_VISUAL_HEIGHT = 98;
 const ENEMY_SPAWN_Y = -ENEMY_VISUAL_HEIGHT - 8;
 const BACKGROUND_COLOR_OPTIONS = ['#F6F7F8', '#E8F3FF', '#EAF7EF', '#FFF4E6', '#F3EAFE', '#111827'] as const;
@@ -105,7 +107,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const phaseRef = useRef<GamePhase>('menu');
   const configRef = useRef({
     difficulty: 'Beginner' as Difficulty,
-    enemyCount: DEFAULT_ENEMY_COUNT,
+    gameDurationSec: DEFAULT_GAME_DURATION_SECONDS,
     maxHp: DEFAULT_HP,
     speed: DEFAULT_ENEMY_SPEED,
     strictness: 45,
@@ -115,8 +117,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
-  const [enemyCount, setEnemyCount] = useState(DEFAULT_ENEMY_COUNT);
-  const [customEnemyCount, setCustomEnemyCount] = useState(DEFAULT_ENEMY_COUNT);
+  const [gameDurationSec, setGameDurationSec] = useState<GameDurationSeconds>(DEFAULT_GAME_DURATION_SECONDS);
   const [maxHp, setMaxHp] = useState(DEFAULT_HP);
   const [customHp, setCustomHp] = useState(DEFAULT_HP);
   const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
@@ -128,14 +129,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [backgroundColor, setBackgroundColor] = useState<string>(BACKGROUND_COLOR_OPTIONS[0]);
   const [hp, setHp] = useState(DEFAULT_HP);
   const [defeated, setDefeated] = useState(0);
-  const [spawned, setSpawned] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recognized, setRecognized] = useState<string>('尚未辨識');
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
-  const isCustomEnemyCount = !ENEMY_COUNT_OPTIONS.includes(enemyCount as typeof ENEMY_COUNT_OPTIONS[number]);
   const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
+  const gameDurationLabel = formatGameDuration(gameDurationSec);
   const backgroundSummary = backgroundMode === 'stars' ? '星空' : backgroundColor;
   const backgroundStyle = useMemo<CSSProperties>(() => (
     backgroundMode === 'stars'
@@ -149,8 +150,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, []);
 
   useEffect(() => {
-    configRef.current = { difficulty, enemyCount, maxHp, speed, strictness, strokeWaitMs };
-  }, [difficulty, enemyCount, maxHp, speed, strictness, strokeWaitMs]);
+    configRef.current = { difficulty, gameDurationSec, maxHp, speed, strictness, strokeWaitMs };
+  }, [difficulty, gameDurationSec, maxHp, speed, strictness, strokeWaitMs]);
 
   useEffect(() => {
     jsPsychRef.current = initJsPsych();
@@ -194,12 +195,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       Test_Date: formatTestDate(new Date()),
       Participant_ID: getActiveUser() || 'Unknown',
       Difficulty: configRef.current.difficulty,
-      Enemy_Count: configRef.current.enemyCount,
+      Game_Time_Seconds: configRef.current.gameDurationSec,
       Starting_HP: configRef.current.maxHp,
       Enemy_Speed: configRef.current.speed,
       Recognition_Strictness: configRef.current.strictness,
       Stroke_Wait_Milliseconds: configRef.current.strokeWaitMs,
       Total_Duration_Seconds: Number(metrics.elapsed.toFixed(1)),
+      Enemies_Spawned: metrics.spawned,
       Enemies_Defeated: metrics.defeated,
       HP_Remaining: metrics.hp,
       Game_Result: gameResult,
@@ -208,6 +210,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setResult(record);
     setHp(metrics.hp);
     setDefeated(metrics.defeated);
+    setElapsedSeconds(Math.floor(metrics.elapsed));
     setPhase('results');
     try {
       const jsPsychData = jsPsychRef.current?.data;
@@ -281,7 +284,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     app.stage.addChild(enemy.node);
     enemiesRef.current.push(enemy);
     metricsRef.current.spawned += 1;
-    setSpawned(metricsRef.current.spawned);
   }, [drawShape]);
 
   const redrawPath = useCallback(() => {
@@ -343,7 +345,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     enemyResultsRef.current = [];
     setHp(initialHp);
     setDefeated(0);
-    setSpawned(0);
+    setElapsedSeconds(0);
     setResult(null);
     setRecognized('尚未辨識');
     setPhase('playing');
@@ -395,15 +397,18 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         const dt = Math.min(ticker.deltaMS / 1000, 0.05);
         const metrics = metricsRef.current;
         const cfg = DIFFICULTIES[configRef.current.difficulty];
-        const targetEnemyCount = configRef.current.enemyCount;
+        const targetGameDurationSec = configRef.current.gameDurationSec;
+        const isTimeUnlimited = targetGameDurationSec === null;
         metrics.elapsed += dt;
+        const nextElapsedSeconds = Math.floor(metrics.elapsed);
+        setElapsedSeconds((current) => current === nextElapsedSeconds ? current : nextElapsedSeconds);
         const noActiveEnemies = enemiesRef.current.length === 0;
         if (cfg.spawnMode === 'fixed-interval' || noActiveEnemies) {
           metrics.spawnTimer += dt;
         } else {
           metrics.spawnTimer = 0;
         }
-        if (metrics.spawned < targetEnemyCount) {
+        if (isTimeUnlimited || metrics.elapsed < targetGameDurationSec) {
           const shouldSpawn =
             metrics.spawned === 0 ||
             (cfg.spawnMode === 'after-clear-delay' && noActiveEnemies && metrics.spawnTimer >= cfg.spawnIntervalSec) ||
@@ -431,7 +436,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           finishGame('Defeat');
           return;
         }
-        if (metrics.spawned >= targetEnemyCount && enemiesRef.current.length === 0 && metrics.hp > 0) {
+        if (!isTimeUnlimited && metrics.elapsed >= targetGameDurationSec && metrics.hp > 0) {
           finishGame('Victory');
         }
       });
@@ -501,7 +506,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     };
   }, [handlePointerEnd, redrawPath]);
 
-  const progressText = useMemo(() => `${spawned}/${enemyCount}`, [enemyCount, spawned]);
+  const timeProgressText = useMemo(() => {
+    if (gameDurationSec === null) return `${elapsedSeconds}s / 無限`;
+    return `${Math.min(elapsedSeconds, gameDurationSec)}/${gameDurationSec}s`;
+  }, [elapsedSeconds, gameDurationSec]);
 
   const downloadResult = () => {
     if (!result) return;
@@ -515,7 +523,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       {phase !== 'results' && <div className="drawing-defense-hud">
         <div><strong>HP</strong> {hp}/{maxHp}</div>
         <div><strong>消滅</strong> {defeated}</div>
-        <div><strong>敵人</strong> {progressText}</div>
+        <div><strong>時間</strong> {timeProgressText}</div>
         <div><strong>辨識</strong> {recognized}</div>
         {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>}
       </div>}
@@ -529,7 +537,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <h1>畫畫塔防</h1>
               </div>
               <div className="drawing-defense-config-stats">
-                <span><strong>{enemyCount}</strong> 敵人</span>
+                <span><strong>{gameDurationLabel}</strong></span>
                 <span><strong>{maxHp}</strong> HP</span>
                 <span><strong>{speed}</strong> px/s</span>
               </div>
@@ -605,43 +613,22 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>敵人數量</h2>
-                    <p>{enemyCount} 人</p>
+                    <h2>遊戲時間</h2>
+                    <p>{gameDurationLabel}</p>
                   </div>
-                  <span>{isCustomEnemyCount ? '自訂' : '預設'}</span>
+                  <span>{gameDurationSec === DEFAULT_GAME_DURATION_SECONDS ? '預設' : '選用'}</span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
-                  {ENEMY_COUNT_OPTIONS.map((option) => (
+                  {GAME_DURATION_OPTIONS.map((option) => (
                     <button
-                      key={option}
+                      key={option ?? 'infinite'}
                       type="button"
-                      className={`drawing-defense-option ${enemyCount === option ? 'active' : ''}`}
-                      onClick={() => setEnemyCount(option)}
+                      className={`drawing-defense-option ${gameDurationSec === option ? 'active' : ''}`}
+                      onClick={() => setGameDurationSec(option)}
                     >
-                      <span className="drawing-defense-option-title">{option} 人</span>
+                      <span className="drawing-defense-option-title">{formatGameDuration(option)}</span>
                     </button>
                   ))}
-                  <label
-                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomEnemyCount ? 'active' : ''}`}
-                    onClick={() => setEnemyCount(customEnemyCount)}
-                  >
-                    <span className="drawing-defense-option-title">自訂</span>
-                    <input
-                      className="drawing-defense-number-input"
-                      type="number"
-                      min="1"
-                      max="60"
-                      step="1"
-                      value={customEnemyCount}
-                      onChange={(event) => {
-                        const value = clamp(Number(event.target.value), 1, 60);
-                        setCustomEnemyCount(value);
-                        setEnemyCount(value);
-                      }}
-                      onFocus={() => setEnemyCount(customEnemyCount)}
-                      aria-label="自訂敵人數量"
-                    />
-                  </label>
                 </div>
               </section>
 
@@ -673,12 +660,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     <input
                       className="drawing-defense-number-input"
                       type="number"
-                      min="10"
+                      min="1"
                       max="170"
-                      step="5"
+                      step="1"
                       value={customSpeed}
                       onChange={(event) => {
-                        const value = clamp(Number(event.target.value), 10, 170);
+                        const value = clamp(Number(event.target.value), 1, 170);
                         setCustomSpeed(value);
                         setSpeed(value);
                       }}
@@ -809,7 +796,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             <div className="drawing-defense-config-footer">
               <div className="drawing-defense-config-summary">
                 <strong>{activeConfig.label}</strong>
-                <span>{enemyCount} 敵人</span>
+                <span>{gameDurationLabel}</span>
                 <span>{maxHp} HP</span>
                 <span>{speed} px/s</span>
                 <span>{strictness}%</span>
@@ -849,8 +836,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <strong>{result.Participant_ID}</strong>
               </span>
               <span>
-                <small>消滅敵人數 / 總敵人數</small>
-                <strong>{result.Enemies_Defeated}/{result.Enemy_Count}</strong>
+                <small>消滅敵人數 / 生成敵人數</small>
+                <strong>{result.Enemies_Defeated}/{result.Enemies_Spawned}</strong>
               </span>
               <span>
                 <small>總時長</small>
@@ -1649,12 +1636,13 @@ function toCsv(records: SessionRecord[]): string {
     { label: '測驗日期', value: (record) => record.Test_Date },
     { label: 'Participant_ID', value: (record) => record.Participant_ID },
     { label: 'Difficulty', value: (record) => record.Difficulty },
-    { label: 'Enemy_Count', value: (record) => record.Enemy_Count },
+    { label: 'Game_Time_Seconds', value: (record) => record.Game_Time_Seconds ?? 'Infinite' },
     { label: 'Starting_HP', value: (record) => record.Starting_HP },
     { label: 'Enemy_Speed', value: (record) => record.Enemy_Speed },
     { label: 'Recognition_Strictness', value: (record) => record.Recognition_Strictness },
     { label: 'Stroke_Wait_Milliseconds', value: (record) => record.Stroke_Wait_Milliseconds },
     { label: 'Total_Duration_Seconds', value: (record) => record.Total_Duration_Seconds },
+    { label: 'Enemies_Spawned', value: (record) => record.Enemies_Spawned },
     { label: 'Enemies_Defeated', value: (record) => record.Enemies_Defeated },
     { label: 'HP_Remaining', value: (record) => record.HP_Remaining },
     { label: 'Game_Result', value: (record) => record.Game_Result },
@@ -1678,6 +1666,10 @@ function csvCell(value: unknown): string {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+function formatGameDuration(duration: GameDurationSeconds): string {
+  return duration === null ? '無限模式' : `${duration}s`;
 }
 
 function formatTestDate(date: Date): string {
