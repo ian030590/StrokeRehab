@@ -1,3 +1,4 @@
+[StrokeTrainerLogo](./public/assets/logo2.png)
 # StrokeTrainer
 
 StrokeTrainer 是一個基於 **React + PixiJS + jsPsych** 建構的復健訓練 Web 應用程式。本系統旨在提供多樣化的訓練模組，包含動作、認知與語言訓練，以協助中風患者進行自我復健練習。透過遊戲化的介面設計與精準的資料收集，提升訓練動機與成效。
