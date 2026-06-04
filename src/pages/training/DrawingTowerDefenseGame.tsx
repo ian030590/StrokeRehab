@@ -470,13 +470,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       recognitionTimerRef.current = null;
       const recognition = recognizeShape(strokesRef.current, configRef.current.strictness);
       setRecognized(recognition ? SHAPE_LABEL[recognition] : '未辨識');
-      const target = enemiesRef.current[0];
-      const matched = Boolean(recognition && target && recognition === target.shape);
+      const matchedTarget = recognition ? findClosestEnemyByShape(enemiesRef.current, recognition) : undefined;
+      const target = matchedTarget ?? enemiesRef.current[0];
+      const matched = Boolean(matchedTarget);
       queueDrawingSampleUpload(strokesRef.current, recognition, target, matched);
-      if (matched && target) {
-        recordEnemyOutcome(target, true);
-        target.node.destroy({ children: true });
-        enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== target.id);
+      if (matchedTarget) {
+        recordEnemyOutcome(matchedTarget, true);
+        matchedTarget.node.destroy({ children: true });
+        enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== matchedTarget.id);
         metricsRef.current.defeated += 1;
         setDefeated(metricsRef.current.defeated);
       }
@@ -1182,6 +1183,14 @@ function createDrawingSampleId(date: Date, participantId: string, targetShape: S
 
 function sanitizeFilenamePart(value: string): string {
   return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+
+function findClosestEnemyByShape(enemies: Enemy[], shape: ShapeId): Enemy | undefined {
+  return enemies.reduce<Enemy | undefined>((closest, enemy) => {
+    if (enemy.shape !== shape) return closest;
+    if (!closest || enemy.y > closest.y) return enemy;
+    return closest;
+  }, undefined);
 }
 
 function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null {
