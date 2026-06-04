@@ -359,14 +359,10 @@ export const zh = {
   'credits.subtitle': '參考的開源專案與資源',
   'credits.webgazer.title': 'WebGazer.js',
   'credits.webgazer.desc': '提供基於攝影機的視線追蹤功能，使用機器學習模型估計使用者注視位置。',
-  'credits.fract10.title': '視力評估與螢幕校正',
-  'credits.fract10.desc': '參考 michaelbach/FrACT10 的實作方法與演算法',
-  'credits.eyeTraining.title': '移動卡片訓練',
-  'credits.eyeTraining.desc': '參考 styts/eye-training 專案',
-  'credits.foveaflow.title': '眼動訓練',
-  'credits.foveaflow.desc': '參考 Jesper-N/foveaflow 的多項目標追蹤設計',
-  'credits.gaborPatching.title': '蓋伯斑塊練習',
-  'credits.gaborPatching.desc': '參考 Fordi/gabor-patching 的遊戲機制',
+  'credits.javascriptGames.title': 'JavaScript 認知遊戲',
+  'credits.javascriptGames.desc': '參考 muthuspark/javascript-games 的多種網頁小遊戲實作',
+  'credits.vueMinesweeper.title': 'Vue 踩地雷',
+  'credits.vueMinesweeper.desc': '參考 antfu/vue-minesweeper 的踩地雷遊戲邏輯與設計',
 
   // Extra
   'nav.brand': 'Stroke Trainer',

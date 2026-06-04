@@ -6,55 +6,26 @@ export function CreditsPage() {
 
   const credits = [
     {
-      titleKey: 'credits.fract10.title',
-      descKey: 'credits.fract10.desc',
-      repo: 'michaelbach/FrACT10',
-      url: 'https://github.com/michaelbach/FrACT10',
+      titleKey: 'credits.javascriptGames.title',
+      descKey: 'credits.javascriptGames.desc',
+      repo: 'muthuspark/javascript-games',
+      url: 'https://github.com/muthuspark/javascript-games',
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
+          <rect x="2" y="6" width="20" height="12" rx="2" ry="2" />
+          <path d="M6 12h4m-2-2v4m8-2h.01M16 12h.01" />
         </svg>
       ),
     },
     {
-      titleKey: 'credits.eyeTraining.title',
-      descKey: 'credits.eyeTraining.desc',
-      repo: 'styts/eye-training',
-      url: 'https://github.com/styts/eye-training',
+      titleKey: 'credits.vueMinesweeper.title',
+      descKey: 'credits.vueMinesweeper.desc',
+      repo: 'antfu/vue-minesweeper',
+      url: 'https://github.com/antfu/vue-minesweeper',
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <path d="M16 8l-4 4-4-4" />
-        </svg>
-      ),
-    },
-    {
-      titleKey: 'credits.foveaflow.title',
-      descKey: 'credits.foveaflow.desc',
-      repo: 'Jesper-N/foveaflow',
-      url: 'https://github.com/Jesper-N/foveaflow',
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="2.5" />
-          <path d="M12 3a9 9 0 0 1 9 9" />
-          <path d="M21 12a9 9 0 0 1 -9 9" />
-          <path d="M12 21a9 9 0 0 1 -9 -9" />
-          <path d="M3 12a9 9 0 0 1 9 -9" />
-        </svg>
-      ),
-    },
-    {
-      titleKey: 'credits.gaborPatching.title',
-      descKey: 'credits.gaborPatching.desc',
-      repo: 'Fordi/gabor-patching',
-      url: 'https://github.com/Fordi/gabor-patching',
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <circle cx="12" cy="12" r="4" />
-          <line x1="12" y1="2" x2="12" y2="4" />
-          <line x1="12" y1="20" x2="12" y2="22" />
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" />
         </svg>
       ),
     },

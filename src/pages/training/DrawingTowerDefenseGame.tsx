@@ -10,6 +10,7 @@ type GamePhase = 'menu' | 'playing' | 'paused' | 'results';
 type GameResult = 'Victory' | 'Defeat';
 type BackgroundMode = 'stars' | 'color' | 'image';
 type GameDurationSeconds = number | null;
+type DrawingSampleUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 interface DrawingTowerDefenseGameProps {
   onExit: () => void;
@@ -42,6 +43,40 @@ interface EnemyResult {
   Shape: ShapeId;
   Reaction_Time_Seconds: number | null;
   Defeated: boolean;
+}
+
+interface DrawingSampleUploadState {
+  status: DrawingSampleUploadStatus;
+  pending: number;
+  uploaded: number;
+  failed: number;
+  message: string;
+}
+
+interface DrawingSampleMetadata {
+  sampleId: string;
+  createdAt: string;
+  participantId: string;
+  targetShape: ShapeId | null;
+  targetShapeLabel: string | null;
+  recognizedShape: ShapeId | null;
+  recognizedShapeLabel: string | null;
+  matched: boolean;
+  difficulty: Difficulty;
+  gameTimeSeconds: GameDurationSeconds;
+  enemyNumber: number | null;
+  elapsedSeconds: number;
+  elapsedSinceTargetSpawnSeconds: number | null;
+  enemySpeed: number;
+  recognitionStrictness: number;
+  strokeWaitMilliseconds: number;
+  strokeCount: number;
+  pointCount: number;
+  sourceCanvasWidth: number | null;
+  sourceCanvasHeight: number | null;
+  boundingBox: ReturnType<typeof getBox>;
+  imageFormat: 'png-transparent';
+  imageSize: number;
 }
 
 interface SessionRecord {
@@ -78,6 +113,10 @@ const BACKGROUND_COLOR_OPTIONS = ['#F6F7F8', '#E8F3FF', '#EAF7EF', '#FFF4E6', '#
 const RECOGNIZER_POINTS = 64;
 const RECOGNIZER_SIZE = 200;
 const starSkyBackgroundImage = `url(${import.meta.env.BASE_URL}assets/StarSky.png)`;
+const DRAWING_SAMPLE_UPLOAD_ENDPOINT = import.meta.env.VITE_DRAWING_SAMPLE_UPLOAD_URL?.trim() || '/api/drawing-samples';
+const DRAWING_SAMPLE_IMAGE_SIZE = 256;
+const DRAWING_SAMPLE_IMAGE_PADDING = 24;
+const DRAWING_SAMPLE_STROKE_WIDTH = 14;
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   Beginner: { label: '初級', spawnMode: 'after-clear-delay', spawnIntervalSec: 2, description: '消滅後 2 秒出現下一名' },
@@ -138,6 +177,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recognized, setRecognized] = useState<string>('尚未辨識');
   const [result, setResult] = useState<SessionRecord | null>(null);
+  const [sampleUpload, setSampleUpload] = useState<DrawingSampleUploadState>({
+    status: 'idle',
+    pending: 0,
+    uploaded: 0,
+    failed: 0,
+    message: '尚未上傳',
+  });
 
   const activeConfig = DIFFICULTIES[difficulty];
   const isPresetGameDuration = GAME_DURATION_OPTIONS.includes(gameDurationSec as typeof GAME_DURATION_OPTIONS[number]);
@@ -155,6 +201,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     }
     return { backgroundImage: 'none', backgroundColor };
   }, [backgroundColor, backgroundMode, uploadedBackgroundUrl]);
+  const sampleUploadLabel = useMemo(() => {
+    if (sampleUpload.pending > 0) return `上傳中 ${sampleUpload.pending}`;
+    if (sampleUpload.failed > 0) return `已傳 ${sampleUpload.uploaded} / 失敗 ${sampleUpload.failed}`;
+    if (sampleUpload.uploaded > 0) return `已傳 ${sampleUpload.uploaded}`;
+    return sampleUpload.message;
+  }, [sampleUpload]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -321,6 +373,81 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     layer.stroke({ color: 0x005eb8, width: 7, alpha: 0.9, cap: 'round', join: 'round' });
   }, []);
 
+  const queueDrawingSampleUpload = useCallback((strokes: Point[][], recognition: ShapeId | null, target: Enemy | undefined, matched: boolean) => {
+    const sampleStrokes = cloneUsableStrokes(strokes);
+    const points = flattenStrokes(sampleStrokes);
+    if (points.length < 2 || strokesPathLength(sampleStrokes) < 8) return;
+
+    const participantId = getActiveUser() || 'Unknown';
+    const createdAt = new Date();
+    const sampleId = createDrawingSampleId(createdAt, participantId, target?.shape ?? null);
+    const stageRect = overlayRef.current?.getBoundingClientRect();
+    const targetResult = target ? enemyResultsRef.current[target.resultIndex] : undefined;
+    const elapsedSinceTargetSpawnSeconds = target
+      ? Number(Math.max(0, metricsRef.current.elapsed - target.spawnedAtSec).toFixed(2))
+      : null;
+    const metadata: DrawingSampleMetadata = {
+      sampleId,
+      createdAt: createdAt.toISOString(),
+      participantId,
+      targetShape: target?.shape ?? null,
+      targetShapeLabel: target ? SHAPE_LABEL[target.shape] : null,
+      recognizedShape: recognition,
+      recognizedShapeLabel: recognition ? SHAPE_LABEL[recognition] : null,
+      matched,
+      difficulty: configRef.current.difficulty,
+      gameTimeSeconds: configRef.current.gameDurationSec,
+      enemyNumber: targetResult?.Enemy_Number ?? null,
+      elapsedSeconds: Number(metricsRef.current.elapsed.toFixed(2)),
+      elapsedSinceTargetSpawnSeconds,
+      enemySpeed: configRef.current.speed,
+      recognitionStrictness: configRef.current.strictness,
+      strokeWaitMilliseconds: configRef.current.strokeWaitMs,
+      strokeCount: sampleStrokes.length,
+      pointCount: points.length,
+      sourceCanvasWidth: stageRect ? Math.round(stageRect.width) : null,
+      sourceCanvasHeight: stageRect ? Math.round(stageRect.height) : null,
+      boundingBox: getBox(points),
+      imageFormat: 'png-transparent',
+      imageSize: DRAWING_SAMPLE_IMAGE_SIZE,
+    };
+
+    setSampleUpload((current) => ({
+      ...current,
+      status: 'uploading',
+      pending: current.pending + 1,
+      message: '上傳中',
+    }));
+
+    void createDrawingSampleBlob(sampleStrokes)
+      .then((blob) => uploadDrawingSample(blob, metadata))
+      .then(() => {
+        setSampleUpload((current) => {
+          const pending = Math.max(0, current.pending - 1);
+          return {
+            status: pending > 0 ? 'uploading' : 'success',
+            pending,
+            uploaded: current.uploaded + 1,
+            failed: current.failed,
+            message: '已上傳 Discord',
+          };
+        });
+      })
+      .catch((error) => {
+        console.warn('Unable to upload drawing sample to Discord.', error);
+        setSampleUpload((current) => {
+          const pending = Math.max(0, current.pending - 1);
+          return {
+            status: pending > 0 ? 'uploading' : 'error',
+            pending,
+            uploaded: current.uploaded,
+            failed: current.failed + 1,
+            message: '上傳失敗',
+          };
+        });
+      });
+  }, []);
+
   const handlePointerEnd = useCallback(() => {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
@@ -336,7 +463,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       const recognition = recognizeShape(strokesRef.current, configRef.current.strictness);
       setRecognized(recognition ? SHAPE_LABEL[recognition] : '未辨識');
       const target = enemiesRef.current[0];
-      if (recognition && target && recognition === target.shape) {
+      const matched = Boolean(recognition && target && recognition === target.shape);
+      queueDrawingSampleUpload(strokesRef.current, recognition, target, matched);
+      if (matched && target) {
         recordEnemyOutcome(target, true);
         target.node.destroy({ children: true });
         enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== target.id);
@@ -348,7 +477,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         drawingLayerRef.current?.clear();
       }, 650);
     }, configRef.current.strokeWaitMs);
-  }, [recordEnemyOutcome]);
+  }, [queueDrawingSampleUpload, recordEnemyOutcome]);
 
   const startGame = useCallback(() => {
     const app = appRef.current;
@@ -364,6 +493,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setElapsedSeconds(0);
     setResult(null);
     setRecognized('尚未辨識');
+    setSampleUpload({
+      status: 'idle',
+      pending: 0,
+      uploaded: 0,
+      failed: 0,
+      message: '尚未上傳',
+    });
     setPhase('playing');
   }, [clearPixiState, drawLayout, setPhase]);
 
@@ -553,6 +689,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         <div><strong>消滅</strong> {defeated}</div>
         <div><strong>時間</strong> {timeProgressText}</div>
         <div><strong>辨識</strong> {recognized}</div>
+        <div><strong>圖像</strong> {sampleUploadLabel}</div>
         {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>}
       </div>}
 
@@ -916,6 +1053,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <small>總時長</small>
                 <strong>{result.Total_Duration_Seconds} 秒</strong>
               </span>
+              <span>
+                <small>Discord 圖像上傳</small>
+                <strong>{sampleUpload.pending > 0 ? sampleUploadLabel : `${sampleUpload.uploaded}/${sampleUpload.uploaded + sampleUpload.failed}`}</strong>
+              </span>
             </div>
 
             <table className="results-table">
@@ -953,6 +1094,86 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       )}
     </div>
   );
+}
+
+function cloneUsableStrokes(strokes: Point[][]): Point[][] {
+  return strokes
+    .filter((stroke) => stroke.length >= 2)
+    .map((stroke) => stroke.map((point) => ({ x: point.x, y: point.y })));
+}
+
+function createDrawingSampleBlob(strokes: Point[][]): Promise<Blob> {
+  const points = flattenStrokes(strokes);
+  if (points.length < 2) {
+    return Promise.reject(new Error('Drawing sample has no usable points.'));
+  }
+
+  const box = getBox(points);
+  const width = Math.max(1, box.maxX - box.minX);
+  const height = Math.max(1, box.maxY - box.minY);
+  const canvas = document.createElement('canvas');
+  canvas.width = DRAWING_SAMPLE_IMAGE_SIZE;
+  canvas.height = DRAWING_SAMPLE_IMAGE_SIZE;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Promise.reject(new Error('Canvas 2D context is unavailable.'));
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#111827';
+  ctx.lineWidth = DRAWING_SAMPLE_STROKE_WIDTH;
+
+  const drawableSize = DRAWING_SAMPLE_IMAGE_SIZE - DRAWING_SAMPLE_IMAGE_PADDING * 2;
+  const scale = drawableSize / Math.max(width, height);
+  const offsetX = (DRAWING_SAMPLE_IMAGE_SIZE - width * scale) / 2 - box.minX * scale;
+  const offsetY = (DRAWING_SAMPLE_IMAGE_SIZE - height * scale) / 2 - box.minY * scale;
+
+  ctx.beginPath();
+  strokes.forEach((stroke) => {
+    stroke.forEach((point, index) => {
+      const x = point.x * scale + offsetX;
+      const y = point.y * scale + offsetY;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+  });
+  ctx.stroke();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Unable to encode drawing sample PNG.'));
+    }, 'image/png');
+  });
+}
+
+async function uploadDrawingSample(blob: Blob, metadata: DrawingSampleMetadata): Promise<void> {
+  const filename = `drawing_${metadata.targetShape ?? 'unknown'}_${metadata.matched ? 'hit' : 'miss'}_${metadata.sampleId}.png`;
+  const body = new FormData();
+  body.append('image', blob, filename);
+  body.append('metadata', JSON.stringify(metadata));
+
+  const response = await fetch(DRAWING_SAMPLE_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    body,
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Upload failed with ${response.status}${text ? `: ${text}` : ''}`);
+  }
+}
+
+function createDrawingSampleId(date: Date, participantId: string, targetShape: ShapeId | null): string {
+  const timestamp = date.toISOString().replace(/\D/g, '').slice(0, 17);
+  const user = sanitizeFilenamePart(participantId) || 'user';
+  const shape = targetShape ?? 'unknown';
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${timestamp}_${user}_${shape}_${random}`;
+}
+
+function sanitizeFilenamePart(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 }
 
 function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null {

@@ -360,14 +360,10 @@ export const en: Record<TranslationKey, string> = {
   'credits.subtitle': 'Referenced open source projects and resources',
   'credits.webgazer.title': 'WebGazer.js',
   'credits.webgazer.desc': 'Provides webcam-based eye tracking using machine learning models to estimate user gaze location.',
-  'credits.fract10.title': 'Visual Assessment & Screen Calibration',
-  'credits.fract10.desc': 'Referenced implementation methods and algorithms from michaelbach/FrACT10',
-  'credits.eyeTraining.title': 'Moving Card Training',
-  'credits.eyeTraining.desc': 'Referenced styts/eye-training project',
-  'credits.foveaflow.title': 'Oculomotor Training',
-  'credits.foveaflow.desc': 'Referenced MOT design from Jesper-N/foveaflow',
-  'credits.gaborPatching.title': 'Gabor Patching',
-  'credits.gaborPatching.desc': 'Referenced game mechanics from Fordi/gabor-patching',
+  'credits.javascriptGames.title': 'JavaScript Cognitive Games',
+  'credits.javascriptGames.desc': 'Referenced various web games implementation from muthuspark/javascript-games',
+  'credits.vueMinesweeper.title': 'Vue Minesweeper',
+  'credits.vueMinesweeper.desc': 'Referenced minesweeper game logic and design from antfu/vue-minesweeper',
 
   // Extra
   'nav.brand': 'Stroke Trainer',
