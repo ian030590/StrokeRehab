@@ -104,7 +104,9 @@ const GAME_DURATION_OPTIONS = [30, 60, 300, null] as const;
 const ENEMY_SPEED_OPTIONS = [5, 15, 30] as const;
 const DEFAULT_HP = 3;
 const DEFAULT_ENEMY_SPEED = 5;
+const MIN_RECOGNITION_STRICTNESS = 10;
 const DEFAULT_RECOGNITION_STRICTNESS = 20;
+const MAX_RECOGNITION_STRICTNESS = 90;
 const DEFAULT_GAME_DURATION_SECONDS: GameDurationSeconds = 30;
 const DEFAULT_CUSTOM_GAME_DURATION_SECONDS = 120;
 const ENEMY_VISUAL_HEIGHT = 98;
@@ -112,6 +114,12 @@ const ENEMY_SPAWN_Y = -ENEMY_VISUAL_HEIGHT - 8;
 const BACKGROUND_COLOR_OPTIONS = ['#F6F7F8', '#E8F3FF', '#EAF7EF', '#FFF4E6', '#F3EAFE', '#111827'] as const;
 const RECOGNIZER_POINTS = 64;
 const RECOGNIZER_SIZE = 200;
+const RDP_STATIONARY_POINT_DISTANCE_PX = 2.5;
+const DEFAULT_RDP_EPSILON_RATIO = 0.08;
+const MIN_RDP_EPSILON_RATIO = 0.05;
+const MAX_RDP_EPSILON_RATIO = 0.1;
+const RDP_CLOSED_ENDPOINT_DISTANCE_PX = 30;
+const RDP_STRAIGHT_ANGLE_DEGREES = 160;
 const starSkyBackgroundImage = `url(${import.meta.env.BASE_URL}assets/StarSky.png)`;
 const DRAWING_SAMPLE_UPLOAD_ENDPOINT = import.meta.env.VITE_DRAWING_SAMPLE_UPLOAD_URL?.trim() || '/api/drawing-samples';
 const DRAWING_SAMPLE_IMAGE_SIZE = 256;
@@ -876,8 +884,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <input
                   className="drawing-defense-slider"
                   type="range"
-                  min="10"
-                  max="90"
+                  min={MIN_RECOGNITION_STRICTNESS}
+                  max={MAX_RECOGNITION_STRICTNESS}
                   step="5"
                   value={strictness}
                   onChange={(event) => setStrictness(Number(event.target.value))}
@@ -1185,14 +1193,15 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
   const box = getBox(rawPoints);
   const tolerance = shapeTolerance(strictness);
   if (looksLikeIntersectingCross(usableStrokes, box, tolerance)) return 'cross';
-  if (looksLikeTriangle(usableStrokes, rawPoints, box, tolerance)) return 'triangle';
+  const polygonRecognition = recognizePolygonByRdpCorners(usableStrokes, rawPoints, box, strictness);
+  if (polygonRecognition) return polygonRecognition;
   if (looksLikeCross(usableStrokes, rawPoints, box, tolerance)) return 'cross';
-  if (looksLikeSquare(rawPoints, box, tolerance)) return 'square';
 
   const candidate = normalizeGesture(usableStrokes);
   let best: { shape: ShapeId; score: number } | null = null;
 
   for (const template of GESTURE_TEMPLATES) {
+    if (template.shape === 'square' || template.shape === 'triangle') continue;
     for (const variant of template.variants) {
       const strokePenalty = Math.abs(usableStrokes.length - template.strokeCount) * 0.08;
       const distanceScore = pathDistance(candidate, variant) / (RECOGNIZER_SIZE * 0.48);
@@ -1205,7 +1214,7 @@ function recognizeShape(strokes: Point[][], strictness: number): ShapeId | null 
 
   const threshold = 0.42 + strictness * 0.0025;
   const adjustedThreshold =
-    best?.shape === 'cross' || best?.shape === 'square' || best?.shape === 'triangle'
+    best?.shape === 'cross'
       ? threshold - 0.06
       : threshold;
   return best && best.score >= adjustedThreshold ? best.shape : null;
@@ -1435,79 +1444,101 @@ function sampleEllipse(cx: number, cy: number, rx: number, ry: number, count: nu
   return points;
 }
 
-function looksLikeSquare(points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
-  if (points.length < 8) return false;
-  const width = box.maxX - box.minX;
-  const height = box.maxY - box.minY;
-  const maxSize = Math.max(width, height);
-  const minSize = Math.min(width, height);
-  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.45) return false;
-
-  const margin = Math.max(7, maxSize * (0.12 + tolerance * 0.06));
-  const coverage = getBoxSideCoverage(points, box, margin);
-  const sideCoverageFloor = 0.42 - tolerance * 0.08;
-
-  return (
-    coverage.left >= sideCoverageFloor &&
-    coverage.right >= sideCoverageFloor &&
-    coverage.top >= sideCoverageFloor &&
-    coverage.bottom >= sideCoverageFloor
-  );
+function recognizePolygonByRdpCorners(
+  strokes: Point[][],
+  points: Point[],
+  box: ReturnType<typeof getBox>,
+  strictness: number,
+): ShapeId | null {
+  const corners = getRdpPolygonCorners(strokes, points, box, strictness);
+  if (corners.length === 3) return 'triangle';
+  if (corners.length === 4) return 'square';
+  return null;
 }
 
-function looksLikeTriangle(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
-  if (points.length < 6) return false;
+function getRdpPolygonCorners(
+  strokes: Point[][],
+  points: Point[],
+  box: ReturnType<typeof getBox>,
+  strictness: number,
+): Point[] {
+  if (points.length < 6) return [];
+
   const width = box.maxX - box.minX;
   const height = box.maxY - box.minY;
   const maxSize = Math.max(width, height);
   const minSize = Math.min(width, height);
-  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.32) return false;
+  const diagonal = Math.hypot(width, height);
+  if (maxSize < 24 || minSize / Math.max(1, maxSize) < 0.32) return [];
 
-  const margin = Math.max(7, maxSize * (0.12 + tolerance * 0.05));
-  const coverage = getBoxSideCoverage(points, box, margin);
-  const squareCoverageFloor = 0.42 - tolerance * 0.08;
-  const squareLike = (
-    coverage.left >= squareCoverageFloor &&
-    coverage.right >= squareCoverageFloor &&
-    coverage.top >= squareCoverageFloor &&
-    coverage.bottom >= squareCoverageFloor
-  );
-  if (squareLike) return false;
-  if (hasTriangleOutline(strokes, points, box, tolerance)) return true;
+  const preprocessed = filterStationaryPoints(flattenStrokes(strokes), RDP_STATIONARY_POINT_DISTANCE_PX);
+  if (preprocessed.length < 6) return [];
 
-  const strokeLines = strokes
-    .map(getStrokeLineFeatures)
-    .filter((stroke): stroke is StrokeLineFeatures => stroke !== null && stroke.straightness > 0.54 - tolerance * 0.14);
-  const segmentLines = getSimplifiedStrokeSegments(strokes, Math.max(4, maxSize * 0.045), Math.max(12, maxSize * 0.14));
-  const lineFeatures = [...strokeLines, ...segmentLines];
-  const hasAnchors = hasUprightTriangleAnchors(points, box, tolerance);
-  const horizontalBase = lineFeatures.some((stroke) => isHorizontal(stroke.angle, tolerance));
-  const diagonalStrokes = lineFeatures.filter((stroke) => isDiagonal(stroke.angle, tolerance));
-  const hasOpposingDiagonals = diagonalStrokes.some((first, index) => (
-    diagonalStrokes.slice(index + 1).some((second) => {
-      const diff = angleDifference(first.angle, second.angle);
-      return diff > 45 - tolerance * 12 && diff < 135 + tolerance * 12;
-    })
-  ));
-  const hasBase = horizontalBase || coverage.bottom >= 0.4 - tolerance * 0.05;
+  const simplified = simplify(preprocessed, rdpEpsilon(strictness, diagonal));
+  const closed = mergeClosedEndpoint(simplified, RDP_CLOSED_ENDPOINT_DISTANCE_PX);
+  return removeNearlyStraightCorners(closed, RDP_STRAIGHT_ANGLE_DEGREES);
+}
 
-  if (hasAnchors && hasOpposingDiagonals && hasBase) {
-    return true;
+function rdpEpsilon(strictness: number, diagonal: number): number {
+  return Math.max(1, diagonal) * rdpEpsilonRatio(strictness);
+}
+
+function rdpEpsilonRatio(strictness: number): number {
+  const value = clamp(strictness, MIN_RECOGNITION_STRICTNESS, MAX_RECOGNITION_STRICTNESS);
+  if (value <= DEFAULT_RECOGNITION_STRICTNESS) {
+    const ratio = (DEFAULT_RECOGNITION_STRICTNESS - value) /
+      Math.max(1, DEFAULT_RECOGNITION_STRICTNESS - MIN_RECOGNITION_STRICTNESS);
+    return DEFAULT_RDP_EPSILON_RATIO + ratio * (MAX_RDP_EPSILON_RATIO - DEFAULT_RDP_EPSILON_RATIO);
   }
 
-  const simplified = simplify(points, Math.max(5, maxSize * 0.06));
-  const corners = countCorners(simplified);
-  const areaRatio = polygonArea(points) / Math.max(1, width * height);
+  const ratio = (value - DEFAULT_RECOGNITION_STRICTNESS) /
+    Math.max(1, MAX_RECOGNITION_STRICTNESS - DEFAULT_RECOGNITION_STRICTNESS);
+  return DEFAULT_RDP_EPSILON_RATIO - ratio * (DEFAULT_RDP_EPSILON_RATIO - MIN_RDP_EPSILON_RATIO);
+}
 
-  return (
-    hasAnchors &&
-    hasBase &&
-    corners >= 1 &&
-    corners <= 5 &&
-    areaRatio >= 0.12 &&
-    areaRatio <= 0.75 &&
-    coverage.top < 0.58 + tolerance * 0.08
-  );
+function filterStationaryPoints(points: Point[], minDistance: number): Point[] {
+  if (points.length === 0) return [];
+
+  const filtered: Point[] = [points[0]];
+  for (let i = 1; i < points.length; i += 1) {
+    if (distance(points[i], filtered[filtered.length - 1]) >= minDistance) {
+      filtered.push(points[i]);
+    }
+  }
+  return filtered;
+}
+
+function mergeClosedEndpoint(points: Point[], closeDistance: number): Point[] {
+  if (points.length < 3) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (distance(first, last) > closeDistance) return points;
+
+  return [
+    { x: (first.x + last.x) / 2, y: (first.y + last.y) / 2 },
+    ...points.slice(1, -1),
+  ];
+}
+
+function removeNearlyStraightCorners(points: Point[], straightAngle: number): Point[] {
+  const corners = [...points];
+  let changed = true;
+
+  while (changed && corners.length > 2) {
+    changed = false;
+    for (let i = 0; i < corners.length; i += 1) {
+      const previous = corners[(i - 1 + corners.length) % corners.length];
+      const current = corners[i];
+      const next = corners[(i + 1) % corners.length];
+      if (angle(previous, current, next) > straightAngle) {
+        corners.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return corners;
 }
 
 function looksLikeCross(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
@@ -1628,121 +1659,6 @@ function getSimplifiedStrokeSegments(strokes: Point[][], epsilon: number, minLen
   return segments;
 }
 
-function hasTriangleOutline(strokes: Point[][], points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
-  const width = Math.max(1, box.maxX - box.minX);
-  const height = Math.max(1, box.maxY - box.minY);
-  const maxSize = Math.max(width, height);
-  const candidates = getTriangleVertexCandidates(strokes, points, maxSize, tolerance);
-  if (candidates.length < 3) return false;
-
-  const margin = Math.max(8, maxSize * (0.09 + tolerance * 0.05));
-  const minEdgeCoverage = 0.32 - tolerance * 0.07;
-  const minAreaRatio = 0.1 - tolerance * 0.02;
-  const maxAreaRatio = 0.78 + tolerance * 0.05;
-
-  for (let a = 0; a < candidates.length - 2; a += 1) {
-    for (let b = a + 1; b < candidates.length - 1; b += 1) {
-      for (let c = b + 1; c < candidates.length; c += 1) {
-        const first = candidates[a];
-        const second = candidates[b];
-        const third = candidates[c];
-        const areaRatio = triangleArea(first, second, third) / Math.max(1, width * height);
-        if (areaRatio < minAreaRatio || areaRatio > maxAreaRatio) continue;
-
-        const vertexBox = getBox([first, second, third]);
-        const vertexWidth = vertexBox.maxX - vertexBox.minX;
-        const vertexHeight = vertexBox.maxY - vertexBox.minY;
-        if (vertexWidth < width * 0.62 || vertexHeight < height * 0.62) continue;
-        if (Math.min(distance(first, second), distance(second, third), distance(third, first)) < maxSize * 0.18) continue;
-
-        const edgeCoverages = [
-          edgeCoverage(points, first, second, margin),
-          edgeCoverage(points, second, third, margin),
-          edgeCoverage(points, third, first, margin),
-        ];
-        if (edgeCoverages.every((coverage) => coverage >= minEdgeCoverage)) {
-          return true;
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
-function getTriangleVertexCandidates(strokes: Point[][], points: Point[], maxSize: number, tolerance: number): Point[] {
-  const epsilon = Math.max(4, maxSize * (0.04 + tolerance * 0.02));
-  const rawCandidates: Point[] = [];
-  strokes.forEach((stroke) => {
-    rawCandidates.push(...simplify(stroke, epsilon));
-  });
-  rawCandidates.push(...simplify(points, epsilon));
-
-  const clusterRadius = Math.max(8, maxSize * (0.1 + tolerance * 0.04));
-  return clusterPoints(rawCandidates, clusterRadius).slice(0, 9);
-}
-
-function clusterPoints(points: Point[], radius: number): Point[] {
-  const clusters: Array<{ x: number; y: number; count: number }> = [];
-  points.forEach((point) => {
-    const cluster = clusters.find((item) => distance(point, item) <= radius);
-    if (cluster) {
-      cluster.x = (cluster.x * cluster.count + point.x) / (cluster.count + 1);
-      cluster.y = (cluster.y * cluster.count + point.y) / (cluster.count + 1);
-      cluster.count += 1;
-    } else {
-      clusters.push({ x: point.x, y: point.y, count: 1 });
-    }
-  });
-  return clusters.map(({ x, y }) => ({ x, y }));
-}
-
-function edgeCoverage(points: Point[], start: Point, end: Point, margin: number): number {
-  const length = distance(start, end);
-  if (length < 1) return 0;
-  const bins = 7;
-  const occupied = new Set<number>();
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const lengthSquared = length * length;
-
-  points.forEach((point) => {
-    const projection = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared;
-    if (projection < -0.04 || projection > 1.04) return;
-    if (perpendicularDistance(point, start, end) > margin) return;
-    occupied.add(clamp(Math.floor(projection * bins), 0, bins - 1));
-  });
-
-  if ([...occupied].filter((bin) => bin > 0 && bin < bins - 1).length < 2) return 0;
-  return occupied.size / bins;
-}
-
-function hasUprightTriangleAnchors(points: Point[], box: ReturnType<typeof getBox>, tolerance: number): boolean {
-  const width = Math.max(1, box.maxX - box.minX);
-  const height = Math.max(1, box.maxY - box.minY);
-  const centerX = (box.minX + box.maxX) / 2;
-  const topBand = box.minY + height * (0.18 + tolerance * 0.03);
-  const lowerBand = box.minY + height * (0.48 - tolerance * 0.08);
-  const centerLimit = width * (0.24 + tolerance * 0.08);
-  const apexSpreadLimit = width * (0.36 + tolerance * 0.08);
-  const sideLimit = width * (0.42 + tolerance * 0.06);
-  const topPoints = points.filter((point) => point.y <= topBand);
-  const topXs = topPoints.map((point) => point.x);
-  const topMinX = Math.min(...topXs);
-  const topMaxX = Math.max(...topXs);
-  const topAverageX = topXs.reduce((sum, x) => sum + x, 0) / Math.max(1, topXs.length);
-
-  const topApex = (
-    topPoints.length > 0 &&
-    topMaxX - topMinX <= apexSpreadLimit &&
-    Math.abs(topAverageX - centerX) <= centerLimit
-  );
-  const lowerLeft = points.some((point) => point.x <= box.minX + sideLimit && point.y >= lowerBand);
-  const lowerRight = points.some((point) => point.x >= box.maxX - sideLimit && point.y >= lowerBand);
-
-  return topApex && lowerLeft && lowerRight;
-}
-
 function lineIntersection(aStart: Point, aEnd: Point, bStart: Point, bEnd: Point): Point | null {
   const denominator =
     (aStart.x - aEnd.x) * (bStart.y - bEnd.y) -
@@ -1793,11 +1709,6 @@ function isDiagonal(angle: number, tolerance: number): boolean {
   return Math.abs(angle - 45) < 34 + tolerance * 18 || Math.abs(angle - 135) < 34 + tolerance * 18;
 }
 
-function isHorizontal(angle: number, tolerance: number): boolean {
-  const limit = 22 + tolerance * 16;
-  return angle < limit || angle > 180 - limit;
-}
-
 function linePassesNearCenter(line: StrokeLineFeatures, center: Point, box: ReturnType<typeof getBox>, tolerance: number): boolean {
   const width = box.maxX - box.minX;
   const height = box.maxY - box.minY;
@@ -1809,32 +1720,6 @@ function linePassesNearCenter(line: StrokeLineFeatures, center: Point, box: Retu
   const maxY = Math.max(line.first.y, line.last.y) + margin;
   if (center.x < minX || center.x > maxX || center.y < minY || center.y > maxY) return false;
   return perpendicularDistance(center, line.first, line.last) <= maxSize * (0.16 + tolerance * 0.08);
-}
-
-function getBoxSideCoverage(points: Point[], box: ReturnType<typeof getBox>, margin: number) {
-  const width = Math.max(1, box.maxX - box.minX);
-  const height = Math.max(1, box.maxY - box.minY);
-  const left = points.filter((point) => Math.abs(point.x - box.minX) <= margin);
-  const right = points.filter((point) => Math.abs(point.x - box.maxX) <= margin);
-  const top = points.filter((point) => Math.abs(point.y - box.minY) <= margin);
-  const bottom = points.filter((point) => Math.abs(point.y - box.maxY) <= margin);
-  return {
-    left: axisCoverage(left, 'y', box.minY, height),
-    right: axisCoverage(right, 'y', box.minY, height),
-    top: axisCoverage(top, 'x', box.minX, width),
-    bottom: axisCoverage(bottom, 'x', box.minX, width),
-  };
-}
-
-function axisCoverage(points: Point[], axis: 'x' | 'y', start: number, span: number): number {
-  if (points.length < 3) return 0;
-  const bins = 6;
-  const occupied = new Set<number>();
-  points.forEach((point) => {
-    const ratio = (point[axis] - start) / Math.max(1, span);
-    occupied.add(clamp(Math.floor(ratio * bins), 0, bins - 1));
-  });
-  return occupied.size / bins;
 }
 
 function simplify(points: Point[], epsilon: number): Point[] {
@@ -1910,10 +1795,6 @@ function polygonArea(points: Point[]): number {
     area += points[i].x * next.y - next.x * points[i].y;
   }
   return Math.abs(area) / 2;
-}
-
-function triangleArea(a: Point, b: Point, c: Point): number {
-  return Math.abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2;
 }
 
 function radialCoefficientOfVariation(points: Point[], box: ReturnType<typeof getBox>): number {
