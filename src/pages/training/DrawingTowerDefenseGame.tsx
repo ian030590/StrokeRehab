@@ -382,24 +382,24 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, []);
 
   const queueDrawingSampleUpload = useCallback((strokes: Point[][], recognition: ShapeId | null, target: Enemy | undefined, matched: boolean) => {
+    if (matched || !target) return;
+
     const sampleStrokes = cloneUsableStrokes(strokes);
     const points = flattenStrokes(sampleStrokes);
     if (points.length < 2 || strokesPathLength(sampleStrokes) < 8) return;
 
     const participantId = getActiveUser() || 'Unknown';
     const createdAt = new Date();
-    const sampleId = createDrawingSampleId(createdAt, participantId, target?.shape ?? null);
+    const sampleId = createDrawingSampleId(createdAt, participantId, target.shape);
     const stageRect = overlayRef.current?.getBoundingClientRect();
-    const targetResult = target ? enemyResultsRef.current[target.resultIndex] : undefined;
-    const elapsedSinceTargetSpawnSeconds = target
-      ? Number(Math.max(0, metricsRef.current.elapsed - target.spawnedAtSec).toFixed(2))
-      : null;
+    const targetResult = enemyResultsRef.current[target.resultIndex];
+    const elapsedSinceTargetSpawnSeconds = Number(Math.max(0, metricsRef.current.elapsed - target.spawnedAtSec).toFixed(2));
     const metadata: DrawingSampleMetadata = {
       sampleId,
       createdAt: createdAt.toISOString(),
       participantId,
-      targetShape: target?.shape ?? null,
-      targetShapeLabel: target ? SHAPE_LABEL[target.shape] : null,
+      targetShape: target.shape,
+      targetShapeLabel: SHAPE_LABEL[target.shape],
       recognizedShape: recognition,
       recognizedShapeLabel: recognition ? SHAPE_LABEL[recognition] : null,
       matched,
