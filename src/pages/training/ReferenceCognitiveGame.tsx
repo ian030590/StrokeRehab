@@ -1,6 +1,7 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { Application, type Ticker } from 'pixi.js';
 import { initJsPsych } from 'jspsych';
+import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
 import {
@@ -67,6 +68,7 @@ import type {
   SessionRecord,
 } from './cognitive/types';
 import { COGNITIVE_ACCENT_CSS, clearStage, drawBackground } from './cognitive/utils';
+import { verifySelectedTrainingUser } from './selectedUserGuard';
 
 export type { ReferenceGameId } from './cognitive/types';
 export { REFERENCE_COGNITIVE_MODULES } from './cognitive/constants';
@@ -81,6 +83,7 @@ export function isReferenceGameId(value: string | null): value is ReferenceGameI
 }
 
 export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGameProps) {
+  const { t } = useT();
   const pixiHostRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const phaseRef = useRef<GamePhase>('menu');
@@ -184,6 +187,8 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
   finishGameRef.current = finishGame;
 
   const startGame = useCallback(() => {
+    if (!verifySelectedTrainingUser(t)) return;
+
     metricsRef.current = { elapsed: 0 };
     lastHudSecondRef.current = -1;
     stateRef.current = createInitialState(gameId, difficulty, reactionTrials);
@@ -192,7 +197,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     setHud(summarizeState(stateRef.current, 0, effectiveLimit));
     setPhase('playing');
     window.setTimeout(() => renderRef.current(), 0);
-  }, [difficulty, effectiveLimit, gameId, reactionTrials, setPhase]);
+  }, [difficulty, effectiveLimit, gameId, reactionTrials, setPhase, t]);
 
   const restartGame = useCallback(() => {
     startGame();

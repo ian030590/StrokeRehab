@@ -27,7 +27,7 @@ export const zh = {
 
   // HomePage
   'home.deleteUserPrompt': '確定要刪除使用者「{name}」嗎？',
-  'home.pleaseSelectUser': '請先選擇或新增一位使用者',
+  'home.pleaseSelectUser': '請選擇使用者',
   'home.pleaseSelectImage': '請選擇圖片檔案',
   'home.pleaseSelectAudio': '請選擇音效檔案',
   'home.shape.circle': '圓形',

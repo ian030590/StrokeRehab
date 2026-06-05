@@ -1,7 +1,9 @@
 import { type CSSProperties, type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { initJsPsych } from 'jspsych';
+import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { verifySelectedTrainingUser } from './selectedUserGuard';
 
 type MinesweeperPhase = 'menu' | 'playing' | 'paused' | 'results';
 type MinesweeperDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -78,6 +80,7 @@ const DIRECTIONS = [
 ] as const;
 
 export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
+  const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const elapsedMillisRef = useRef(0);
   const playStartedAtRef = useRef<number>(Date.now());
@@ -149,6 +152,8 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   }, [boardCols, boardRows, difficulty, mineCount, selectedBoardConfig.label]);
 
   const startGame = useCallback(() => {
+    if (!verifySelectedTrainingUser(t)) return;
+
     const nextRows = selectedBoardConfig.rows;
     const nextCols = selectedBoardConfig.cols;
     const nextMineCount = selectedBoardConfig.mines;
@@ -163,7 +168,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
     elapsedMillisRef.current = 0;
     playStartedAtRef.current = Date.now();
     setPhase('playing');
-  }, [selectedBoardConfig]);
+  }, [selectedBoardConfig, t]);
 
   const returnToMenu = useCallback(() => {
     setPhase('menu');

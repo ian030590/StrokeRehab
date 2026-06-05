@@ -29,7 +29,7 @@ export const en: Record<TranslationKey, string> = {
 
   // HomePage
   'home.deleteUserPrompt': 'Are you sure you want to delete user "{name}"?',
-  'home.pleaseSelectUser': 'Please select or add a user first',
+  'home.pleaseSelectUser': 'Please select a user',
   'home.pleaseSelectImage': 'Please select an image file',
   'home.pleaseSelectAudio': 'Please select an audio file',
   'home.shape.circle': 'Circle',

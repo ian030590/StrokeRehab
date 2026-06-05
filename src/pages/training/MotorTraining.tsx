@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { DrawingTowerDefenseGame } from './DrawingTowerDefenseGame';
 import { TrainingUserSelector } from './TrainingUserSelector';
+import { hasSelectedTrainingUser, verifySelectedTrainingUser } from './selectedUserGuard';
 
 type MotorModuleId = 'drawing-defense';
 
@@ -11,15 +12,30 @@ export function MotorTraining() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedGameId = searchParams.get('game');
+  const blockedRequestRef = useRef<string | null>(null);
   const [activeModule, setActiveModule] = useState<MotorModuleId | null>(
-    requestedGameId === 'drawing-defense' ? 'drawing-defense' : null,
+    requestedGameId === 'drawing-defense' && hasSelectedTrainingUser() ? 'drawing-defense' : null,
   );
 
   useEffect(() => {
-    setActiveModule(requestedGameId === 'drawing-defense' ? 'drawing-defense' : null);
-  }, [requestedGameId]);
+    const requestedModule = requestedGameId === 'drawing-defense' ? 'drawing-defense' : null;
+    if (requestedModule && !hasSelectedTrainingUser()) {
+      if (blockedRequestRef.current !== requestedGameId) {
+        blockedRequestRef.current = requestedGameId;
+        window.alert(t('home.pleaseSelectUser'));
+      }
+      setActiveModule(null);
+      navigate('/motor-training', { replace: true });
+      return;
+    }
+
+    blockedRequestRef.current = null;
+    setActiveModule(requestedModule);
+  }, [navigate, requestedGameId, t]);
 
   const openDrawingDefense = () => {
+    if (!verifySelectedTrainingUser(t)) return;
+
     setActiveModule('drawing-defense');
     navigate('/motor-training?game=drawing-defense');
   };

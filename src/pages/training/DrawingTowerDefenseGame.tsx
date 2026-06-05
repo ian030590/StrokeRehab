@@ -1,8 +1,10 @@
 import { type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js';
 import { initJsPsych } from 'jspsych';
+import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { verifySelectedTrainingUser } from './selectedUserGuard';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type ShapeId = 'circle' | 'cross' | 'square' | 'triangle' | 'vertical-line' | 'horizontal-line';
@@ -142,6 +144,7 @@ const SHAPE_LABEL: Record<ShapeId, string> = {
 };
 
 export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps) {
+  const { t } = useT();
   const pixiHostRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
@@ -489,6 +492,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, [queueDrawingSampleUpload, recordEnemyOutcome]);
 
   const startGame = useCallback(() => {
+    if (!verifySelectedTrainingUser(t)) return;
+
     const app = appRef.current;
     if (!app) return;
     clearPixiState();
@@ -510,7 +515,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       message: '尚未上傳',
     });
     setPhase('playing');
-  }, [clearPixiState, drawLayout, setPhase]);
+  }, [clearPixiState, drawLayout, setPhase, t]);
 
   const restartGame = useCallback(() => {
     startGame();
