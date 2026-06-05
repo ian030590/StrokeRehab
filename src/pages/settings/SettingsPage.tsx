@@ -84,13 +84,13 @@ function GeneralTab({ refresh }: { refresh: () => void }) {
             className={`btn btn-sm ${lang === 'zh' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => { setLang('zh'); refresh(); }}
           >
-            {lang === 'zh' ? '中文' : 'Chinese'}
+            {t('settings.language.zh')}
           </button>
           <button
             className={`btn btn-sm ${lang === 'en' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => { setLang('en'); refresh(); }}
           >
-            {lang === 'zh' ? '英文' : 'English'}
+            {t('settings.language.en')}
           </button>
         </div>
       </div>

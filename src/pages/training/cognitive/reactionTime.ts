@@ -1,5 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { REACTION_CONFIG } from './constants';
+import type { TFunction } from '../types';
 import type { Difficulty, GameResult, HudState, ReactionState, ResultStats, SessionLimitSeconds } from './types';
 import {
   COGNITIVE_ACCENT,
@@ -65,14 +66,14 @@ export function isReactionAutoSuccess(state: ReactionState) {
   return state.attempts.length >= state.targetTrials;
 }
 
-export function summarizeReactionState(state: ReactionState, _elapsed: number, _limit: SessionLimitSeconds): HudState {
+export function summarizeReactionState(state: ReactionState, _elapsed: number, _limit: SessionLimitSeconds, t: TFunction): HudState {
   const avg = average(state.attempts);
   return {
-    primaryLabel: '次數',
+    primaryLabel: t('cognitive.hud.count'),
     primaryValue: `${state.attempts.length}/${state.targetTrials}`,
-    secondaryLabel: '平均',
+    secondaryLabel: t('cognitive.hud.average'),
     secondaryValue: avg === null ? '-' : `${avg}ms`,
-    tertiaryLabel: '過早',
+    tertiaryLabel: t('cognitive.hud.tooEarly'),
     tertiaryValue: String(state.falseStarts),
   };
 }
@@ -92,7 +93,7 @@ export function buildReactionResultStats(state: ReactionState): ResultStats {
   };
 }
 
-export function drawReaction(app: Application, state: ReactionState, onTap: () => void) {
+export function drawReaction(app: Application, state: ReactionState, onTap: () => void, t: TFunction) {
   const w = app.renderer.width;
   const h = app.renderer.height;
   const boxW = Math.min(w - 48, 720);
@@ -107,11 +108,11 @@ export function drawReaction(app: Application, state: ReactionState, onTap: () =
     'too-early': COGNITIVE_ACCENT_TINT,
   };
   const labels = {
-    waiting: '點擊開始',
-    ready: '等待訊號',
-    go: '點擊',
-    result: state.lastReactionMs === null ? '完成' : `${state.lastReactionMs} ms`,
-    'too-early': '太早',
+    waiting: t('cognitive.reaction.waiting'),
+    ready: t('cognitive.reaction.ready'),
+    go: t('cognitive.reaction.go'),
+    result: state.lastReactionMs === null ? t('cognitive.reaction.complete') : `${state.lastReactionMs} ms`,
+    'too-early': t('cognitive.reaction.tooEarly'),
   };
   const node = new Container();
   node.eventMode = 'static';
@@ -126,7 +127,7 @@ export function drawReaction(app: Application, state: ReactionState, onTap: () =
     fill: state.status === 'go' ? '#FFFFFF' : `#${COGNITIVE_TEXT.toString(16).padStart(6, '0')}`,
   });
   const avg = average(state.attempts);
-  addText(node, `${state.attempts.length}/${state.targetTrials}${avg === null ? '' : `  AVG ${avg} ms`}`, w / 2, y + boxH / 2 + 58, {
+  addText(node, `${state.attempts.length}/${state.targetTrials}${avg === null ? '' : `  ${t('cognitive.hud.average')} ${avg} ms`}`, w / 2, y + boxH / 2 + 58, {
     fontSize: 22,
     fontWeight: '700',
     fill: state.status === 'go' ? '#FFFFFF' : `#${COGNITIVE_TEXT_MUTED.toString(16).padStart(6, '0')}`,

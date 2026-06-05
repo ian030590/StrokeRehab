@@ -1,3 +1,5 @@
+import type { TranslationKey } from '../../../i18n';
+
 export type ReferenceGameId = 'memory-match' | 'lights-out' | 'reaction-time' | 'whack-a-mole' | 'sliding-puzzle';
 
 export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -7,10 +9,10 @@ export type SessionLimitSeconds = number | null;
 
 export interface ReferenceModuleMeta {
   id: ReferenceGameId;
-  title: string;
-  referenceTitle: string;
-  description: string;
-  focus: string;
+  titleKey: TranslationKey;
+  referenceTitleKey: TranslationKey;
+  descriptionKey: TranslationKey;
+  focusKey: TranslationKey;
 }
 
 export interface SessionRecord {

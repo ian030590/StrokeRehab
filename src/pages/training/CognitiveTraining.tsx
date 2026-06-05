@@ -36,7 +36,7 @@ export function CognitiveTraining() {
     <div className="page-content">
       <TrainingUserSelector />
       <h1 className="section-title fade-in-up">{t('home.module.cognitive.title')}</h1>
-      <p className="section-subtitle fade-in-up">選擇一個認知訓練模組開始練習。</p>
+      <p className="section-subtitle fade-in-up">{t('training.cognitive.subtitle')}</p>
       <div className="training-grid">
         <button className="card fade-in-up training-module-button" onClick={() => openModule('minesweeper')}>
           <div className="card-icon">
@@ -49,9 +49,9 @@ export function CognitiveTraining() {
               <circle cx="12" cy="12" r="2.2" />
             </svg>
           </div>
-          <h2 className="card-title">踩地雷</h2>
-          <p className="card-desc">透過開格、推理與標記地雷位置，訓練注意力、視覺掃描與策略判斷。</p>
-          <div className="card-expand-hint">開始訓練</div>
+          <h2 className="card-title">{t('training.minesweeper.title')}</h2>
+          <p className="card-desc">{t('training.minesweeper.desc')}</p>
+          <div className="card-expand-hint">{t('training.startGame')}</div>
         </button>
         {REFERENCE_COGNITIVE_MODULES.map((module) => (
           <button
@@ -62,9 +62,9 @@ export function CognitiveTraining() {
             <div className="card-icon">
               <CognitiveModuleIcon moduleId={module.id} />
             </div>
-            <h2 className="card-title">{module.title}</h2>
-            <p className="card-desc">{module.description}</p>
-            <div className="card-expand-hint">開始訓練</div>
+            <h2 className="card-title">{t(module.titleKey)}</h2>
+            <p className="card-desc">{t(module.descriptionKey)}</p>
+            <div className="card-expand-hint">{t('training.startGame')}</div>
           </button>
         ))}
       </div>

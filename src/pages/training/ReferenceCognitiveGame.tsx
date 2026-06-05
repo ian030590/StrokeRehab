@@ -7,7 +7,7 @@ import { getActiveUser } from '../../utils/settings';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import {
-  DEFAULT_HUD,
+  createDefaultHud,
   DIFFICULTIES,
   REACTION_TRIAL_OPTIONS,
   REFERENCE_COGNITIVE_MODULES,
@@ -69,6 +69,7 @@ import type {
   SessionLimitSeconds,
   SessionRecord,
 } from './cognitive/types';
+import type { TFunction } from './types';
 import { COGNITIVE_ACCENT_CSS, clearStage, drawBackground } from './cognitive/utils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 
@@ -102,11 +103,17 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
   const [reactionTrials, setReactionTrials] = useState<number>(8);
   const [whackDurationSec, setWhackDurationSec] = useState<number>(30);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [hud, setHud] = useState<HudState>(DEFAULT_HUD);
+  const [hud, setHud] = useState<HudState>(() => createDefaultHud(t));
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const meta = getModuleMeta(gameId);
+  const metaTitle = t(meta.titleKey);
+  const metaReferenceTitle = t(meta.referenceTitleKey);
+  const metaDescription = t(meta.descriptionKey);
+  const metaFocus = t(meta.focusKey);
   const activeConfig = DIFFICULTIES[difficulty];
+  const activeDifficultyLabel = t(activeConfig.labelKey);
+  const activeDifficultyDescription = t(activeConfig.descriptionKey);
   const effectiveLimit = gameId === 'whack-a-mole' ? whackDurationSec : sessionLimitSec;
 
   const setPhase = useCallback((next: GamePhase) => {
@@ -117,10 +124,10 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
   const syncHud = useCallback(() => {
     const state = stateRef.current;
     if (!state) return;
-    const summary = summarizeState(state, metricsRef.current.elapsed, effectiveLimit);
+    const summary = summarizeState(state, metricsRef.current.elapsed, effectiveLimit, t);
     setHud(summary);
     setElapsedSeconds(Math.floor(metricsRef.current.elapsed));
-  }, [effectiveLimit]);
+  }, [effectiveLimit, t]);
 
   const renderCurrent = useCallback(() => {
     const app = appRef.current;
@@ -136,7 +143,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
         drawLightsOut(app, state, handleCellTap);
         break;
       case 'reaction-time':
-        drawReaction(app, state, handleReactionTap);
+        drawReaction(app, state, handleReactionTap, t);
         break;
       case 'whack-a-mole':
         drawWhack(app, state, metricsRef.current.elapsed, effectiveLimit ?? whackDurationSec, handleCellTap);
@@ -147,7 +154,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       default:
         break;
     }
-  }, [effectiveLimit, whackDurationSec]);
+  }, [effectiveLimit, t, whackDurationSec]);
 
   renderRef.current = renderCurrent;
 
@@ -160,9 +167,9 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       Test_Date: formatTestDate(new Date()),
       Participant_ID: getActiveUser() || 'Unknown',
       Game_ID: gameId,
-      Game_Title: meta.title,
+      Game_Title: metaTitle,
       Difficulty: difficulty,
-      Session_Limit_Seconds: effectiveLimit === null ? 'Infinite' : String(effectiveLimit),
+      Session_Limit_Seconds: effectiveLimit === null ? t('training.infinite') : String(effectiveLimit),
       Target_Trials: gameId === 'reaction-time' ? reactionTrials : 0,
       Total_Duration_Seconds: Number(metricsRef.current.elapsed.toFixed(1)),
       Score: stats.score,
@@ -175,7 +182,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       Details_JSON: JSON.stringify(stats.details),
     };
     setResult(record);
-    setHud(summarizeState(state, metricsRef.current.elapsed, effectiveLimit));
+    setHud(summarizeState(state, metricsRef.current.elapsed, effectiveLimit, t));
     setPhase('results');
     saveTrainingSessionRecord({
       userName: record.Participant_ID,
@@ -199,7 +206,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       },
     });
     writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write reference cognitive result to jsPsych data.');
-  }, [difficulty, effectiveLimit, gameId, meta.title, reactionTrials, setPhase]);
+  }, [difficulty, effectiveLimit, gameId, metaTitle, reactionTrials, setPhase, t]);
 
   finishGameRef.current = finishGame;
 
@@ -211,7 +218,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     stateRef.current = createInitialState(gameId, difficulty, reactionTrials);
     setResult(null);
     setElapsedSeconds(0);
-    setHud(summarizeState(stateRef.current, 0, effectiveLimit));
+    setHud(summarizeState(stateRef.current, 0, effectiveLimit, t));
     setPhase('playing');
     window.setTimeout(() => renderRef.current(), 0);
   }, [difficulty, effectiveLimit, gameId, reactionTrials, setPhase, t]);
@@ -226,13 +233,13 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     stateRef.current = null;
     metricsRef.current = { elapsed: 0 };
     setElapsedSeconds(0);
-    setHud(DEFAULT_HUD);
+    setHud(createDefaultHud(t));
     const app = appRef.current;
     if (app) {
       clearStage(app);
       drawBackground(app);
     }
-  }, [setPhase]);
+  }, [setPhase, t]);
 
   const pauseGame = useCallback(() => {
     if (phaseRef.current !== 'playing') return;
@@ -350,12 +357,12 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
 
       {phase === 'playing' && (
         <div className="cognitive-game-hud">
-          <div><strong>時間</strong> {elapsedSeconds}s</div>
+          <div><strong>{t('cognitive.hud.time')}</strong> {elapsedSeconds}s</div>
           <div><strong>{hud.primaryLabel}</strong> {hud.primaryValue}</div>
           <div><strong>{hud.secondaryLabel}</strong> {hud.secondaryValue}</div>
           <div><strong>{hud.tertiaryLabel}</strong> {hud.tertiaryValue}</div>
-          <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>
-          <button className="btn btn-sm btn-ghost" onClick={returnToMenu}>回選單</button>
+          <button className="btn btn-sm btn-secondary" onClick={pauseGame}>{t('training.pause')}</button>
+          <button className="btn btn-sm btn-ghost" onClick={returnToMenu}>{t('training.returnMenu')}</button>
         </div>
       )}
 
@@ -364,12 +371,12 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
           <div className="drawing-defense-config cognitive-config">
             <header className="drawing-defense-config-header">
               <div>
-                <span className="drawing-defense-config-label">reference/javascript-games</span>
-                <h1>{meta.title}</h1>
+                <span className="drawing-defense-config-label">{t('cognitive.source.javascriptGames')}</span>
+                <h1>{metaTitle}</h1>
               </div>
               <div className="drawing-defense-config-stats">
-                <span>{meta.referenceTitle}</span>
-                <span>{meta.focus}</span>
+                <span>{metaReferenceTitle}</span>
+                <span>{metaFocus}</span>
               </div>
             </header>
 
@@ -377,10 +384,10 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>難度</h2>
-                    <p>{activeConfig.description}</p>
+                    <h2>{t('cognitive.config.difficulty')}</h2>
+                    <p>{activeDifficultyDescription}</p>
                   </div>
-                  <span>{activeConfig.label}</span>
+                  <span>{activeDifficultyLabel}</span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
                   {Object.entries(DIFFICULTIES).map(([key, value]) => (
@@ -390,8 +397,8 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                       className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
                       onClick={() => setDifficulty(key as Difficulty)}
                     >
-                      <span className="drawing-defense-option-title">{value.label}</span>
-                      <span className="drawing-defense-option-meta">{value.description}</span>
+                      <span className="drawing-defense-option-title">{t(value.labelKey)}</span>
+                      <span className="drawing-defense-option-meta">{t(value.descriptionKey)}</span>
                     </button>
                   ))}
                 </div>
@@ -401,10 +408,10 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                 <section className="drawing-defense-setting">
                   <div className="drawing-defense-setting-header">
                     <div>
-                      <h2>測驗次數</h2>
-                      <p>設定反應時間測驗要完成的點擊次數。</p>
+                      <h2>{t('cognitive.config.reactionTrials')}</h2>
+                      <p>{t('cognitive.config.reactionTrialsDesc')}</p>
                     </div>
-                    <span>{reactionTrials} 次</span>
+                    <span>{t('training.count', { value: reactionTrials })}</span>
                   </div>
                   <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
                     {REACTION_TRIAL_OPTIONS.map((value) => (
@@ -414,7 +421,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                         className={`drawing-defense-option ${reactionTrials === value ? 'active' : ''}`}
                         onClick={() => setReactionTrials(value)}
                       >
-                        <span className="drawing-defense-option-title">{value} 次</span>
+                        <span className="drawing-defense-option-title">{t('training.count', { value })}</span>
                       </button>
                     ))}
                   </div>
@@ -423,10 +430,10 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                 <section className="drawing-defense-setting">
                   <div className="drawing-defense-setting-header">
                     <div>
-                      <h2>訓練時間</h2>
-                      <p>設定目標點擊訓練的總秒數。</p>
+                      <h2>{t('cognitive.config.trainingDuration')}</h2>
+                      <p>{t('cognitive.config.trainingDurationDesc')}</p>
                     </div>
-                    <span>{whackDurationSec}s</span>
+                    <span>{formatSeconds(whackDurationSec, t)}</span>
                   </div>
                   <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
                     {WHACK_DURATION_OPTIONS.map((value) => (
@@ -436,7 +443,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                         className={`drawing-defense-option ${whackDurationSec === value ? 'active' : ''}`}
                         onClick={() => setWhackDurationSec(value)}
                       >
-                        <span className="drawing-defense-option-title">{value}s</span>
+                        <span className="drawing-defense-option-title">{formatSeconds(value, t)}</span>
                       </button>
                     ))}
                   </div>
@@ -445,10 +452,10 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                 <section className="drawing-defense-setting">
                   <div className="drawing-defense-setting-header">
                     <div>
-                      <h2>時間限制</h2>
-                      <p>{sessionLimitSec === null ? '不限制訓練時間。' : `${sessionLimitSec} 秒內完成訓練。`}</p>
+                      <h2>{t('cognitive.config.timeLimit')}</h2>
+                      <p>{sessionLimitSec === null ? t('cognitive.config.noTimeLimit') : t('cognitive.config.finishWithin', { seconds: sessionLimitSec })}</p>
                     </div>
-                    <span>{formatLimit(sessionLimitSec)}</span>
+                    <span>{formatLimit(sessionLimitSec, t)}</span>
                   </div>
                   <div className="drawing-defense-option-grid drawing-defense-duration-grid">
                     {SESSION_LIMIT_OPTIONS.map((value) => (
@@ -458,7 +465,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                         className={`drawing-defense-option ${sessionLimitSec === value ? 'active' : ''}`}
                         onClick={() => setSessionLimitSec(value)}
                       >
-                        <span className="drawing-defense-option-title">{formatLimit(value)}</span>
+                        <span className="drawing-defense-option-title">{formatLimit(value, t)}</span>
                       </button>
                     ))}
                   </div>
@@ -468,23 +475,23 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
               <section className="drawing-defense-setting drawing-defense-setting-wide">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>訓練重點</h2>
-                    <p>{meta.description}</p>
+                    <h2>{t('cognitive.config.focusTitle')}</h2>
+                    <p>{metaDescription}</p>
                   </div>
-                  <span>{meta.focus}</span>
+                  <span>{metaFocus}</span>
                 </div>
               </section>
             </div>
 
             <div className="drawing-defense-config-footer">
               <div className="drawing-defense-config-summary">
-                <strong>{meta.title}</strong>
-                <span>{activeConfig.label}</span>
-                <span>{gameId === 'reaction-time' ? `${reactionTrials} 次` : formatLimit(effectiveLimit)}</span>
+                <strong>{metaTitle}</strong>
+                <span>{activeDifficultyLabel}</span>
+                <span>{gameId === 'reaction-time' ? t('training.count', { value: reactionTrials }) : formatLimit(effectiveLimit, t)}</span>
               </div>
               <div className="drawing-defense-config-actions">
-                <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>開始訓練</button>
-                <button className="btn btn-ghost btn-lg" onClick={onExit}>返回</button>
+                <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>{t('training.startGame')}</button>
+                <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.cancel')}</button>
               </div>
             </div>
           </div>
@@ -493,12 +500,12 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
 
       {phase === 'paused' && (
         <div className="drawing-defense-panel drawing-defense-panel-compact">
-          <h1>訓練已暫停</h1>
-          <p>{hud.primaryLabel} {hud.primaryValue}，已進行 {elapsedSeconds} 秒。</p>
+          <h1>{t('cognitive.pause.title')}</h1>
+          <p>{t('cognitive.pause.desc', { label: hud.primaryLabel, value: hud.primaryValue, seconds: elapsedSeconds })}</p>
           <div className="drawing-defense-actions">
-            <button className="btn btn-primary btn-lg" onClick={resumeGame}>繼續訓練</button>
-            <button className="btn btn-secondary btn-lg" onClick={restartGame}>重新開始</button>
-            <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>回選單</button>
+            <button className="btn btn-primary btn-lg" onClick={resumeGame}>{t('training.continueTraining')}</button>
+            <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
+            <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnMenu')}</button>
           </div>
         </div>
       )}
@@ -506,18 +513,18 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       {phase === 'results' && result && (
         <div className="experiment-container cognitive-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
-            <h1>{result.Game_Result === 'Victory' ? '訓練完成' : '訓練結束'}</h1>
+            <h1>{result.Game_Result === 'Victory' ? t('cognitive.results.complete') : t('cognitive.results.ended')}</h1>
             <div className="drawing-defense-result-summary">
               <span>
-                <small>分數</small>
+                <small>{t('cognitive.results.score')}</small>
                 <strong>{result.Score}</strong>
               </span>
               <span>
-                <small>正確率</small>
+                <small>{t('cognitive.results.accuracy')}</small>
                 <strong>{result.Accuracy_Percent}%</strong>
               </span>
               <span>
-                <small>使用時間</small>
+                <small>{t('cognitive.results.elapsed')}</small>
                 <strong>{result.Total_Duration_Seconds}s</strong>
               </span>
             </div>
@@ -525,32 +532,32 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
             <table className="results-table">
               <tbody>
                 <tr>
-                  <th>遊戲</th>
+                  <th>{t('cognitive.results.game')}</th>
                   <td>{result.Game_Title}</td>
                 </tr>
                 <tr>
-                  <th>難度</th>
-                  <td>{DIFFICULTIES[result.Difficulty].label}</td>
+                  <th>{t('cognitive.results.difficulty')}</th>
+                  <td>{t(DIFFICULTIES[result.Difficulty].labelKey)}</td>
                 </tr>
                 <tr>
-                  <th>嘗試次數</th>
+                  <th>{t('cognitive.results.attempts')}</th>
                   <td>{result.Attempts}</td>
                 </tr>
                 <tr>
-                  <th>成功次數</th>
+                  <th>{t('cognitive.results.success')}</th>
                   <td>{result.Success_Count}</td>
                 </tr>
                 <tr>
-                  <th>錯誤次數</th>
+                  <th>{t('cognitive.results.errors')}</th>
                   <td>{result.Error_Count}</td>
                 </tr>
               </tbody>
             </table>
 
             <div className="results-actions">
-              <button className="btn btn-primary btn-lg" onClick={downloadResult}>下載 CSV 紀錄</button>
-              <button className="btn btn-secondary btn-lg" onClick={restartGame}>再玩一次</button>
-              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>回選單</button>
+              <button className="btn btn-primary btn-lg" onClick={downloadResult}>{t('training.downloadCsvRecord')}</button>
+              <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.playAgain')}</button>
+              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnMenu')}</button>
             </div>
           </div>
         </div>
@@ -592,12 +599,12 @@ function isAutoSuccess(state: CognitiveGameState | null) {
   return isSlidingAutoSuccess(state);
 }
 
-function summarizeState(state: CognitiveGameState, elapsed: number, limit: SessionLimitSeconds): HudState {
-  if (state.kind === 'memory-match') return summarizeMemoryState(state, elapsed, limit);
-  if (state.kind === 'lights-out') return summarizeLightsState(state, elapsed, limit);
-  if (state.kind === 'reaction-time') return summarizeReactionState(state, elapsed, limit);
-  if (state.kind === 'whack-a-mole') return summarizeWhackState(state, elapsed, limit);
-  return summarizeSlidingState(state, elapsed, limit);
+function summarizeState(state: CognitiveGameState, elapsed: number, limit: SessionLimitSeconds, t: TFunction): HudState {
+  if (state.kind === 'memory-match') return summarizeMemoryState(state, elapsed, limit, t);
+  if (state.kind === 'lights-out') return summarizeLightsState(state, elapsed, limit, t);
+  if (state.kind === 'reaction-time') return summarizeReactionState(state, elapsed, limit, t);
+  if (state.kind === 'whack-a-mole') return summarizeWhackState(state, elapsed, limit, t);
+  return summarizeSlidingState(state, elapsed, limit, t);
 }
 
 function buildResultStats(state: CognitiveGameState): ResultStats {
@@ -608,8 +615,12 @@ function buildResultStats(state: CognitiveGameState): ResultStats {
   return buildSlidingResultStats(state);
 }
 
-function formatLimit(value: SessionLimitSeconds) {
-  return value === null ? '不限時' : `${value}s`;
+function formatLimit(value: SessionLimitSeconds, t: TFunction) {
+  return value === null ? t('training.unlimited') : formatSeconds(value, t);
+}
+
+function formatSeconds(value: number, t: TFunction) {
+  return `${value}${t('training.secondsShort')}`;
 }
 
 function toCsv(records: SessionRecord[]): string {

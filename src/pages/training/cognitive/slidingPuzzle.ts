@@ -1,5 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { SLIDING_CONFIG } from './constants';
+import type { TFunction } from '../types';
 import type { Difficulty, GameResult, HudState, ResultStats, SessionLimitSeconds, SlidingState } from './types';
 import {
   COGNITIVE_ACCENT,
@@ -41,13 +42,13 @@ export function isSlidingAutoSuccess(state: SlidingState) {
   return isSlidingSolved(state.tiles);
 }
 
-export function summarizeSlidingState(state: SlidingState, elapsed: number, limit: SessionLimitSeconds): HudState {
+export function summarizeSlidingState(state: SlidingState, elapsed: number, limit: SessionLimitSeconds, t: TFunction): HudState {
   return {
-    primaryLabel: '步數',
+    primaryLabel: t('cognitive.hud.moves'),
     primaryValue: String(state.moves),
-    secondaryLabel: '失誤',
+    secondaryLabel: t('cognitive.results.errors'),
     secondaryValue: String(state.errors),
-    tertiaryLabel: '剩餘',
+    tertiaryLabel: t('cognitive.hud.remaining'),
     tertiaryValue: formatTimeValue(elapsed, limit),
   };
 }

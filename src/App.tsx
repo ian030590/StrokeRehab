@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
+import { useT } from './i18n';
 
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const TrainingPage = lazy(() => import('./pages/training/TrainingPage').then((module) => ({ default: module.TrainingPage })));
@@ -32,6 +33,8 @@ export function App() {
 }
 
 function AppLayout() {
+  const { t } = useT();
+
   return (
     <div className="app-layout">
       <Navbar />
@@ -41,7 +44,7 @@ function AppLayout() {
         <a href="https://github.com/ian030590/StrokeTrainer" target="_blank" rel="noopener noreferrer">
           ian030590
         </a>
-        <span>All rights reserved.</span>
+        <span>{t('app.footer.rights')}</span>
       </footer>
     </div>
   );

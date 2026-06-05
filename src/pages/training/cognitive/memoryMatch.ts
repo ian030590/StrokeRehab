@@ -1,5 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { CARD_VALUES, MEMORY_CONFIG } from './constants';
+import type { TFunction } from '../types';
 import type { Difficulty, GameResult, HudState, MemoryState, ResultStats, SessionLimitSeconds } from './types';
 import {
   COGNITIVE_ACCENT,
@@ -66,13 +67,13 @@ export function isMemoryAutoSuccess(state: MemoryState) {
   return state.matchedPairs === state.pairs;
 }
 
-export function summarizeMemoryState(state: MemoryState, elapsed: number, limit: SessionLimitSeconds): HudState {
+export function summarizeMemoryState(state: MemoryState, elapsed: number, limit: SessionLimitSeconds, t: TFunction): HudState {
   return {
-    primaryLabel: '配對',
+    primaryLabel: t('cognitive.hud.pairs'),
     primaryValue: `${state.matchedPairs}/${state.pairs}`,
-    secondaryLabel: '步數',
+    secondaryLabel: t('cognitive.hud.moves'),
     secondaryValue: String(state.moves),
-    tertiaryLabel: '剩餘',
+    tertiaryLabel: t('cognitive.hud.remaining'),
     tertiaryValue: formatTimeValue(elapsed, limit),
   };
 }

@@ -1,47 +1,49 @@
+import type { TranslationKey } from '../../../i18n';
+import type { TFunction } from '../types';
 import type { Difficulty, HudState, ReferenceModuleMeta, SessionLimitSeconds } from './types';
 
 export const REFERENCE_COGNITIVE_MODULES: ReferenceModuleMeta[] = [
   {
     id: 'memory-match',
-    title: '記憶配對',
-    referenceTitle: 'Memory Match',
-    description: '翻開卡片尋找相同圖案，訓練短期記憶、視覺掃描與錯誤抑制。',
-    focus: '記憶',
+    titleKey: 'cognitive.memory.title',
+    referenceTitleKey: 'cognitive.memory.referenceTitle',
+    descriptionKey: 'cognitive.memory.desc',
+    focusKey: 'cognitive.memory.focus',
   },
   {
     id: 'lights-out',
-    title: '熄燈解題',
-    referenceTitle: 'Lights Out',
-    description: '切換格子與相鄰格的亮滅狀態，訓練邏輯推理與問題分解。',
-    focus: '推理',
+    titleKey: 'cognitive.lights.title',
+    referenceTitleKey: 'cognitive.lights.referenceTitle',
+    descriptionKey: 'cognitive.lights.desc',
+    focusKey: 'cognitive.lights.focus',
   },
   {
     id: 'reaction-time',
-    title: '反應時間',
-    referenceTitle: 'Reaction Time',
-    description: '等待訊號出現後快速點擊，訓練注意力維持與反應控制。',
-    focus: '反應',
+    titleKey: 'cognitive.reaction.title',
+    referenceTitleKey: 'cognitive.reaction.referenceTitle',
+    descriptionKey: 'cognitive.reaction.desc',
+    focusKey: 'cognitive.reaction.focus',
   },
   {
     id: 'whack-a-mole',
-    title: '目標點擊',
-    referenceTitle: 'Whack-a-Mole',
-    description: '在限定時間內點擊出現的目標，訓練視覺搜尋、注意轉移與手眼協調。',
-    focus: '注意',
+    titleKey: 'cognitive.whack.title',
+    referenceTitleKey: 'cognitive.whack.referenceTitle',
+    descriptionKey: 'cognitive.whack.desc',
+    focusKey: 'cognitive.whack.focus',
   },
   {
     id: 'sliding-puzzle',
-    title: '滑塊拼圖',
-    referenceTitle: 'Sliding Puzzle',
-    description: '移動方塊還原數字順序，訓練規劃、空間推理與步驟控制。',
-    focus: '規劃',
+    titleKey: 'cognitive.sliding.title',
+    referenceTitleKey: 'cognitive.sliding.referenceTitle',
+    descriptionKey: 'cognitive.sliding.desc',
+    focusKey: 'cognitive.sliding.focus',
   },
 ];
 
-export const DIFFICULTIES: Record<Difficulty, { label: string; description: string }> = {
-  Beginner: { label: '初級', description: '較少格數或較慢節奏，適合暖身。' },
-  Intermediate: { label: '中級', description: '提高步驟與反應要求，適合一般訓練。' },
-  Advanced: { label: '高級', description: '提高密度與速度，適合進階挑戰。' },
+export const DIFFICULTIES: Record<Difficulty, { labelKey: TranslationKey; descriptionKey: TranslationKey }> = {
+  Beginner: { labelKey: 'cognitive.diff.beginner', descriptionKey: 'cognitive.diff.beginnerDesc' },
+  Intermediate: { labelKey: 'cognitive.diff.intermediate', descriptionKey: 'cognitive.diff.intermediateDesc' },
+  Advanced: { labelKey: 'cognitive.diff.advanced', descriptionKey: 'cognitive.diff.advancedDesc' },
 };
 
 export const SESSION_LIMIT_OPTIONS = [60, 120, 300, null] as const satisfies readonly SessionLimitSeconds[];
@@ -79,11 +81,13 @@ export const SLIDING_CONFIG: Record<Difficulty, { size: number; shuffles: number
   Advanced: { size: 5, shuffles: 120 },
 };
 
-export const DEFAULT_HUD: HudState = {
-  primaryLabel: '狀態',
-  primaryValue: '-',
-  secondaryLabel: '進度',
-  secondaryValue: '-',
-  tertiaryLabel: '時間',
-  tertiaryValue: '-',
-};
+export function createDefaultHud(t: TFunction): HudState {
+  return {
+    primaryLabel: t('cognitive.hud.status'),
+    primaryValue: '-',
+    secondaryLabel: t('cognitive.hud.progress'),
+    secondaryValue: '-',
+    tertiaryLabel: t('cognitive.hud.time'),
+    tertiaryValue: '-',
+  };
+}

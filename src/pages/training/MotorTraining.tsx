@@ -27,7 +27,7 @@ export function MotorTraining() {
       <TrainingUserSelector />
 
       <h1 className="section-title fade-in-up">{t('home.module.motor.title')}</h1>
-      <p className="section-subtitle fade-in-up">選擇動作訓練模組</p>
+      <p className="section-subtitle fade-in-up">{t('training.motor.subtitle')}</p>
 
       <div className="training-grid">
         <button className="card fade-in-up training-module-button" onClick={() => openModule('drawing-defense')}>
@@ -39,9 +39,9 @@ export function MotorTraining() {
               <circle cx="11" cy="11" r="2" />
             </svg>
           </div>
-          <h2 className="card-title">畫畫塔防</h2>
-          <p className="card-desc">以滑鼠或觸控繪製圓形、叉叉、方形、三角形與直橫線，訓練上肢精細動作與手眼協調。</p>
-          <div className="card-expand-hint">開始訓練</div>
+          <h2 className="card-title">{t('training.drawing.title')}</h2>
+          <p className="card-desc">{t('training.drawing.desc')}</p>
+          <div className="card-expand-hint">{t('training.startGame')}</div>
         </button>
       </div>
     </div>

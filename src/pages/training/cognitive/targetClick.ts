@@ -1,5 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { WHACK_CONFIG } from './constants';
+import type { TFunction } from '../types';
 import type { Difficulty, HudState, ResultStats, SessionLimitSeconds, WhackState } from './types';
 import {
   COGNITIVE_ACCENT,
@@ -61,13 +62,13 @@ export function isWhackAutoSuccess(state: WhackState) {
   return state.hits > 0;
 }
 
-export function summarizeWhackState(state: WhackState, elapsed: number, limit: SessionLimitSeconds): HudState {
+export function summarizeWhackState(state: WhackState, elapsed: number, limit: SessionLimitSeconds, t: TFunction): HudState {
   return {
-    primaryLabel: '命中',
+    primaryLabel: t('cognitive.hud.hits'),
     primaryValue: String(state.hits),
-    secondaryLabel: '失誤',
+    secondaryLabel: t('cognitive.hud.misses'),
     secondaryValue: String(state.misses),
-    tertiaryLabel: '剩餘',
+    tertiaryLabel: t('cognitive.hud.remaining'),
     tertiaryValue: formatTimeValue(elapsed, limit),
   };
 }

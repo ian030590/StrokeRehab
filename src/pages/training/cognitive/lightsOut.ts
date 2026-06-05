@@ -1,5 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { LIGHTS_CONFIG } from './constants';
+import type { TFunction } from '../types';
 import type { Difficulty, GameResult, HudState, LightsOutState, ResultStats, SessionLimitSeconds } from './types';
 import {
   COGNITIVE_ACCENT,
@@ -34,14 +35,14 @@ export function isLightsAutoSuccess(state: LightsOutState) {
   return isAllLightsOff(state.lights);
 }
 
-export function summarizeLightsState(state: LightsOutState, elapsed: number, limit: SessionLimitSeconds): HudState {
+export function summarizeLightsState(state: LightsOutState, elapsed: number, limit: SessionLimitSeconds, t: TFunction): HudState {
   const lightsOn = countLightsOn(state.lights);
   return {
-    primaryLabel: '亮燈',
+    primaryLabel: t('cognitive.hud.lightsOn'),
     primaryValue: String(lightsOn),
-    secondaryLabel: '步數',
+    secondaryLabel: t('cognitive.hud.moves'),
     secondaryValue: String(state.moves),
-    tertiaryLabel: '剩餘',
+    tertiaryLabel: t('cognitive.hud.remaining'),
     tertiaryValue: formatTimeValue(elapsed, limit),
   };
 }

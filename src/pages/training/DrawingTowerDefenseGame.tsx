@@ -1,12 +1,13 @@
 import { type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js';
 import { initJsPsych } from 'jspsych';
-import { useT } from '../../i18n';
+import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import type { TFunction } from './types';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type ShapeId = 'circle' | 'cross' | 'square' | 'triangle' | 'vertical-line' | 'horizontal-line';
@@ -21,10 +22,10 @@ interface DrawingTowerDefenseGameProps {
 }
 
 interface DifficultyConfig {
-  label: string;
+  labelKey: TranslationKey;
   spawnMode: 'after-clear-delay' | 'after-clear' | 'fixed-interval';
   spawnIntervalSec: number;
-  description: string;
+  descriptionKey: TranslationKey;
 }
 
 interface Point {
@@ -131,18 +132,18 @@ const DRAWING_SAMPLE_IMAGE_PADDING = 24;
 const DRAWING_SAMPLE_STROKE_WIDTH = 14;
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
-  Beginner: { label: '初級', spawnMode: 'after-clear-delay', spawnIntervalSec: 2, description: '消滅後 2 秒出現下一名' },
-  Intermediate: { label: '中級', spawnMode: 'after-clear', spawnIntervalSec: 0, description: '消滅後馬上出現下一名' },
-  Advanced: { label: '高級', spawnMode: 'fixed-interval', spawnIntervalSec: 3, description: '每 3 秒出現一名' },
+  Beginner: { labelKey: 'drawing.diff.beginner', spawnMode: 'after-clear-delay', spawnIntervalSec: 2, descriptionKey: 'drawing.diff.beginnerDesc' },
+  Intermediate: { labelKey: 'drawing.diff.intermediate', spawnMode: 'after-clear', spawnIntervalSec: 0, descriptionKey: 'drawing.diff.intermediateDesc' },
+  Advanced: { labelKey: 'drawing.diff.advanced', spawnMode: 'fixed-interval', spawnIntervalSec: 3, descriptionKey: 'drawing.diff.advancedDesc' },
 };
 
-const SHAPE_LABEL: Record<ShapeId, string> = {
-  circle: '圓形',
-  cross: '叉叉',
-  square: '方形',
-  triangle: '三角形',
-  'vertical-line': '直線',
-  'horizontal-line': '橫線',
+const SHAPE_LABEL_KEYS: Record<ShapeId, TranslationKey> = {
+  circle: 'drawing.shape.circle',
+  cross: 'drawing.shape.cross',
+  square: 'drawing.shape.square',
+  triangle: 'drawing.shape.triangle',
+  'vertical-line': 'drawing.shape.verticalLine',
+  'horizontal-line': 'drawing.shape.horizontalLine',
 };
 
 export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps) {
@@ -184,29 +185,31 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
   const backgroundColor = DEFAULT_BACKGROUND_COLOR;
   const [uploadedBackgroundUrl, setUploadedBackgroundUrl] = useState<string | null>(null);
-  const [uploadedBackgroundName, setUploadedBackgroundName] = useState('未選擇圖像');
+  const [uploadedBackgroundName, setUploadedBackgroundName] = useState(() => t('drawing.upload.noImage'));
   const [hp, setHp] = useState(DEFAULT_HP);
   const [defeated, setDefeated] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [recognized, setRecognized] = useState<string>('尚未辨識');
+  const [recognized, setRecognized] = useState<string>(() => t('drawing.recognition.idle'));
   const [result, setResult] = useState<SessionRecord | null>(null);
   const [sampleUpload, setSampleUpload] = useState<DrawingSampleUploadState>({
     status: 'idle',
     pending: 0,
     uploaded: 0,
     failed: 0,
-    message: '尚未上傳',
+    message: t('drawing.upload.idle'),
   });
 
   const activeConfig = DIFFICULTIES[difficulty];
+  const activeDifficultyLabel = t(activeConfig.labelKey);
+  const activeDifficultyDescription = t(activeConfig.descriptionKey);
   const isPresetGameDuration = GAME_DURATION_OPTIONS.includes(gameDurationSec as typeof GAME_DURATION_OPTIONS[number]);
   const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
-  const gameDurationLabel = formatGameDuration(gameDurationSec);
+  const gameDurationLabel = formatGameDuration(gameDurationSec, t);
   const backgroundSummary =
-    backgroundMode === 'stars' ? '星空' : backgroundMode === 'color' ? backgroundColor : '自訂圖像';
+    backgroundMode === 'stars' ? t('drawing.background.stars') : backgroundMode === 'color' ? backgroundColor : t('drawing.background.customImage');
   const backgroundModeLabel =
-    backgroundMode === 'stars' ? '圖片' : backgroundMode === 'color' ? '顏色' : '自訂圖像';
+    backgroundMode === 'stars' ? t('drawing.background.image') : backgroundMode === 'color' ? t('drawing.background.color') : t('drawing.background.customImage');
   const backgroundStyle = useMemo<CSSProperties>(() => {
     if (backgroundMode === 'stars') return { backgroundImage: starSkyBackgroundImage };
     if (backgroundMode === 'image' && uploadedBackgroundUrl) {
@@ -215,11 +218,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     return { backgroundImage: 'none', backgroundColor };
   }, [backgroundColor, backgroundMode, uploadedBackgroundUrl]);
   const sampleUploadLabel = useMemo(() => {
-    if (sampleUpload.pending > 0) return `上傳中 ${sampleUpload.pending}`;
-    if (sampleUpload.failed > 0) return `已傳 ${sampleUpload.uploaded} / 失敗 ${sampleUpload.failed}`;
-    if (sampleUpload.uploaded > 0) return `已傳 ${sampleUpload.uploaded}`;
+    if (sampleUpload.pending > 0) return t('drawing.upload.uploadingCount', { count: sampleUpload.pending });
+    if (sampleUpload.failed > 0) return t('drawing.upload.summaryFailed', { uploaded: sampleUpload.uploaded, failed: sampleUpload.failed });
+    if (sampleUpload.uploaded > 0) return t('drawing.upload.summary', { uploaded: sampleUpload.uploaded });
     return sampleUpload.message;
-  }, [sampleUpload]);
+  }, [sampleUpload, t]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -297,11 +300,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       userName: record.Participant_ID,
       moduleId: 'motor-training',
       gameId: 'drawing-defense',
-      gameTitle: 'Drawing Tower Defense',
+      gameTitle: t('training.drawing.title'),
       difficulty: record.Difficulty,
       trainingDate: record.Test_Date,
       details: {
-        Game_Time_Seconds: record.Game_Time_Seconds ?? 'Infinite',
+        Game_Time_Seconds: record.Game_Time_Seconds ?? t('training.infinite'),
         Starting_HP: record.Starting_HP,
         Enemy_Speed: record.Enemy_Speed,
         Recognition_Strictness: record.Recognition_Strictness,
@@ -314,13 +317,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       },
       detailRows: record.Enemy_Results.map((enemyResult) => ({
         Enemy_Number: enemyResult.Enemy_Number,
-        Enemy_Shape: SHAPE_LABEL[enemyResult.Shape],
+        Enemy_Shape: getShapeLabel(enemyResult.Shape, t),
         Enemy_Reaction_Time_Seconds: enemyResult.Reaction_Time_Seconds,
         Enemy_Defeated: enemyResult.Defeated,
       })),
     });
     writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write drawing tower defense result to jsPsych data.');
-  }, [recordEnemyOutcome, setPhase]);
+  }, [recordEnemyOutcome, setPhase, t]);
 
   const drawLayout = useCallback((app: Application) => {
     const w = app.renderer.width;
@@ -424,9 +427,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       createdAt: createdAt.toISOString(),
       participantId,
       targetShape: target.shape,
-      targetShapeLabel: SHAPE_LABEL[target.shape],
+      targetShapeLabel: getShapeLabel(target.shape, t),
       recognizedShape: recognition,
-      recognizedShapeLabel: recognition ? SHAPE_LABEL[recognition] : null,
+      recognizedShapeLabel: recognition ? getShapeLabel(recognition, t) : null,
       matched,
       difficulty: configRef.current.difficulty,
       gameTimeSeconds: configRef.current.gameDurationSec,
@@ -449,7 +452,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       ...current,
       status: 'uploading',
       pending: current.pending + 1,
-      message: '上傳中',
+      message: t('drawing.upload.uploading'),
     }));
 
     void createDrawingSampleBlob(sampleStrokes)
@@ -462,7 +465,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             pending,
             uploaded: current.uploaded + 1,
             failed: current.failed,
-            message: '已上傳 Discord',
+            message: t('drawing.upload.done'),
           };
         });
       })
@@ -475,11 +478,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             pending,
             uploaded: current.uploaded,
             failed: current.failed + 1,
-            message: '上傳失敗',
+            message: t('drawing.upload.failed'),
           };
         });
       });
-  }, []);
+  }, [t]);
 
   const handlePointerEnd = useCallback(() => {
     if (!isDrawingRef.current) return;
@@ -494,7 +497,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     recognitionTimerRef.current = window.setTimeout(() => {
       recognitionTimerRef.current = null;
       const recognition = recognizeShape(strokesRef.current, configRef.current.strictness);
-      setRecognized(recognition ? SHAPE_LABEL[recognition] : '未辨識');
+      setRecognized(recognition ? getShapeLabel(recognition, t) : t('drawing.recognition.unknown'));
       const matchedTarget = recognition ? findClosestEnemyByShape(enemiesRef.current, recognition) : undefined;
       const target = matchedTarget ?? enemiesRef.current[0];
       const matched = Boolean(matchedTarget);
@@ -511,7 +514,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         drawingLayerRef.current?.clear();
       }, 650);
     }, configRef.current.strokeWaitMs);
-  }, [queueDrawingSampleUpload, recordEnemyOutcome]);
+  }, [queueDrawingSampleUpload, recordEnemyOutcome, t]);
 
   const startGame = useCallback(() => {
     if (!verifySelectedTrainingUser(t)) return;
@@ -528,13 +531,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setDefeated(0);
     setElapsedSeconds(0);
     setResult(null);
-    setRecognized('尚未辨識');
+    setRecognized(t('drawing.recognition.idle'));
     setSampleUpload({
       status: 'idle',
       pending: 0,
       uploaded: 0,
       failed: 0,
-      message: '尚未上傳',
+      message: t('drawing.upload.idle'),
     });
     setPhase('playing');
   }, [clearPixiState, drawLayout, setPhase, t]);
@@ -707,13 +710,13 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, [handlePointerEnd, redrawPath]);
 
   const timeProgressText = useMemo(() => {
-    if (gameDurationSec === null) return `${elapsedSeconds}s / 無限`;
+    if (gameDurationSec === null) return `${elapsedSeconds}s / ${t('training.infinite')}`;
     return `${Math.min(elapsedSeconds, gameDurationSec)}/${gameDurationSec}s`;
-  }, [elapsedSeconds, gameDurationSec]);
+  }, [elapsedSeconds, gameDurationSec, t]);
 
   const downloadResult = () => {
     if (!result) return;
-    downloadCsvFile(toCsv([result]), `drawing_tower_defense_${Date.now()}.csv`);
+    downloadCsvFile(toCsv([result], t), `drawing_tower_defense_${Date.now()}.csv`);
   };
 
   return (
@@ -721,12 +724,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       <div ref={pixiHostRef} className="drawing-defense-stage" />
       <div ref={overlayRef} className="drawing-defense-input" />
       {phase !== 'results' && <div className="drawing-defense-hud">
-        <div><strong>HP</strong> {hp}/{maxHp}</div>
-        <div><strong>消滅</strong> {defeated}</div>
-        <div><strong>時間</strong> {timeProgressText}</div>
-        <div><strong>辨識</strong> {recognized}</div>
-        <div><strong>圖像</strong> {sampleUploadLabel}</div>
-        {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>}
+        <div><strong>{t('drawing.config.hp')}</strong> {hp}/{maxHp}</div>
+        <div><strong>{t('drawing.hud.defeated')}</strong> {defeated}</div>
+        <div><strong>{t('drawing.hud.time')}</strong> {timeProgressText}</div>
+        <div><strong>{t('drawing.hud.recognition')}</strong> {recognized}</div>
+        <div><strong>{t('drawing.hud.image')}</strong> {sampleUploadLabel}</div>
+        {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>{t('training.pause')}</button>}
       </div>}
 
       {phase === 'menu' && (
@@ -734,8 +737,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           <div className="drawing-defense-config">
             <header className="drawing-defense-config-header">
               <div>
-                <span className="drawing-defense-config-label">訓練設定</span>
-                <h1>畫畫塔防</h1>
+                <span className="drawing-defense-config-label">{t('drawing.config.label')}</span>
+                <h1>{t('training.drawing.title')}</h1>
               </div>
             </header>
 
@@ -743,10 +746,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>難度</h2>
-                    <p>{activeConfig.description}</p>
+                    <h2>{t('cognitive.config.difficulty')}</h2>
+                    <p>{activeDifficultyDescription}</p>
                   </div>
-                  <span>{activeConfig.label}</span>
+                  <span>{activeDifficultyLabel}</span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
                   {Object.entries(DIFFICULTIES).map(([key, value]) => (
@@ -756,8 +759,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
                       onClick={() => setDifficulty(key as Difficulty)}
                     >
-                      <span className="drawing-defense-option-title">{value.label}</span>
-                      <span className="drawing-defense-option-meta">{value.description}</span>
+                      <span className="drawing-defense-option-title">{t(value.labelKey)}</span>
+                      <span className="drawing-defense-option-meta">{t(value.descriptionKey)}</span>
                     </button>
                   ))}
                 </div>
@@ -766,10 +769,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>生命值</h2>
-                    <p>{maxHp} HP</p>
+                    <h2>{t('drawing.config.hp')}</h2>
+                    <p>{t('drawing.config.hpValue', { value: maxHp })}</p>
                   </div>
-                  <span>{isCustomHp ? '自訂' : '預設'}</span>
+                  <span>{isCustomHp ? t('training.custom') : t('training.default')}</span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
                   {HP_OPTIONS.map((option) => (
@@ -779,14 +782,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       className={`drawing-defense-option ${maxHp === option ? 'active' : ''}`}
                       onClick={() => setMaxHp(option)}
                     >
-                      <span className="drawing-defense-option-title">{option} HP</span>
+                      <span className="drawing-defense-option-title">{t('drawing.config.hpValue', { value: option })}</span>
                     </button>
                   ))}
                   <label
                     className={`drawing-defense-option drawing-defense-option-custom ${isCustomHp ? 'active' : ''}`}
                     onClick={() => setMaxHp(customHp)}
                   >
-                    <span className="drawing-defense-option-title">自訂</span>
+                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
                     <input
                       className="drawing-defense-number-input"
                       type="number"
@@ -800,7 +803,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                         setMaxHp(value);
                       }}
                       onFocus={() => setMaxHp(customHp)}
-                      aria-label="自訂生命值"
+                      aria-label={t('drawing.config.customHp')}
                     />
                   </label>
                 </div>
@@ -809,11 +812,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting drawing-defense-setting-wide">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>遊戲時間</h2>
+                    <h2>{t('drawing.config.gameDuration')}</h2>
                     <p>{gameDurationLabel}</p>
                   </div>
                   <span>
-                    {gameDurationSec === DEFAULT_GAME_DURATION_SECONDS ? '預設' : isPresetGameDuration ? '選用' : '自訂'}
+                    {gameDurationSec === DEFAULT_GAME_DURATION_SECONDS ? t('training.default') : isPresetGameDuration ? t('training.optional') : t('training.custom')}
                   </span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-duration-grid">
@@ -824,14 +827,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       className={`drawing-defense-option ${gameDurationSec === option ? 'active' : ''}`}
                       onClick={() => setGameDurationSec(option)}
                     >
-                      <span className="drawing-defense-option-title">{formatGameDuration(option)}</span>
+                      <span className="drawing-defense-option-title">{formatGameDuration(option, t)}</span>
                     </button>
                   ))}
                   <label
                     className={`drawing-defense-option drawing-defense-option-custom ${!isPresetGameDuration ? 'active' : ''}`}
                     onClick={() => setGameDurationSec(customGameDurationSec)}
                   >
-                    <span className="drawing-defense-option-title">自訂</span>
+                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
                     <input
                       className="drawing-defense-number-input"
                       type="number"
@@ -845,7 +848,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                         setGameDurationSec(value);
                       }}
                       onFocus={() => setGameDurationSec(customGameDurationSec)}
-                      aria-label="自訂遊戲時間秒數"
+                      aria-label={t('drawing.config.customDuration')}
                     />
                   </label>
                   <button
@@ -853,7 +856,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     className={`drawing-defense-option ${gameDurationSec === null ? 'active' : ''}`}
                     onClick={() => setGameDurationSec(null)}
                   >
-                    <span className="drawing-defense-option-title">無限模式</span>
+                    <span className="drawing-defense-option-title">{t('drawing.config.infiniteMode')}</span>
                   </button>
                 </div>
               </section>
@@ -861,10 +864,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>敵人速度</h2>
-                    <p>{speed} px/s</p>
+                    <h2>{t('drawing.config.enemySpeed')}</h2>
+                    <p>{t('drawing.config.speedValue', { value: speed })}</p>
                   </div>
-                  <span>{isCustomSpeed ? '自訂' : '預設'}</span>
+                  <span>{isCustomSpeed ? t('training.custom') : t('training.default')}</span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-speed-grid">
                   {ENEMY_SPEED_OPTIONS.map((option) => (
@@ -875,14 +878,14 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       onClick={() => setSpeed(option)}
                     >
                       <span className="drawing-defense-option-title">{option}</span>
-                      <span className="drawing-defense-option-meta">px/s</span>
+                      <span className="drawing-defense-option-meta">{t('drawing.config.speedUnit')}</span>
                     </button>
                   ))}
                   <label
                     className={`drawing-defense-option drawing-defense-option-custom ${isCustomSpeed ? 'active' : ''}`}
                     onClick={() => setSpeed(customSpeed)}
                   >
-                    <span className="drawing-defense-option-title">自訂</span>
+                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
                     <input
                       className="drawing-defense-number-input"
                       type="number"
@@ -896,7 +899,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                         setSpeed(value);
                       }}
                       onFocus={() => setSpeed(customSpeed)}
-                      aria-label="自訂敵人速度"
+                      aria-label={t('drawing.config.customEnemySpeed')}
                     />
                   </label>
                 </div>
@@ -905,7 +908,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>辨識嚴格度</h2>
+                    <h2>{t('drawing.config.strictness')}</h2>
                     <p>{strictness}%</p>
                   </div>
                 </div>
@@ -923,8 +926,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>收筆等待</h2>
-                    <p>{strokeWaitMs} ms</p>
+                    <h2>{t('drawing.config.strokeWait')}</h2>
+                    <p>{t('drawing.config.waitValue', { value: strokeWaitMs })}</p>
                   </div>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-wait-grid">
@@ -942,7 +945,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     className={`drawing-defense-option drawing-defense-option-custom ${!STROKE_WAIT_OPTIONS.includes(strokeWaitMs as typeof STROKE_WAIT_OPTIONS[number]) ? 'active' : ''}`}
                     onClick={() => setStrokeWaitMs(customStrokeWaitMs)}
                   >
-                    <span className="drawing-defense-option-title">自訂</span>
+                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
                     <input
                       className="drawing-defense-number-input"
                       type="number"
@@ -956,7 +959,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                         setStrokeWaitMs(value);
                       }}
                       onFocus={() => setStrokeWaitMs(customStrokeWaitMs)}
-                      aria-label="自訂收筆等待毫秒"
+                      aria-label={t('drawing.config.customStrokeWait')}
                     />
                   </label>
                 </div>
@@ -965,7 +968,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <section className="drawing-defense-setting drawing-defense-setting-wide">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>背景</h2>
+                    <h2>{t('drawing.config.background')}</h2>
                     <p>{backgroundSummary}</p>
                   </div>
                   <span>{backgroundModeLabel}</span>
@@ -976,18 +979,18 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     className={`drawing-defense-option ${backgroundMode === 'stars' ? 'active' : ''}`}
                     onClick={() => setBackgroundMode('stars')}
                   >
-                    <span className="drawing-defense-option-title">星空圖片</span>
-                    <span className="drawing-defense-option-meta">目前背景貼圖</span>
+                    <span className="drawing-defense-option-title">{t('drawing.config.starBackground')}</span>
+                    <span className="drawing-defense-option-meta">{t('drawing.config.currentTexture')}</span>
                   </button>
                   <div
                     className={`drawing-defense-background-card ${backgroundMode === 'color' ? 'active' : ''}`}
                     onClick={() => setBackgroundMode('color')}
                   >
                     <div className="drawing-defense-background-card-header">
-                      <span>背景顏色</span>
+                      <span>{t('drawing.config.backgroundColor')}</span>
                       <strong>{backgroundColor}</strong>
                     </div>
-                    <span className="drawing-defense-option-meta">固定使用 #005EB8。</span>
+                    <span className="drawing-defense-option-meta">{t('drawing.config.fixedColor')}</span>
                   </div>
                   <label
                     className={`drawing-defense-background-card ${backgroundMode === 'image' ? 'active' : ''}`}
@@ -996,17 +999,17 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     }}
                   >
                     <div className="drawing-defense-background-card-header">
-                      <span>自訂圖像</span>
-                      <strong>{uploadedBackgroundUrl ? '已上傳' : '未上傳'}</strong>
+                      <span>{t('drawing.background.customImage')}</span>
+                      <strong>{uploadedBackgroundUrl ? t('drawing.config.uploaded') : t('drawing.config.notUploaded')}</strong>
                     </div>
                     <span className="drawing-defense-option-meta">{uploadedBackgroundName}</span>
-                    <span className="drawing-defense-upload-action">選擇圖像</span>
+                    <span className="drawing-defense-upload-action">{t('drawing.config.selectImage')}</span>
                     <input
                       type="file"
                       accept="image/*"
                       hidden
                       onChange={handleBackgroundImageUpload}
-                      aria-label="上傳自訂背景圖像"
+                      aria-label={t('drawing.config.uploadAria')}
                     />
                   </label>
                 </div>
@@ -1015,12 +1018,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
             <div className="drawing-defense-config-footer">
               <div className="drawing-defense-config-summary">
-                <strong>{activeConfig.label}</strong>
+                <strong>{activeDifficultyLabel}</strong>
                 <span>{gameDurationLabel}</span>
-                <span>{maxHp} HP</span>
-                <span>{speed} px/s</span>
+                <span>{t('drawing.config.hpValue', { value: maxHp })}</span>
+                <span>{t('drawing.config.speedValue', { value: speed })}</span>
                 <span>{strictness}%</span>
-                <span>{strokeWaitMs} ms</span>
+                <span>{t('drawing.config.waitValue', { value: strokeWaitMs })}</span>
                 <span>{backgroundSummary}</span>
               </div>
               <div className="drawing-defense-config-actions">
@@ -1028,9 +1031,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <polygon points="5,3 19,12 5,21" />
                   </svg>
-                  開始訓練
+                  {t('training.start')}
                 </button>
-                <button className="btn btn-ghost btn-lg" onClick={onExit}>取消</button>
+                <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.cancel')}</button>
               </div>
             </div>
           </div>
@@ -1039,32 +1042,32 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
       {phase === 'paused' && (
         <div className="drawing-defense-panel drawing-defense-panel-compact">
-          <h1>暫停</h1>
-          <button className="btn btn-primary btn-lg" onClick={resumeGame}>繼續遊戲</button>
-          <button className="btn btn-secondary btn-lg" onClick={restartGame}>重新開始</button>
-          <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回目錄</button>
+          <h1>{t('drawing.pause.title')}</h1>
+          <button className="btn btn-primary btn-lg" onClick={resumeGame}>{t('training.continueGame')}</button>
+          <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
+          <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnMenu')}</button>
         </div>
       )}
 
       {phase === 'results' && result && (
         <div className="experiment-container drawing-defense-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
-            <h1>訓練完成！</h1>
+            <h1>{t('drawing.results.complete')}</h1>
             <div className="drawing-defense-result-summary">
               <span>
-                <small>使用者</small>
+                <small>{t('drawing.results.user')}</small>
                 <strong>{result.Participant_ID}</strong>
               </span>
               <span>
-                <small>消滅敵人數 / 生成敵人數</small>
+                <small>{t('drawing.results.defeatedEnemies')}</small>
                 <strong>{result.Enemies_Defeated}/{result.Enemies_Spawned}</strong>
               </span>
               <span>
-                <small>總時長</small>
-                <strong>{result.Total_Duration_Seconds} 秒</strong>
+                <small>{t('drawing.results.duration')}</small>
+                <strong>{formatSeconds(result.Total_Duration_Seconds, t)}</strong>
               </span>
               <span>
-                <small>Discord 圖像上傳</small>
+                <small>{t('drawing.results.discordUpload')}</small>
                 <strong>{sampleUpload.pending > 0 ? sampleUploadLabel : `${sampleUpload.uploaded}/${sampleUpload.uploaded + sampleUpload.failed}`}</strong>
               </span>
             </div>
@@ -1073,21 +1076,21 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>圖形種類</th>
-                  <th>反應時間</th>
-                  <th>是否成功消滅</th>
+                  <th>{t('drawing.results.shape')}</th>
+                  <th>{t('drawing.results.reactionTime')}</th>
+                  <th>{t('drawing.results.defeated')}</th>
                 </tr>
               </thead>
               <tbody>
                 {result.Enemy_Results.map((enemyResult) => (
                   <tr key={enemyResult.Enemy_Number}>
                     <td>{enemyResult.Enemy_Number}</td>
-                    <td>{SHAPE_LABEL[enemyResult.Shape]}</td>
+                    <td>{getShapeLabel(enemyResult.Shape, t)}</td>
                     <td>
-                      {enemyResult.Reaction_Time_Seconds === null ? '-' : `${enemyResult.Reaction_Time_Seconds} 秒`}
+                      {enemyResult.Reaction_Time_Seconds === null ? '-' : formatSeconds(enemyResult.Reaction_Time_Seconds, t)}
                     </td>
                     <td className={enemyResult.Defeated ? 'result-success' : 'result-fail'}>
-                      {enemyResult.Defeated ? '成功' : '未消滅'}
+                      {enemyResult.Defeated ? t('drawing.results.success') : t('drawing.results.notDefeated')}
                     </td>
                   </tr>
                 ))}
@@ -1095,9 +1098,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             </table>
 
             <div className="results-actions">
-              <button className="btn btn-primary btn-lg" onClick={downloadResult}>下載 CSV 成績</button>
-              <button className="btn btn-secondary btn-lg" onClick={restartGame}>再玩一次</button>
-              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回設定</button>
+              <button className="btn btn-primary btn-lg" onClick={downloadResult}>{t('training.downloadCsvScores')}</button>
+              <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.playAgain')}</button>
+              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnSettings')}</button>
             </div>
           </div>
         </div>
@@ -1816,12 +1819,12 @@ function radialCoefficientOfVariation(points: Point[], box: ReturnType<typeof ge
   return Math.sqrt(variance) / Math.max(1, mean);
 }
 
-function toCsv(records: SessionRecord[]): string {
+function toCsv(records: SessionRecord[], t: TFunction): string {
   const columns: Array<{ label: string; value: (record: SessionRecord, enemyResult: EnemyResult | null) => unknown }> = [
-    { label: '測驗日期', value: (record) => record.Test_Date },
+    { label: t('drawing.csv.testDate'), value: (record) => record.Test_Date },
     { label: 'Participant_ID', value: (record) => record.Participant_ID },
     { label: 'Difficulty', value: (record) => record.Difficulty },
-    { label: 'Game_Time_Seconds', value: (record) => record.Game_Time_Seconds ?? 'Infinite' },
+    { label: 'Game_Time_Seconds', value: (record) => record.Game_Time_Seconds ?? t('training.infinite') },
     { label: 'Starting_HP', value: (record) => record.Starting_HP },
     { label: 'Enemy_Speed', value: (record) => record.Enemy_Speed },
     { label: 'Recognition_Strictness', value: (record) => record.Recognition_Strictness },
@@ -1832,7 +1835,7 @@ function toCsv(records: SessionRecord[]): string {
     { label: 'HP_Remaining', value: (record) => record.HP_Remaining },
     { label: 'Game_Result', value: (record) => record.Game_Result },
     { label: 'Enemy_Number', value: (_record, enemyResult) => enemyResult?.Enemy_Number ?? '' },
-    { label: 'Enemy_Shape', value: (_record, enemyResult) => enemyResult ? SHAPE_LABEL[enemyResult.Shape] : '' },
+    { label: 'Enemy_Shape', value: (_record, enemyResult) => enemyResult ? getShapeLabel(enemyResult.Shape, t) : '' },
     { label: 'Enemy_Reaction_Time_Seconds', value: (_record, enemyResult) => enemyResult?.Reaction_Time_Seconds ?? '' },
     { label: 'Enemy_Defeated', value: (_record, enemyResult) => enemyResult?.Defeated ?? '' },
   ];
@@ -1843,6 +1846,14 @@ function toCsv(records: SessionRecord[]): string {
   return [columns.map((column) => column.label).join(','), ...rows].join('\n');
 }
 
-function formatGameDuration(duration: GameDurationSeconds): string {
-  return duration === null ? '無限模式' : `${duration}s`;
+function formatGameDuration(duration: GameDurationSeconds, t: TFunction): string {
+  return duration === null ? t('drawing.config.infiniteMode') : `${duration}${t('training.secondsShort')}`;
+}
+
+function formatSeconds(value: number, t: TFunction): string {
+  return `${value}${t('training.secondsShort')}`;
+}
+
+function getShapeLabel(shape: ShapeId, t: TFunction): string {
+  return t(SHAPE_LABEL_KEYS[shape]);
 }

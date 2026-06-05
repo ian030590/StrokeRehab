@@ -1,6 +1,6 @@
 import { type CSSProperties, type PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { initJsPsych } from 'jspsych';
-import { useT } from '../../i18n';
+import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
@@ -17,9 +17,9 @@ interface MinesweeperGameProps {
 }
 
 interface DifficultyConfig {
-  label: string;
+  labelKey: TranslationKey;
   density: number;
-  description: string;
+  descriptionKey: TranslationKey;
 }
 
 interface Cell {
@@ -49,18 +49,18 @@ interface SessionRecord {
 }
 
 const DIFFICULTIES: Record<MinesweeperDifficulty, DifficultyConfig> = {
-  Beginner: { label: '初級', density: 0.1, description: '地雷密度 10%，適合熟悉規則' },
-  Intermediate: { label: '中級', density: 0.16, description: '地雷密度 16%，需要更多推理' },
-  Advanced: { label: '高級', density: 0.24, description: '地雷密度 24%，挑戰高注意力' },
+  Beginner: { labelKey: 'minesweeper.diff.beginner', density: 0.1, descriptionKey: 'minesweeper.diff.beginnerDesc' },
+  Intermediate: { labelKey: 'minesweeper.diff.intermediate', density: 0.16, descriptionKey: 'minesweeper.diff.intermediateDesc' },
+  Advanced: { labelKey: 'minesweeper.diff.advanced', density: 0.24, descriptionKey: 'minesweeper.diff.advancedDesc' },
 };
 
-const BOARD_PRESETS: Record<Exclude<BoardPresetId, 'custom'>, { label: string; rows: number; cols: number; mines?: number; description: string }> = {
-  compact: { label: '6x6', rows: 6, cols: 6, description: '原有短局訓練盤' },
-  'classic-easy': { label: '9x9 / 10', rows: 9, cols: 9, mines: 10, description: 'reference 經典 Easy' },
-  'classic-medium': { label: '16x16 / 40', rows: 16, cols: 16, mines: 40, description: 'reference 經典 Medium' },
-  'classic-hard': { label: '16x30 / 99', rows: 16, cols: 30, mines: 99, description: 'reference 經典 Hard' },
-  large: { label: '20x20', rows: 20, cols: 20, description: '原有大盤推理' },
-  dense: { label: '80x80', rows: 80, cols: 80, description: '原有高密度掃描' },
+const BOARD_PRESETS: Record<Exclude<BoardPresetId, 'custom'>, { label: string; rows: number; cols: number; mines?: number; descriptionKey: TranslationKey }> = {
+  compact: { label: '6x6', rows: 6, cols: 6, descriptionKey: 'minesweeper.preset.compactDesc' },
+  'classic-easy': { label: '9x9 / 10', rows: 9, cols: 9, mines: 10, descriptionKey: 'minesweeper.preset.classicEasyDesc' },
+  'classic-medium': { label: '16x16 / 40', rows: 16, cols: 16, mines: 40, descriptionKey: 'minesweeper.preset.classicMediumDesc' },
+  'classic-hard': { label: '16x30 / 99', rows: 16, cols: 30, mines: 99, descriptionKey: 'minesweeper.preset.classicHardDesc' },
+  large: { label: '20x20', rows: 20, cols: 20, descriptionKey: 'minesweeper.preset.largeDesc' },
+  dense: { label: '80x80', rows: 80, cols: 80, descriptionKey: 'minesweeper.preset.denseDesc' },
 };
 const DEFAULT_DIFFICULTY: MinesweeperDifficulty = 'Beginner';
 const DEFAULT_BOARD_PRESET: BoardPresetId = 'compact';
@@ -101,6 +101,8 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const activeConfig = DIFFICULTIES[difficulty];
+  const activeDifficultyLabel = t(activeConfig.labelKey);
+  const activeDifficultyDescription = t(activeConfig.descriptionKey);
   const selectedBoardConfig = useMemo(() => getSelectedBoardConfig(boardPreset, customBoardSize, activeConfig.density), [activeConfig.density, boardPreset, customBoardSize]);
   const selectedMineCount = selectedBoardConfig.mines;
   const selectedDensityPercent = Math.round((selectedMineCount / Math.max(1, selectedBoardConfig.rows * selectedBoardConfig.cols)) * 100);
@@ -108,6 +110,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   const boardMetrics = useMemo(() => getBoardMetrics(boardRows, boardCols), [boardCols, boardRows]);
   const boardStats = useMemo(() => getBoardStats(board), [board]);
   const remainingMineEstimate = Math.max(0, mineCount - boardStats.flags);
+  const gameTitle = t('training.minesweeper.title');
 
   const canvasStyle = useMemo<CSSProperties>(() => {
     return {
@@ -149,7 +152,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
       userName: record.Participant_ID,
       moduleId: 'cognitive-training',
       gameId: 'minesweeper',
-      gameTitle: 'Minesweeper',
+      gameTitle,
       difficulty: record.Difficulty,
       trainingDate: record.Test_Date,
       details: {
@@ -167,7 +170,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
       },
     });
     writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write minesweeper result to jsPsych data.');
-  }, [boardCols, boardRows, difficulty, mineCount, selectedBoardConfig.label]);
+  }, [boardCols, boardRows, difficulty, gameTitle, mineCount, selectedBoardConfig.label]);
 
   const startGame = useCallback(() => {
     if (!verifySelectedTrainingUser(t)) return;
@@ -294,8 +297,8 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
           <div className="drawing-defense-config">
             <header className="drawing-defense-config-header">
               <div>
-                <span className="drawing-defense-config-label">認知訓練設定</span>
-                <h1>踩地雷</h1>
+                <span className="drawing-defense-config-label">{t('minesweeper.config.label')}</span>
+                <h1>{gameTitle}</h1>
               </div>
             </header>
 
@@ -303,10 +306,10 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>難度</h2>
-                    <p>{activeConfig.description}</p>
+                    <h2>{t('cognitive.config.difficulty')}</h2>
+                    <p>{activeDifficultyDescription}</p>
                   </div>
-                  <span>{activeConfig.label}</span>
+                  <span>{activeDifficultyLabel}</span>
                 </div>
                 <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
                   {Object.entries(DIFFICULTIES).map(([key, value]) => (
@@ -316,8 +319,8 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
                       className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
                       onClick={() => setDifficulty(key as MinesweeperDifficulty)}
                     >
-                      <span className="drawing-defense-option-title">{value.label}</span>
-                      <span className="drawing-defense-option-meta">{value.description}</span>
+                      <span className="drawing-defense-option-title">{t(value.labelKey)}</span>
+                      <span className="drawing-defense-option-meta">{t(value.descriptionKey)}</span>
                     </button>
                   ))}
                 </div>
@@ -326,10 +329,10 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
               <section className="drawing-defense-setting">
                 <div className="drawing-defense-setting-header">
                   <div>
-                    <h2>棋盤大小</h2>
+                    <h2>{t('minesweeper.config.boardSize')}</h2>
                     <p>{selectedBoardConfig.rows}x{selectedBoardConfig.cols}</p>
                   </div>
-                  <span>{isCustomBoardSize ? '自訂' : '預設'}</span>
+                  <span>{isCustomBoardSize ? t('training.custom') : t('training.default')}</span>
                 </div>
                 <div className="drawing-defense-option-grid minesweeper-preset-grid">
                   {Object.entries(BOARD_PRESETS).map(([id, preset]) => (
@@ -340,14 +343,14 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
                       onClick={() => setBoardPreset(id as BoardPresetId)}
                     >
                       <span className="drawing-defense-option-title">{preset.label}</span>
-                      <span className="drawing-defense-option-meta">{preset.description}</span>
+                      <span className="drawing-defense-option-meta">{t(preset.descriptionKey)}</span>
                     </button>
                   ))}
                   <label
                     className={`drawing-defense-option drawing-defense-option-custom ${isCustomBoardSize ? 'active' : ''}`}
                     onClick={() => setBoardPreset('custom')}
                   >
-                    <span className="drawing-defense-option-title">自訂</span>
+                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
                     <input
                       className="drawing-defense-number-input"
                       type="number"
@@ -361,7 +364,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
                         setBoardPreset('custom');
                       }}
                       onFocus={() => setBoardPreset('custom')}
-                      aria-label="自訂棋盤邊長"
+                      aria-label={t('minesweeper.config.customBoardSize')}
                     />
                   </label>
                 </div>
@@ -370,16 +373,16 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
 
             <div className="drawing-defense-config-footer">
               <div className="drawing-defense-config-summary">
-                <strong>{activeConfig.label}</strong>
+                <strong>{activeDifficultyLabel}</strong>
                 <span>{selectedBoardConfig.label}</span>
-                <span>{selectedDensityPercent}% 密度</span>
-                <span>{selectedMineCount} 地雷</span>
+                <span>{t('minesweeper.config.density', { value: selectedDensityPercent })}</span>
+                <span>{t('minesweeper.config.mineCount', { value: selectedMineCount })}</span>
               </div>
               <div className="drawing-defense-config-actions">
                 <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
-                  開始遊戲
+                  {t('training.startGame')}
                 </button>
-                <button className="btn btn-ghost btn-lg" onClick={onExit}>取消</button>
+                <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.back')}</button>
               </div>
             </div>
           </div>
@@ -389,17 +392,17 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
       {phase === 'playing' && (
         <>
           <div className="minesweeper-hud">
-            <div><strong>時間</strong> {elapsedSeconds}s</div>
-            <div><strong>地雷</strong> {remainingMineEstimate}</div>
-            <div><strong>已開闢</strong> {boardStats.openedSafeCells}</div>
+            <div><strong>{t('minesweeper.hud.time')}</strong> {elapsedSeconds}s</div>
+            <div><strong>{t('minesweeper.hud.mines')}</strong> {remainingMineEstimate}</div>
+            <div><strong>{t('minesweeper.hud.opened')}</strong> {boardStats.openedSafeCells}</div>
             <button
               className={`btn btn-sm ${flagMode ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFlagMode((current) => !current)}
             >
-              {flagMode ? '標記模式中' : '標記模式'}
+              {flagMode ? t('minesweeper.flagModeActive') : t('minesweeper.flagMode')}
             </button>
-            <button className="btn btn-sm btn-secondary" onClick={pauseGame}>暫停</button>
-            <button className="btn btn-sm btn-ghost" onClick={returnToMenu}>返回設定</button>
+            <button className="btn btn-sm btn-secondary" onClick={pauseGame}>{t('training.pause')}</button>
+            <button className="btn btn-sm btn-ghost" onClick={returnToMenu}>{t('training.returnSettings')}</button>
           </div>
           <div className="minesweeper-board-stage">
             <canvas
@@ -408,7 +411,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
               style={canvasStyle}
               onPointerDown={handleCanvasPointerDown}
               onContextMenu={(event) => event.preventDefault()}
-              aria-label="踩地雷棋盤"
+              aria-label={t('minesweeper.boardAria')}
             />
           </div>
         </>
@@ -416,12 +419,12 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
 
       {phase === 'paused' && (
         <div className="drawing-defense-panel drawing-defense-panel-compact">
-          <h1>遊戲暫停</h1>
-          <p>目前時間 {elapsedSeconds} 秒，棋盤會保留在目前狀態。</p>
+          <h1>{t('minesweeper.pause.title')}</h1>
+          <p>{t('minesweeper.pause.desc', { seconds: elapsedSeconds })}</p>
           <div className="drawing-defense-actions">
-            <button className="btn btn-primary btn-lg" onClick={resumeGame}>繼續遊戲</button>
-            <button className="btn btn-secondary btn-lg" onClick={restartGame}>重新開始</button>
-            <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回設定</button>
+            <button className="btn btn-primary btn-lg" onClick={resumeGame}>{t('training.continueGame')}</button>
+            <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
+            <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnSettings')}</button>
           </div>
         </div>
       )}
@@ -429,18 +432,18 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
       {phase === 'results' && result && (
         <div className="experiment-container minesweeper-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
-            <h1>{result.Game_Result === 'Victory' ? '成功完成！' : '遊戲結束'}</h1>
+            <h1>{result.Game_Result === 'Victory' ? t('minesweeper.results.victory') : t('minesweeper.results.defeat')}</h1>
             <div className="drawing-defense-result-summary">
               <span>
-                <small>成功標記的地雷數量</small>
+                <small>{t('minesweeper.results.correctFlags')}</small>
                 <strong>{result.Correctly_Flagged_Mines}</strong>
               </span>
               <span>
-                <small>使用總時數</small>
-                <strong>{result.Total_Duration_Seconds} 秒</strong>
+                <small>{t('minesweeper.results.duration')}</small>
+                <strong>{formatSeconds(result.Total_Duration_Seconds, t)}</strong>
               </span>
               <span>
-                <small>成功開闢格子數量</small>
+                <small>{t('minesweeper.results.openedCells')}</small>
                 <strong>{result.Successful_Opened_Cells}</strong>
               </span>
             </div>
@@ -448,32 +451,32 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
             <table className="results-table">
               <tbody>
                 <tr>
-                  <th>棋盤大小</th>
+                  <th>{t('minesweeper.results.boardSize')}</th>
                   <td>{result.Board_Size}</td>
                 </tr>
                 <tr>
-                  <th>難度</th>
-                  <td>{DIFFICULTIES[result.Difficulty].label}</td>
+                  <th>{t('cognitive.results.difficulty')}</th>
+                  <td>{t(DIFFICULTIES[result.Difficulty].labelKey)}</td>
                 </tr>
                 <tr>
-                  <th>地雷總數</th>
+                  <th>{t('minesweeper.results.minesTotal')}</th>
                   <td>{result.Mines_Total}</td>
                 </tr>
                 <tr>
-                  <th>放置旗標</th>
+                  <th>{t('minesweeper.results.flagsPlaced')}</th>
                   <td>{result.Flags_Placed}</td>
                 </tr>
                 <tr>
-                  <th>錯誤旗標</th>
+                  <th>{t('minesweeper.results.incorrectFlags')}</th>
                   <td>{result.Incorrect_Flags}</td>
                 </tr>
               </tbody>
             </table>
 
             <div className="results-actions">
-              <button className="btn btn-primary btn-lg" onClick={downloadResult}>下載 CSV 成績</button>
-              <button className="btn btn-secondary btn-lg" onClick={restartGame}>再玩一次</button>
-              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>返回設定</button>
+              <button className="btn btn-primary btn-lg" onClick={downloadResult}>{t('training.downloadCsvRecord')}</button>
+              <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.playAgain')}</button>
+              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnSettings')}</button>
             </div>
           </div>
         </div>
@@ -721,9 +724,13 @@ function getBoardStats(board: Cell[][]) {
   };
 }
 
+function formatSeconds(value: number, t: (key: TranslationKey, params?: Record<string, string | number>) => string) {
+  return `${value}${t('training.secondsShort')}`;
+}
+
 function toCsv(records: SessionRecord[]): string {
   const columns: Array<{ label: string; value: (record: SessionRecord) => unknown }> = [
-    { label: '測驗日期', value: (record) => record.Test_Date },
+    { label: 'Test_Date', value: (record) => record.Test_Date },
     { label: 'Participant_ID', value: (record) => record.Participant_ID },
     { label: 'Difficulty', value: (record) => record.Difficulty },
     { label: 'Board_Preset', value: (record) => record.Board_Preset },
