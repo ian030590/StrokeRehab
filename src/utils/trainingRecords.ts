@@ -37,12 +37,18 @@ export interface TrainingRecordConfig {
 export interface TrainingRecord {
   id: string;
   savedAt: string;
+  trainingDate?: string;
   userName: string;
   moduleId: string;
+  moduleName?: string;
+  gameId?: string;
+  gameTitle?: string;
   difficulty: string;
   oculomotorMode?: string;
   oculomotorPattern?: string;
   config?: TrainingRecordConfig;
+  details?: CsvDetailRow;
+  detailRows?: CsvDetailRow[];
   results: TrialData[];
 }
 
@@ -56,7 +62,42 @@ interface SaveTrainingRecordArgs {
   results: TrialData[];
 }
 
-type CsvRow = unknown[];
+interface SaveTrainingSessionRecordArgs {
+  userName: string;
+  moduleId: string;
+  moduleName?: string;
+  gameId: string;
+  gameTitle: string;
+  difficulty: string;
+  trainingDate?: string;
+  details?: CsvDetailRow;
+  detailRows?: CsvDetailRow[];
+}
+
+type CsvDetailRow = Record<string, unknown>;
+
+interface CsvColumn {
+  key: string;
+  label: string;
+}
+
+interface PreparedCsvRow {
+  base: CsvDetailRow;
+  details: CsvDetailRow;
+}
+
+const BASE_CSV_COLUMNS: CsvColumn[] = [
+  { key: 'Training_Date', label: 'Training_Date' },
+  { key: 'Training_Time', label: 'Training_Time' },
+  { key: 'Record_ID', label: 'Record_ID' },
+  { key: 'Saved_At', label: 'Saved_At' },
+  { key: 'User', label: 'User' },
+  { key: 'Module', label: 'Module' },
+  { key: 'Module_ID', label: 'Module_ID' },
+  { key: 'Game', label: 'Game' },
+  { key: 'Game_ID', label: 'Game_ID' },
+  { key: 'Difficulty', label: 'Difficulty' },
+];
 
 export function getTrainingRecords(): TrainingRecord[] {
   try {
@@ -75,16 +116,14 @@ export function getTrainingRecords(): TrainingRecord[] {
   }
 }
 
-export function getTrainingRecordCount(): number {
-  return getTrainingRecords().length;
-}
-
 export function saveTrainingRecord(args: SaveTrainingRecordArgs): TrainingRecord | null {
   if (args.results.length === 0) return null;
+  const now = new Date();
 
   const record: TrainingRecord = {
     id: createRecordId(),
-    savedAt: new Date().toISOString(),
+    savedAt: now.toISOString(),
+    trainingDate: formatDate(now),
     userName: args.userName,
     moduleId: args.moduleId,
     difficulty: args.difficulty,
@@ -94,6 +133,35 @@ export function saveTrainingRecord(args: SaveTrainingRecordArgs): TrainingRecord
     results: args.results,
   };
 
+  return appendTrainingRecord(record);
+}
+
+export function saveTrainingSessionRecord(args: SaveTrainingSessionRecordArgs): TrainingRecord | null {
+  const now = new Date();
+  const details = normalizeCsvRow(args.details);
+  const detailRows = args.detailRows
+    ?.map((row) => normalizeCsvRow(row))
+    .filter((row): row is CsvDetailRow => Boolean(row));
+
+  const record: TrainingRecord = {
+    id: createRecordId(),
+    savedAt: now.toISOString(),
+    trainingDate: args.trainingDate || formatDate(now),
+    userName: args.userName,
+    moduleId: args.moduleId,
+    moduleName: args.moduleName,
+    gameId: args.gameId,
+    gameTitle: args.gameTitle,
+    difficulty: args.difficulty,
+    details,
+    detailRows: detailRows && detailRows.length > 0 ? detailRows : undefined,
+    results: [],
+  };
+
+  return appendTrainingRecord(record);
+}
+
+function appendTrainingRecord(record: TrainingRecord): TrainingRecord | null {
   try {
     const records = getTrainingRecords();
     localStorage.setItem(TRAINING_RECORDS_KEY, JSON.stringify([...records, record]));
@@ -120,144 +188,101 @@ export function downloadAllTrainingRecordsCsv(t: TFunction): boolean {
 }
 
 export function buildTrainingRecordsCsv(records: TrainingRecord[], t: TFunction): string {
-  const headers = [
-    t('exp.csv.date'),
-    t('exp.csv.time'),
-    t('exp.csv.sessionId'),
-    t('exp.csv.savedAt'),
-    t('exp.csv.user'),
-    t('exp.csv.module'),
-    t('exp.csv.moduleId'),
-    t('exp.csv.diff'),
-    t('exp.csv.mode'),
-    t('exp.csv.path'),
-    t('exp.csv.trialType'),
-    t('exp.csv.round'),
-    t('exp.csv.target'),
-    t('exp.csv.response'),
-    t('exp.csv.correct'),
-    t('exp.csv.rt'),
-    t('exp.csv.duration'),
-    t('exp.csv.score'),
-    t('exp.csv.acquired'),
-    t('exp.csv.fps'),
-    t('exp.csv.aoi'),
-    t('exp.csv.status'),
-    t('exp.csv.event'),
-    t('exp.csv.valid'),
-    t('exp.csv.collision'),
-    t('exp.csv.preBrake'),
-    t('exp.csv.laneDeviations'),
-    t('exp.csv.routeProgress'),
-    t('exp.csv.readingWps'),
-    t('exp.csv.readingCrowding'),
-  ];
+  const rows = records.flatMap((record) => toPreparedCsvRows(record, t));
+  const detailKeys = collectDetailKeys(rows);
+  const columns = [...BASE_CSV_COLUMNS, ...detailKeys.map((key) => ({ key, label: key }))];
 
-  const rows = records.flatMap((record) => toCsvRows(record, t));
-  return [headers, ...rows].map((row) => row.map(toCsvCell).join(',')).join('\n');
+  return [
+    columns.map((column) => column.label),
+    ...rows.map((row) => columns.map((column) => row.base[column.key] ?? row.details[column.key] ?? '')),
+  ].map((row) => row.map(toCsvCell).join(',')).join('\n');
 }
 
-function toCsvRows(record: TrainingRecord, t: TFunction): CsvRow[] {
+function toPreparedCsvRows(record: TrainingRecord, t: TFunction): PreparedCsvRow[] {
+  const detailRows = hasSessionDetails(record) ? toSessionDetailRows(record) : toLegacyDetailRows(record, t);
+  const rows = detailRows.length > 0 ? detailRows : [{}];
+  const { date, time } = formatRecordDateTime(record);
+  const base = {
+    Training_Date: date,
+    Training_Time: time,
+    Record_ID: record.id,
+    Saved_At: record.savedAt,
+    User: record.userName,
+    Module: record.moduleName || formatModule(record.moduleId, t),
+    Module_ID: record.moduleId,
+    Game: record.gameTitle || formatModule(record.moduleId, t),
+    Game_ID: record.gameId || record.moduleId,
+    Difficulty: formatDifficulty(record.config?.drivingDifficulty ?? record.difficulty, t),
+  };
+
+  return rows.map((details) => ({ base, details }));
+}
+
+function toSessionDetailRows(record: TrainingRecord): CsvDetailRow[] {
+  const details = record.details ?? {};
+  const detailRows = record.detailRows && record.detailRows.length > 0 ? record.detailRows : [undefined];
+  return detailRows.map((detailRow, index) => normalizeCsvRow({
+    ...(detailRows.length > 1 ? { Detail_Row: index + 1 } : {}),
+    ...details,
+    ...(detailRow ?? {}),
+  }) ?? {});
+}
+
+function toLegacyDetailRows(record: TrainingRecord, t: TFunction): CsvDetailRow[] {
   const firstResult = record.results[0];
-  const moduleLabel = formatModule(record.moduleId, t);
-  const difficulty = formatDifficulty(record.config?.drivingDifficulty ?? record.difficulty, t);
-  const { date, time } = formatSavedAt(record.savedAt);
   const readingWPS = record.config?.readingWPS ?? '';
   const readingCrowding = record.config?.readingCrowding ?? '';
-
-  const base = [
-    date,
-    time,
-    record.id,
-    record.savedAt,
-    record.userName,
-    moduleLabel,
-    record.moduleId,
-    difficulty,
-  ];
 
   if (record.moduleId === 'driving-rehab') {
     const events = firstResult?.driving_events ?? [];
     if (events.length === 0) {
-      return [[
-        ...base,
-        '',
-        '',
-        firstResult?.trial_type ?? '',
-        '',
-        '',
-        firstResult?.response ?? '',
-        '',
-        firstResult?.average_rt ?? '',
-        firstResult?.duration_ms ?? firstResult?.rt ?? '',
-        '',
-        '',
-        firstResult?.average_fps ?? '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        firstResult?.lane_deviations ?? '',
-        firstResult?.route_progress ?? '',
-        '',
-        '',
-      ]];
+      return [stripEmptyValues({
+        Trial_Type: firstResult?.trial_type,
+        Response: firstResult?.response,
+        RT_ms: firstResult?.average_rt,
+        Duration_ms: firstResult?.duration_ms ?? firstResult?.rt,
+        Average_FPS: firstResult?.average_fps,
+        Lane_Deviations: firstResult?.lane_deviations,
+        Route_Progress: firstResult?.route_progress,
+      })];
     }
 
-    return events.map((event, index) => [
-      ...base,
-      '',
-      '',
-      firstResult?.trial_type ?? '',
-      index + 1,
-      '',
-      event.response,
-      '',
-      event.rt_ms ?? '',
-      firstResult?.duration_ms ?? firstResult?.rt ?? '',
-      '',
-      '',
-      firstResult?.average_fps ?? '',
-      '',
-      '',
-      event.label,
-      event.valid,
-      event.collision,
-      event.brake_preheld,
-      firstResult?.lane_deviations ?? '',
-      firstResult?.route_progress ?? '',
-      '',
-      '',
-    ]);
+    return events.map((event, index) => stripEmptyValues({
+      Trial_Type: firstResult?.trial_type,
+      Round: index + 1,
+      Response: event.response,
+      RT_ms: event.rt_ms,
+      Duration_ms: firstResult?.duration_ms ?? firstResult?.rt,
+      Average_FPS: firstResult?.average_fps,
+      Event: event.label,
+      Valid: event.valid,
+      Collision: event.collision,
+      Preheld_Brake: event.brake_preheld,
+      Lane_Deviations: firstResult?.lane_deviations,
+      Route_Progress: firstResult?.route_progress,
+    }));
   }
 
-  return record.results.map((result, index) => [
-    ...base,
-    formatOculomotorMode(result.mode ?? record.oculomotorMode ?? record.config?.oculomotorMode, t),
-    formatOculomotorPath(result.pattern ?? record.oculomotorPattern ?? record.config?.oculomotorPattern, t),
-    result.trial_type ?? '',
-    index + 1,
-    result.target ?? '',
-    (result as TrialData & { response_text?: string }).response_text ?? result.response ?? '',
-    formatCorrect(result.correct),
-    result.rt ?? result.reading_time ?? '',
-    result.duration_ms ?? '',
-    result.score ?? '',
-    result.acquired_targets ?? '',
-    result.average_fps ?? '',
-    (result as TrialData & { aoi_score?: number }).aoi_score ?? '',
-    result.response ?? '',
-    '',
-    '',
-    '',
-    '',
-    result.lane_deviations ?? '',
-    result.route_progress ?? '',
-    record.moduleId === 'reading-training' ? readingWPS : '',
-    record.moduleId === 'reading-training' ? readingCrowding : '',
-  ]);
+  return record.results.map((result, index) => stripEmptyValues({
+    Mode: formatOculomotorMode(result.mode ?? record.oculomotorMode ?? record.config?.oculomotorMode, t),
+    Path: formatOculomotorPath(result.pattern ?? record.oculomotorPattern ?? record.config?.oculomotorPattern, t),
+    Trial_Type: result.trial_type,
+    Round: index + 1,
+    Target: result.target,
+    Response: (result as TrialData & { response_text?: string }).response_text ?? result.response,
+    Correct: formatCorrect(result.correct),
+    RT_ms: result.rt ?? result.reading_time,
+    Duration_ms: result.duration_ms,
+    Score: result.score,
+    Acquired_Targets: result.acquired_targets,
+    Average_FPS: result.average_fps,
+    AOI_Score: (result as TrialData & { aoi_score?: number }).aoi_score,
+    Status: result.response,
+    Lane_Deviations: result.lane_deviations,
+    Route_Progress: result.route_progress,
+    Reading_WPS: record.moduleId === 'reading-training' ? readingWPS : '',
+    Reading_Crowding: record.moduleId === 'reading-training' ? readingCrowding : '',
+  }));
 }
 
 function toTrainingRecord(value: unknown): TrainingRecord | null {
@@ -267,12 +292,20 @@ function toTrainingRecord(value: unknown): TrainingRecord | null {
   return {
     id: typeof item.id === 'string' ? item.id : createRecordId(),
     savedAt: typeof item.savedAt === 'string' ? item.savedAt : new Date().toISOString(),
+    trainingDate: typeof item.trainingDate === 'string' ? item.trainingDate : undefined,
     userName: typeof item.userName === 'string' ? item.userName : '',
     moduleId: typeof item.moduleId === 'string' ? item.moduleId : '',
+    moduleName: typeof item.moduleName === 'string' ? item.moduleName : undefined,
+    gameId: typeof item.gameId === 'string' ? item.gameId : undefined,
+    gameTitle: typeof item.gameTitle === 'string' ? item.gameTitle : undefined,
     difficulty: typeof item.difficulty === 'string' ? item.difficulty : '',
     oculomotorMode: typeof item.oculomotorMode === 'string' ? item.oculomotorMode : undefined,
     oculomotorPattern: typeof item.oculomotorPattern === 'string' ? item.oculomotorPattern : undefined,
     config: toObject(item.config) as TrainingRecordConfig | undefined,
+    details: normalizeCsvRow(toObject(item.details)),
+    detailRows: Array.isArray(item.detailRows)
+      ? item.detailRows.map((row) => normalizeCsvRow(toObject(row))).filter((row): row is CsvDetailRow => Boolean(row))
+      : undefined,
     results: item.results as TrialData[],
   };
 }
@@ -295,6 +328,14 @@ function formatSavedAt(savedAt: string): { date: string; time: string } {
     return { date: '', time: '' };
   }
   return { date: formatDate(date), time: formatTime(date) };
+}
+
+function formatRecordDateTime(record: TrainingRecord): { date: string; time: string } {
+  const savedAt = formatSavedAt(record.savedAt);
+  return {
+    date: record.trainingDate || savedAt.date,
+    time: savedAt.time,
+  };
 }
 
 function formatDate(date: Date): string {
@@ -334,6 +375,53 @@ function formatOculomotorPath(path: string | undefined, t: TFunction): string {
 function formatCorrect(correct: boolean | undefined): string {
   if (correct === undefined) return '';
   return correct ? 'true' : 'false';
+}
+
+function hasSessionDetails(record: TrainingRecord): boolean {
+  return Boolean(record.details || (record.detailRows && record.detailRows.length > 0));
+}
+
+function collectDetailKeys(rows: PreparedCsvRow[]): string[] {
+  const baseKeys = new Set(BASE_CSV_COLUMNS.map((column) => column.key));
+  const keys: string[] = [];
+  rows.forEach((row) => {
+    Object.keys(row.details).forEach((key) => {
+      if (baseKeys.has(key) || keys.includes(key)) return;
+      keys.push(key);
+    });
+  });
+  return keys;
+}
+
+function normalizeCsvRow(row: CsvDetailRow | undefined): CsvDetailRow | undefined {
+  if (!row) return undefined;
+  const normalized = stripEmptyValues(row);
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+function stripEmptyValues(row: CsvDetailRow): CsvDetailRow {
+  return Object.fromEntries(
+    Object.entries(row)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, normalizeCsvValue(value)]),
+  );
+}
+
+function normalizeCsvValue(value: unknown): unknown {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value) ?? '';
+  } catch {
+    return String(value);
+  }
 }
 
 function toCsvCell(value: unknown): string {

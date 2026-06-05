@@ -4,6 +4,8 @@ import { initJsPsych } from 'jspsych';
 import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
+import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -291,13 +293,33 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setDefeated(metrics.defeated);
     setElapsedSeconds(Math.floor(metrics.elapsed));
     setPhase('results');
-    try {
-      const jsPsychData = jsPsychRef.current?.data;
-      const writeData = jsPsychData?.write as unknown as ((data: Record<string, unknown>) => void) | undefined;
-      writeData?.call(jsPsychData, record as unknown as Record<string, unknown>);
-    } catch (error) {
-      console.warn('Unable to write drawing tower defense result to jsPsych data.', error);
-    }
+    saveTrainingSessionRecord({
+      userName: record.Participant_ID,
+      moduleId: 'motor-training',
+      gameId: 'drawing-defense',
+      gameTitle: 'Drawing Tower Defense',
+      difficulty: record.Difficulty,
+      trainingDate: record.Test_Date,
+      details: {
+        Game_Time_Seconds: record.Game_Time_Seconds ?? 'Infinite',
+        Starting_HP: record.Starting_HP,
+        Enemy_Speed: record.Enemy_Speed,
+        Recognition_Strictness: record.Recognition_Strictness,
+        Stroke_Wait_Milliseconds: record.Stroke_Wait_Milliseconds,
+        Total_Duration_Seconds: record.Total_Duration_Seconds,
+        Enemies_Spawned: record.Enemies_Spawned,
+        Enemies_Defeated: record.Enemies_Defeated,
+        HP_Remaining: record.HP_Remaining,
+        Game_Result: record.Game_Result,
+      },
+      detailRows: record.Enemy_Results.map((enemyResult) => ({
+        Enemy_Number: enemyResult.Enemy_Number,
+        Enemy_Shape: SHAPE_LABEL[enemyResult.Shape],
+        Enemy_Reaction_Time_Seconds: enemyResult.Reaction_Time_Seconds,
+        Enemy_Defeated: enemyResult.Defeated,
+      })),
+    });
+    writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write drawing tower defense result to jsPsych data.');
   }, [recordEnemyOutcome, setPhase]);
 
   const drawLayout = useCallback((app: Application) => {
@@ -1821,23 +1843,6 @@ function toCsv(records: SessionRecord[]): string {
   return [columns.map((column) => column.label).join(','), ...rows].join('\n');
 }
 
-function csvCell(value: unknown): string {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(max, Math.max(min, value));
-}
-
 function formatGameDuration(duration: GameDurationSeconds): string {
   return duration === null ? '無限模式' : `${duration}s`;
-}
-
-function formatTestDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }

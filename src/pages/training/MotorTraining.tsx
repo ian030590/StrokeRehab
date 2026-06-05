@@ -1,49 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { DrawingTowerDefenseGame } from './DrawingTowerDefenseGame';
 import { TrainingUserSelector } from './TrainingUserSelector';
-import { hasSelectedTrainingUser, verifySelectedTrainingUser } from './selectedUserGuard';
+import { useGameModuleGuard } from './useGameModuleGuard';
 
 type MotorModuleId = 'drawing-defense';
 
 export function MotorTraining() {
   const { t } = useT();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedGameId = searchParams.get('game');
-  const blockedRequestRef = useRef<string | null>(null);
-  const [activeModule, setActiveModule] = useState<MotorModuleId | null>(
-    requestedGameId === 'drawing-defense' && hasSelectedTrainingUser() ? 'drawing-defense' : null,
-  );
-
-  useEffect(() => {
-    const requestedModule = requestedGameId === 'drawing-defense' ? 'drawing-defense' : null;
-    if (requestedModule && !hasSelectedTrainingUser()) {
-      if (blockedRequestRef.current !== requestedGameId) {
-        blockedRequestRef.current = requestedGameId;
-        window.alert(t('home.pleaseSelectUser'));
-      }
-      setActiveModule(null);
-      navigate('/motor-training', { replace: true });
-      return;
-    }
-
-    blockedRequestRef.current = null;
-    setActiveModule(requestedModule);
-  }, [navigate, requestedGameId, t]);
-
-  const openDrawingDefense = () => {
-    if (!verifySelectedTrainingUser(t)) return;
-
-    setActiveModule('drawing-defense');
-    navigate('/motor-training?game=drawing-defense');
-  };
-
-  const closeModule = () => {
-    setActiveModule(null);
-    navigate('/motor-training');
-  };
+  const requestedModule = requestedGameId === 'drawing-defense' ? 'drawing-defense' : null;
+  const { activeModule, openModule, closeModule } = useGameModuleGuard<MotorModuleId>({
+    requestedGameId,
+    requestedModule,
+    basePath: '/motor-training',
+    t,
+  });
 
   if (activeModule === 'drawing-defense') {
     return <DrawingTowerDefenseGame onExit={closeModule} />;
@@ -57,7 +30,7 @@ export function MotorTraining() {
       <p className="section-subtitle fade-in-up">選擇動作訓練模組</p>
 
       <div className="training-grid">
-        <button className="card fade-in-up training-module-button" onClick={openDrawingDefense}>
+        <button className="card fade-in-up training-module-button" onClick={() => openModule('drawing-defense')}>
           <div className="card-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 19l7-7 3 3-7 7-3-3z" />

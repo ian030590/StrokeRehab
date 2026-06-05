@@ -32,9 +32,7 @@ export function handleWhackTap(state: WhackState, index: number, elapsed: number
   state.taps += 1;
   if (state.activeIndex === index) {
     state.hits += 1;
-    state.activeIndex = null;
-    state.targetExpiresAt = null;
-    state.nextTargetAt = elapsed + randomBetween(state.minDelay, state.maxDelay);
+    scheduleNextTarget(state, elapsed);
     return;
   }
   state.misses += 1;
@@ -43,9 +41,7 @@ export function handleWhackTap(state: WhackState, index: number, elapsed: number
 export function updateWhackTimedState(state: WhackState, elapsed: number, render: () => void) {
   if (state.activeIndex !== null && state.targetExpiresAt !== null && elapsed >= state.targetExpiresAt) {
     state.misses += 1;
-    state.activeIndex = null;
-    state.targetExpiresAt = null;
-    state.nextTargetAt = elapsed + randomBetween(state.minDelay, state.maxDelay);
+    scheduleNextTarget(state, elapsed);
     render();
   }
   if (state.activeIndex === null && elapsed >= state.nextTargetAt) {
@@ -53,6 +49,12 @@ export function updateWhackTimedState(state: WhackState, elapsed: number, render
     state.targetExpiresAt = elapsed + state.targetMs / 1000;
     render();
   }
+}
+
+function scheduleNextTarget(state: WhackState, elapsed: number) {
+  state.activeIndex = null;
+  state.targetExpiresAt = null;
+  state.nextTargetAt = elapsed + randomBetween(state.minDelay, state.maxDelay);
 }
 
 export function isWhackAutoSuccess(state: WhackState) {

@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { Navbar } from './components/NavBar';
+import { Navbar } from './components/Navbar';
 
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const TrainingPage = lazy(() => import('./pages/training/TrainingPage').then((module) => ({ default: module.TrainingPage })));
@@ -15,7 +15,7 @@ export function App() {
     <Suspense fallback={<div className="app-loading" />}>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<MotorTraining />} />
+          <Route path="/" element={<Navigate to="/motor-training" replace />} />
           <Route path="/motor-training" element={<MotorTraining />} />
           <Route path="/cognitive-training" element={<CognitiveTraining />} />
           <Route path="/speech-training" element={<SpeechTraining />} />
@@ -36,6 +36,13 @@ function AppLayout() {
     <div className="app-layout">
       <Navbar />
       <Outlet />
+      <footer className="app-footer">
+        <span>&copy; 2026</span>
+        <a href="https://github.com/ian030590/StrokeTrainer" target="_blank" rel="noopener noreferrer">
+          ian030590
+        </a>
+        <span>All rights reserved.</span>
+      </footer>
     </div>
   );
 }

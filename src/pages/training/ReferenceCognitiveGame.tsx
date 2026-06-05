@@ -4,6 +4,8 @@ import { initJsPsych } from 'jspsych';
 import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
+import { csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import {
   DEFAULT_HUD,
   DIFFICULTIES,
@@ -175,13 +177,28 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     setResult(record);
     setHud(summarizeState(state, metricsRef.current.elapsed, effectiveLimit));
     setPhase('results');
-    try {
-      const jsPsychData = jsPsychRef.current?.data;
-      const writeData = jsPsychData?.write as unknown as ((data: Record<string, unknown>) => void) | undefined;
-      writeData?.call(jsPsychData, record as unknown as Record<string, unknown>);
-    } catch (error) {
-      console.warn('Unable to write reference cognitive result to jsPsych data.', error);
-    }
+    saveTrainingSessionRecord({
+      userName: record.Participant_ID,
+      moduleId: 'cognitive-training',
+      gameId: record.Game_ID,
+      gameTitle: record.Game_Title,
+      difficulty: record.Difficulty,
+      trainingDate: record.Test_Date,
+      details: {
+        Session_Limit_Seconds: record.Session_Limit_Seconds,
+        Target_Trials: record.Target_Trials,
+        Total_Duration_Seconds: record.Total_Duration_Seconds,
+        Score: record.Score,
+        Accuracy_Percent: record.Accuracy_Percent,
+        Moves: record.Moves,
+        Attempts: record.Attempts,
+        Success_Count: record.Success_Count,
+        Error_Count: record.Error_Count,
+        Game_Result: record.Game_Result,
+        Details_JSON: record.Details_JSON,
+      },
+    });
+    writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write reference cognitive result to jsPsych data.');
   }, [difficulty, effectiveLimit, gameId, meta.title, reactionTrials, setPhase]);
 
   finishGameRef.current = finishGame;
@@ -562,7 +579,7 @@ function updateTimedState(
 ) {
   if (!state) return;
   if (state.kind === 'memory-match') updateMemoryTimedState(state, elapsed, render);
-  if (state.kind === 'reaction-time') updateReactionTimedState(state, elapsed, render, finishGame);
+  if (state.kind === 'reaction-time') updateReactionTimedState(state, elapsed, render);
   if (state.kind === 'whack-a-mole') updateWhackTimedState(state, elapsed, render);
 }
 
@@ -618,16 +635,4 @@ function toCsv(records: SessionRecord[]): string {
     columns.map((column) => column.label).join(','),
     ...records.map((record) => columns.map((column) => csvCell(column.value(record))).join(',')),
   ].join('\n');
-}
-
-function csvCell(value: unknown): string {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function formatTestDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }

@@ -10,8 +10,8 @@ const logoStyle = { width: 'auto', objectFit: 'contain' } as const;
 export function Navbar() {
   const { t } = useT();
   const location = useLocation();
-  const [user, setUser] = useState(getActiveUser);
-  const [isOpen, setIsOpen] = useState(false);
+  const [activeUserName, setActiveUserName] = useState(getActiveUser);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const activeTrainingModule =
     location.pathname === '/' || location.pathname === '/motor-training'
       ? 'motor-training'
@@ -24,7 +24,7 @@ export function Navbar() {
             : null;
 
   useEffect(() => {
-    const syncUser = () => setUser(getActiveUser());
+    const syncUser = () => setActiveUserName(getActiveUser());
     window.addEventListener('storage', syncUser);
     window.addEventListener(ACTIVE_USER_CHANGED_EVENT, syncUser);
     return () => {
@@ -33,8 +33,9 @@ export function Navbar() {
     };
   }, []);
 
-  const toggleMenu = () => setIsOpen((open) => !open);
-  const closeMenu = () => setIsOpen(false);
+  const toggleMenu = () => setIsMenuOpen((open) => !open);
+  const closeMenu = () => setIsMenuOpen(false);
+  const trainingLinkClass = (moduleId: string) => `navbar-link ${activeTrainingModule === moduleId ? 'active' : ''}`;
   const handleDownloadScores = () => {
     const downloaded = downloadAllTrainingRecordsCsv(t);
     if (!downloaded) {
@@ -53,7 +54,7 @@ export function Navbar() {
 
         <button className="navbar-toggle" onClick={toggleMenu} aria-label="Toggle menu">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            {isOpen ? (
+            {isMenuOpen ? (
               <>
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -68,25 +69,25 @@ export function Navbar() {
           </svg>
         </button>
 
-        <div className={`navbar-menu ${isOpen ? 'is-open' : ''}`}>
+        <div className={`navbar-menu ${isMenuOpen ? 'is-open' : ''}`}>
           <div className="navbar-links">
             <NavLink
               to="/motor-training"
-              className={() => `navbar-link ${activeTrainingModule === 'motor-training' ? 'active' : ''}`}
+              className={() => trainingLinkClass('motor-training')}
               onClick={closeMenu}
             >
               {t('home.module.motor.title')}
             </NavLink>
             <NavLink
               to="/cognitive-training"
-              className={() => `navbar-link ${activeTrainingModule === 'cognitive-training' ? 'active' : ''}`}
+              className={() => trainingLinkClass('cognitive-training')}
               onClick={closeMenu}
             >
               {t('home.module.cognitive.title')}
             </NavLink>
             <NavLink
               to="/speech-training"
-              className={() => `navbar-link ${activeTrainingModule === 'speech-training' ? 'active' : ''}`}
+              className={() => trainingLinkClass('speech-training')}
               onClick={closeMenu}
             >
               {t('home.module.speech.title')}
@@ -123,10 +124,10 @@ export function Navbar() {
             </div>
 
             <div className="navbar-user">
-              {user ? (
+              {activeUserName ? (
                 <>
                   <span className="navbar-user-dot" />
-                  <span>{user}</span>
+                  <span>{activeUserName}</span>
                 </>
               ) : (
                 <span style={{ color: 'var(--warning)' }}>{t('nav.noUser')}</span>
@@ -135,7 +136,7 @@ export function Navbar() {
           </div>
         </div>
       </div>
-      {isOpen && <div className="navbar-overlay" onClick={closeMenu} />}
+      {isMenuOpen && <div className="navbar-overlay" onClick={closeMenu} />}
     </nav>
   );
 }

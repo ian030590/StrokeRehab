@@ -3,6 +3,8 @@ import { initJsPsych } from 'jspsych';
 import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
+import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 
 type MinesweeperPhase = 'menu' | 'playing' | 'paused' | 'results';
@@ -104,7 +106,8 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   const selectedDensityPercent = Math.round((selectedMineCount / Math.max(1, selectedBoardConfig.rows * selectedBoardConfig.cols)) * 100);
   const isCustomBoardSize = boardPreset === 'custom';
   const boardMetrics = useMemo(() => getBoardMetrics(boardRows, boardCols), [boardCols, boardRows]);
-  const remainingMineEstimate = Math.max(0, mineCount - countFlags(board));
+  const boardStats = useMemo(() => getBoardStats(board), [board]);
+  const remainingMineEstimate = Math.max(0, mineCount - boardStats.flags);
 
   const canvasStyle = useMemo<CSSProperties>(() => {
     return {
@@ -142,13 +145,28 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
     setElapsedSeconds(Math.floor(duration));
     setResult(record);
     setPhase('results');
-    try {
-      const jsPsychData = jsPsychRef.current?.data;
-      const writeData = jsPsychData?.write as unknown as ((data: Record<string, unknown>) => void) | undefined;
-      writeData?.call(jsPsychData, record as unknown as Record<string, unknown>);
-    } catch (error) {
-      console.warn('Unable to write minesweeper result to jsPsych data.', error);
-    }
+    saveTrainingSessionRecord({
+      userName: record.Participant_ID,
+      moduleId: 'cognitive-training',
+      gameId: 'minesweeper',
+      gameTitle: 'Minesweeper',
+      difficulty: record.Difficulty,
+      trainingDate: record.Test_Date,
+      details: {
+        Board_Preset: record.Board_Preset,
+        Mine_Density_Percent: record.Mine_Density_Percent,
+        Board_Size: record.Board_Size,
+        Total_Cells: record.Total_Cells,
+        Mines_Total: record.Mines_Total,
+        Correctly_Flagged_Mines: record.Correctly_Flagged_Mines,
+        Incorrect_Flags: record.Incorrect_Flags,
+        Flags_Placed: record.Flags_Placed,
+        Successful_Opened_Cells: record.Successful_Opened_Cells,
+        Total_Duration_Seconds: record.Total_Duration_Seconds,
+        Game_Result: record.Game_Result,
+      },
+    });
+    writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write minesweeper result to jsPsych data.');
   }, [boardCols, boardRows, difficulty, mineCount, selectedBoardConfig.label]);
 
   const startGame = useCallback(() => {
@@ -203,11 +221,17 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
 
   const toggleFlagAt = useCallback((x: number, y: number) => {
     if (phase !== 'playing') return;
-    setBoard(board.map((row) => row.map((cell) => {
-      if (cell.x !== x || cell.y !== y || cell.revealed) return cell;
-      return { ...cell, flagged: !cell.flagged };
-    })));
-  }, [board, phase]);
+    setBoard((currentBoard) => {
+      const target = currentBoard[y]?.[x];
+      if (!target || target.revealed) return currentBoard;
+
+      const nextBoard = [...currentBoard];
+      nextBoard[y] = currentBoard[y].map((cell) => (
+        cell.x === x ? { ...cell, flagged: !cell.flagged } : cell
+      ));
+      return nextBoard;
+    });
+  }, [phase]);
 
   const revealAt = useCallback((x: number, y: number) => {
     if (phase !== 'playing') return;
@@ -367,7 +391,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
           <div className="minesweeper-hud">
             <div><strong>時間</strong> {elapsedSeconds}s</div>
             <div><strong>地雷</strong> {remainingMineEstimate}</div>
-            <div><strong>已開闢</strong> {getBoardStats(board).openedSafeCells}</div>
+            <div><strong>已開闢</strong> {boardStats.openedSafeCells}</div>
             <button
               className={`btn btn-sm ${flagMode ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFlagMode((current) => !current)}
@@ -530,10 +554,11 @@ function generateMines(board: Cell[][], mineCount: number, safeX: number, safeY:
 function revealSafeCells(board: Cell[][], x: number, y: number): Cell[][] {
   const queue: Cell[] = [board[y][x]];
   const visited = new Set<string>();
+  let queueIndex = 0;
 
-  while (queue.length > 0) {
-    const cell = queue.shift();
-    if (!cell) continue;
+  while (queueIndex < queue.length) {
+    const cell = queue[queueIndex];
+    queueIndex += 1;
     const key = `${cell.x},${cell.y}`;
     if (visited.has(key) || cell.flagged || cell.mine) continue;
     visited.add(key);
@@ -685,10 +710,6 @@ function getCanvasCell(event: PointerEvent<HTMLCanvasElement>, rows: number, col
   return { x, y };
 }
 
-function countFlags(board: Cell[][]): number {
-  return board.flat().filter((cell) => cell.flagged).length;
-}
-
 function getBoardStats(board: Cell[][]) {
   const cells = board.flat();
   const flags = cells.filter((cell) => cell.flagged);
@@ -721,21 +742,4 @@ function toCsv(records: SessionRecord[]): string {
     columns.map((column) => column.label).join(','),
     ...records.map((record) => columns.map((column) => csvCell(column.value(record))).join(',')),
   ].join('\n');
-}
-
-function csvCell(value: unknown): string {
-  const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(max, Math.max(min, value));
-}
-
-function formatTestDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }

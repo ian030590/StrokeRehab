@@ -19,12 +19,15 @@ import {
 import { pixelFromMillimeter } from '../../utils/spatialUtils';
 
 type Tab = 'general' | 'calibration' | 'webgazer' | 'gamma' | 'crowding';
+type JsPsychInstance = ReturnType<typeof initJsPsych>;
+type TerminableJsPsychInstance = JsPsychInstance & { endExperiment?: () => void };
+type WebGazerWindow = Window & { webgazer?: { clearData?: () => void } };
 
 export function SettingsPage() {
   const { t } = useT();
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [, setTick] = useState(0);
-  const refresh = () => setTick((t) => t + 1);
+  const refresh = () => setTick((previousTick) => previousTick + 1);
 
   const tabs: { label: string; tab: Tab }[] = [
     { label: t('settings.tab.general'), tab: 'general' },
@@ -42,13 +45,13 @@ export function SettingsPage() {
       <div className="settings-container">
         {/* Tabs */}
         <div className="settings-tabs">
-          {tabs.map((t) => (
+          {tabs.map((tabItem) => (
             <button
-              key={t.tab}
-              className={`settings-tab ${activeTab === t.tab ? 'active' : ''}`}
-              onClick={() => setActiveTab(t.tab)}
+              key={tabItem.tab}
+              className={`settings-tab ${activeTab === tabItem.tab ? 'active' : ''}`}
+              onClick={() => setActiveTab(tabItem.tab)}
             >
-              {t.label}
+              {tabItem.label}
             </button>
           ))}
         </div>
@@ -277,7 +280,7 @@ function CardCalibration({ refresh }: { refresh: () => void }) {
 function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
   const { t } = useT();
   const containerRef = useRef<HTMLDivElement>(null);
-  const jsPsychRef = useRef<any>(null);
+  const jsPsychRef = useRef<JsPsychInstance | null>(null);
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const calibratedAt = getSetting('webGazerCalibrationAt');
@@ -287,7 +290,7 @@ function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
     return () => {
       if (jsPsychRef.current) {
         try {
-          jsPsychRef.current.endExperiment?.();
+          (jsPsychRef.current as TerminableJsPsychInstance).endExperiment?.();
         } catch {
           // Ignore cleanup errors
         }
@@ -335,7 +338,7 @@ function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
 
   const runCalibration = () => {
     // Check if webgazer.js is loaded
-    if (!(window as any).webgazer) {
+    if (!(window as WebGazerWindow).webgazer) {
       setStatus('error');
       setMessage(t('settings.wg.errorNotLoaded'));
       return;
@@ -359,7 +362,7 @@ function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
           display_element: container,
           extensions: [
             { type: WebGazerExtension },
-          ] as any,
+          ],
           on_finish: () => {
             setSetting('webGazerCalibrationAt', new Date().toISOString());
             jsPsychRef.current = null;
@@ -396,7 +399,7 @@ function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
             randomize_calibration_order: true,
             point_size: 24,
           },
-        ] as any);
+        ]);
       } catch (error) {
         jsPsychRef.current = null;
         setStatus('error');
@@ -408,7 +411,7 @@ function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
   const cancelCalibration = () => {
     if (jsPsychRef.current) {
       try {
-        jsPsychRef.current.endExperiment?.();
+        (jsPsychRef.current as TerminableJsPsychInstance).endExperiment?.();
       } catch {
         // Ignore cleanup errors
       }
@@ -420,7 +423,7 @@ function WebGazerCalibrationTab({ refresh }: { refresh: () => void }) {
 
   const clearCalibrationStatus = () => {
     try {
-      (window as any).webgazer?.clearData?.();
+      (window as WebGazerWindow).webgazer?.clearData?.();
     } catch {
       // Clearing the saved status should still work if WebGazer is not active.
     }
@@ -532,19 +535,19 @@ function GammaTab({ refresh }: { refresh: () => void }) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
-        {deltas.map((b) => (
+        {deltas.map((button) => (
           <button
-            key={b.label}
+            key={button.label}
             className="btn btn-secondary btn-sm"
             onClick={() => {
-              const nv = Math.round((gammaVal + b.delta) * 100) / 100;
-              if (nv >= 0.8 && nv <= 4.0) {
-                setSetting('gammaValue', nv);
+              const nextValue = Math.round((gammaVal + button.delta) * 100) / 100;
+              if (nextValue >= 0.8 && nextValue <= 4.0) {
+                setSetting('gammaValue', nextValue);
                 refresh();
               }
             }}
           >
-            {b.label}
+            {button.label}
           </button>
         ))}
       </div>

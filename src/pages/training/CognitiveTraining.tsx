@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { MinesweeperGame } from './MinesweeperGame';
 import {
@@ -9,47 +8,21 @@ import {
   isReferenceGameId,
 } from './ReferenceCognitiveGame';
 import { TrainingUserSelector } from './TrainingUserSelector';
-import { hasSelectedTrainingUser, verifySelectedTrainingUser } from './selectedUserGuard';
+import { useGameModuleGuard } from './useGameModuleGuard';
 
 type CognitiveModuleId = 'minesweeper' | ReferenceGameId;
 
 export function CognitiveTraining() {
   const { t } = useT();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedGameId = searchParams.get('game');
-  const blockedRequestRef = useRef<string | null>(null);
-  const [activeModule, setActiveModule] = useState<CognitiveModuleId | null>(
-    hasSelectedTrainingUser() ? getRequestedModule(requestedGameId) : null,
-  );
-
-  useEffect(() => {
-    const requestedModule = getRequestedModule(requestedGameId);
-    if (requestedModule && !hasSelectedTrainingUser()) {
-      if (blockedRequestRef.current !== requestedGameId) {
-        blockedRequestRef.current = requestedGameId;
-        window.alert(t('home.pleaseSelectUser'));
-      }
-      setActiveModule(null);
-      navigate('/cognitive-training', { replace: true });
-      return;
-    }
-
-    blockedRequestRef.current = null;
-    setActiveModule(requestedModule);
-  }, [navigate, requestedGameId, t]);
-
-  const openModule = (moduleId: CognitiveModuleId) => {
-    if (!verifySelectedTrainingUser(t)) return;
-
-    setActiveModule(moduleId);
-    navigate(`/cognitive-training?game=${moduleId}`);
-  };
-
-  const closeModule = () => {
-    setActiveModule(null);
-    navigate('/cognitive-training');
-  };
+  const requestedModule = getRequestedModule(requestedGameId);
+  const { activeModule, openModule, closeModule } = useGameModuleGuard<CognitiveModuleId>({
+    requestedGameId,
+    requestedModule,
+    basePath: '/cognitive-training',
+    t,
+  });
 
   if (activeModule === 'minesweeper') {
     return <MinesweeperGame onExit={closeModule} />;

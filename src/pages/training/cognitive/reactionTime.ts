@@ -47,17 +47,18 @@ export function handleReactionStateTap(state: ReactionState, elapsed: number, di
     state.status = 'result';
     state.goAt = null;
     state.goStartedAt = null;
-    if (state.attempts.length >= state.targetTrials) finishGame('Victory');
+    if (state.attempts.length >= state.targetTrials) {
+      finishGame('Victory');
+    }
   }
 }
 
-export function updateReactionTimedState(state: ReactionState, elapsed: number, render: () => void, finishGame: (result: GameResult) => void) {
+export function updateReactionTimedState(state: ReactionState, elapsed: number, render: () => void) {
   if (state.status === 'ready' && state.goAt !== null && elapsed >= state.goAt) {
     state.status = 'go';
     state.goStartedAt = elapsed;
     render();
   }
-  if (state.attempts.length >= state.targetTrials) finishGame('Victory');
 }
 
 export function isReactionAutoSuccess(state: ReactionState) {

@@ -9,7 +9,6 @@ export const CARD_HEIGHT_MM = 53.98;
 export const DEFAULT_DISTANCE_CM = 60;
 export const DEFAULT_CAL_BAR_LENGTH_MM = 149;
 export const CAL_BAR_LENGTH_PX = 700;
-export const APP_VERSION = '3.0.0';
 export const STORAGE_PREFIX = 'vision_trainer_';
 
 export type OculomotorPattern = string;
@@ -119,29 +118,41 @@ function storageKey(name: string): string {
 
 export const ACTIVE_USER_CHANGED_EVENT = 'vision-trainer-active-user-changed';
 
+const settingCache: Partial<AppSettings> = {};
+
 export function getSetting<K extends keyof AppSettings>(key: K): AppSettings[K] {
+  if (Object.prototype.hasOwnProperty.call(settingCache, key)) {
+    return settingCache[key] as AppSettings[K];
+  }
+
   const raw = localStorage.getItem(storageKey(key));
-  if (raw === null) return META[key].dflt;
+  if (raw === null) {
+    settingCache[key] = META[key].dflt;
+    return META[key].dflt;
+  }
+
   const meta = META[key];
   if (typeof meta.dflt === 'boolean') {
-    return (raw === 'true') as AppSettings[K];
+    const value = (raw === 'true') as AppSettings[K];
+    settingCache[key] = value;
+    return value;
   }
   if (typeof meta.dflt === 'number') {
     const num = parseFloat(raw);
-    if (isNaN(num)) return meta.dflt;
-    if (meta.min !== undefined && num < meta.min) return meta.dflt;
-    if (meta.max !== undefined && num > meta.max) return meta.dflt;
-    return num as AppSettings[K];
+    if (isNaN(num) || (meta.min !== undefined && num < meta.min) || (meta.max !== undefined && num > meta.max)) {
+      settingCache[key] = meta.dflt;
+      return meta.dflt;
+    }
+    settingCache[key] = num as AppSettings[K];
+    return settingCache[key] as AppSettings[K];
   }
-  return raw as unknown as AppSettings[K];
+  settingCache[key] = raw as unknown as AppSettings[K];
+  return settingCache[key] as AppSettings[K];
 }
 
 export function setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
+  settingCache[key] = value;
   localStorage.setItem(storageKey(key), String(value));
-}
-
-export function isDrivingControlMode(value: unknown): value is DrivingControlMode {
-  return value === 'arrow' || value === 'wasd' || value === 'wheel';
 }
 
 export function isCalibrated(): boolean {
@@ -158,12 +169,6 @@ export function markDisplayCalibrated(): void {
 
 export function clearDisplayCalibration(): void {
   setSetting('displayCalibrationAt', '');
-}
-
-export function resetAllSettings(): void {
-  for (const key of Object.keys(META) as (keyof AppSettings)[]) {
-    localStorage.removeItem(storageKey(key));
-  }
 }
 
 export function getPixelsPerMM(): number {

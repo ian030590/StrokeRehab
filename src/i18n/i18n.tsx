@@ -3,6 +3,7 @@ import { zh } from './zh';
 import type { ReactNode } from 'react';
 import type { TranslationKey } from './zh';
 import { en } from './en';
+import { STORAGE_PREFIX } from '../utils/settings';
 
 type Language = 'zh' | 'en';
 
@@ -14,7 +15,7 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const LANGUAGE_KEY = 'vision_trainer_language';
+const LANGUAGE_KEY = `${STORAGE_PREFIX}language`;
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Language>(() => {
@@ -37,7 +38,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Replace parameters if provided e.g., {name} -> 'John'
     if (params) {
       Object.entries(params).forEach(([paramKey, value]) => {
-        text = text.replace(new RegExp(`{${paramKey}}`, 'g'), String(value));
+        text = text.replaceAll(`{${paramKey}}`, String(value));
       });
     }
 

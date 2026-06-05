@@ -1,9 +1,17 @@
-import { useT } from '../../i18n';
+import type { ReactNode } from 'react';
+import { useT, type TranslationKey } from '../../i18n';
+
+interface LinkItem {
+  titleKey: TranslationKey;
+  descKey: TranslationKey;
+  url: string;
+  icon: ReactNode;
+}
 
 export function LinksPage() {
   const { t } = useT();
 
-  const links = [
+  const links: LinkItem[] = [
     {
       titleKey: 'links.strokeTrainer.title',
       descKey: 'links.strokeTrainer.desc',
@@ -25,9 +33,9 @@ export function LinksPage() {
       <p className="section-subtitle fade-in-up">{t('links.subtitle')}</p>
 
       <div className="training-grid" style={{ marginTop: 32 }}>
-        {links.map((link, i) => (
+        {links.map((link) => (
           <a
-            key={i}
+            key={link.url}
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -37,9 +45,9 @@ export function LinksPage() {
             <div className="card-icon">
               {link.icon}
             </div>
-            <div className="card-title">{t(link.titleKey as any)}</div>
+            <div className="card-title">{t(link.titleKey)}</div>
             <div className="card-desc">
-              {t(link.descKey as any)}
+              {t(link.descKey)}
             </div>
             <div style={{
               display: 'flex',

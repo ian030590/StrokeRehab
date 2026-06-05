@@ -140,10 +140,6 @@ function json(data, status, headers) {
 
 function corsHeaders({ request, env }) {
   const origin = request.headers.get('Origin');
-  const allowedOrigins = String(env.DRAWING_UPLOAD_ALLOWED_ORIGINS || '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
   const headers = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'content-type',
@@ -153,8 +149,7 @@ function corsHeaders({ request, env }) {
 
   if (!origin) return headers;
 
-  const requestOrigin = new URL(request.url).origin;
-  if (origin === requestOrigin || allowedOrigins.includes(origin)) {
+  if (isOriginAllowed(origin, request, env)) {
     headers['Access-Control-Allow-Origin'] = origin;
   }
 
@@ -165,11 +160,17 @@ function isAllowedOrigin({ request, env }) {
   const origin = request.headers.get('Origin');
   if (!origin) return true;
 
+  return isOriginAllowed(origin, request, env);
+}
+
+function isOriginAllowed(origin, request, env) {
   const requestOrigin = new URL(request.url).origin;
-  const allowedOrigins = String(env.DRAWING_UPLOAD_ALLOWED_ORIGINS || '')
+  return origin === requestOrigin || getAllowedOrigins(env).includes(origin);
+}
+
+function getAllowedOrigins(env) {
+  return String(env.DRAWING_UPLOAD_ALLOWED_ORIGINS || '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
-
-  return origin === requestOrigin || allowedOrigins.includes(origin);
 }

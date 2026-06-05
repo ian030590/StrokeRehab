@@ -10,8 +10,18 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('/node_modules/three/') || id.includes('\\node_modules\\three\\')) {
+          const normalizedId = id.replaceAll('\\', '/');
+          if (normalizedId.includes('/node_modules/three/')) {
             return 'three-runtime';
+          }
+          if (normalizedId.includes('/node_modules/pixi.js/') || normalizedId.includes('/node_modules/@pixi/')) {
+            return 'pixi-runtime';
+          }
+          if (normalizedId.includes('/node_modules/jspsych/') || normalizedId.includes('/node_modules/@jspsych/')) {
+            return 'experiment-runtime';
+          }
+          if (normalizedId.includes('/node_modules/recharts/')) {
+            return 'charts-runtime';
           }
         },
       },

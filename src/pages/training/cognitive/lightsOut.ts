@@ -16,7 +16,7 @@ export function createLightsState(difficulty: Difficulty): LightsOutState {
   for (let i = 0; i < config.shuffles; i += 1) {
     toggleLights(lights, Math.floor(Math.random() * config.size), Math.floor(Math.random() * config.size));
   }
-  if (lights.every((row) => row.every((light) => !light))) {
+  if (isAllLightsOff(lights)) {
     toggleLights(lights, Math.floor(config.size / 2), Math.floor(config.size / 2));
   }
   return { kind: 'lights-out', size: config.size, lights, moves: 0 };
@@ -27,15 +27,15 @@ export function handleLightsTap(state: LightsOutState, index: number, finishGame
   const col = index % state.size;
   toggleLights(state.lights, row, col);
   state.moves += 1;
-  if (state.lights.every((line) => line.every((light) => !light))) finishGame('Victory');
+  if (isAllLightsOff(state.lights)) finishGame('Victory');
 }
 
 export function isLightsAutoSuccess(state: LightsOutState) {
-  return state.lights.every((line) => line.every((light) => !light));
+  return isAllLightsOff(state.lights);
 }
 
 export function summarizeLightsState(state: LightsOutState, elapsed: number, limit: SessionLimitSeconds): HudState {
-  const lightsOn = state.lights.flat().filter(Boolean).length;
+  const lightsOn = countLightsOn(state.lights);
   return {
     primaryLabel: '亮燈',
     primaryValue: String(lightsOn),
@@ -47,7 +47,7 @@ export function summarizeLightsState(state: LightsOutState, elapsed: number, lim
 }
 
 export function buildLightsResultStats(state: LightsOutState): ResultStats {
-  const lightsOn = state.lights.flat().filter(Boolean).length;
+  const lightsOn = countLightsOn(state.lights);
   return {
     score: Math.max(0, 1000 - state.moves * 12 - lightsOn * 35),
     accuracy: lightsOn === 0 ? 100 : Math.max(0, Math.round(((state.size * state.size - lightsOn) / (state.size * state.size)) * 100)),
@@ -57,6 +57,17 @@ export function buildLightsResultStats(state: LightsOutState): ResultStats {
     errors: lightsOn,
     details: { size: state.size, lightsOn },
   };
+}
+
+function isAllLightsOff(lights: boolean[][]): boolean {
+  return lights.every((row) => row.every((light) => !light));
+}
+
+function countLightsOn(lights: boolean[][]): number {
+  return lights.reduce(
+    (total, row) => total + row.reduce((rowTotal, light) => rowTotal + (light ? 1 : 0), 0),
+    0,
+  );
 }
 
 export function drawLightsOut(app: Application, state: LightsOutState, onTap: (index: number) => void) {
