@@ -7,9 +7,9 @@
   --bg-card:       #FFFFFF; /* White */
   --bg-card-hover: #F9F9FC; /* Surface */
   --accent:        #005EB8; /* Medical Blue */
-  --accent-dark:   #00478D; /* Primary */
-  --accent-hover:  #005DB6; /* Surface Tint */
-  --success:       #005EB8; /* Soft Sage */
+  --accent-dark:   #005EB8; /* Medical Blue */
+  --accent-hover:  #005EB8; /* Medical Blue */
+  --success:       #005EB8; /* Medical Blue */
   --error:         #BA1A1A; /* Error */
   --warning:       #D29922;
   --text-primary:  #1A1C1E; /* On-surface */
@@ -405,7 +405,7 @@ html, body, #root {
 }
 
 .btn-secondary:hover {
-  background: rgba(139, 168, 142, 0.1);
+  background: rgba(0, 94, 184, 0.1);
 }
 
 .btn-ghost {
@@ -2183,37 +2183,6 @@ body #webgazer-calibrate-container #calibration-point {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 700;
-}
-
-.drawing-defense-color-palette {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.drawing-defense-color-swatch {
-  width: 34px;
-  height: 34px;
-  border: 2px solid var(--border);
-  border-radius: var(--radius-s);
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
-}
-
-.drawing-defense-color-swatch.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(0, 94, 184, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.55);
-}
-
-.drawing-defense-color-input {
-  width: 42px;
-  height: 34px;
-  padding: 0;
-  border: 2px solid var(--border);
-  border-radius: var(--radius-s);
-  background: #FFFFFF;
-  cursor: pointer;
 }
 
 .drawing-defense-number-input {

@@ -47,7 +47,7 @@ export function CognitiveTraining() {
     <div className="page-content">
       <TrainingUserSelector />
       <h1 className="section-title fade-in-up">{t('home.module.cognitive.title')}</h1>
-      <p className="section-subtitle fade-in-up">選擇認知訓練模組</p>
+      <p className="section-subtitle fade-in-up">選擇一個認知訓練模組開始練習。</p>
       <div className="training-grid">
         <button className="card fade-in-up training-module-button" onClick={() => openModule('minesweeper')}>
           <div className="card-icon">
@@ -61,8 +61,8 @@ export function CognitiveTraining() {
             </svg>
           </div>
           <h2 className="card-title">踩地雷</h2>
-          <p className="card-desc">透過開格、推理與標記地雷位置訓練注意力、視覺掃描與策略判斷。</p>
-          <div className="card-expand-hint">開始設定</div>
+          <p className="card-desc">透過開格、推理與標記地雷位置，訓練注意力、視覺掃描與策略判斷。</p>
+          <div className="card-expand-hint">開始訓練</div>
         </button>
         {REFERENCE_COGNITIVE_MODULES.map((module) => (
           <button
@@ -73,7 +73,7 @@ export function CognitiveTraining() {
             <div className="card-icon cognitive-module-focus">{module.focus}</div>
             <h2 className="card-title">{module.title}</h2>
             <p className="card-desc">{module.description}</p>
-            <div className="card-expand-hint">開始設定</div>
+            <div className="card-expand-hint">開始訓練</div>
           </button>
         ))}
       </div>

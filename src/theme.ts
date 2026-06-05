@@ -11,9 +11,9 @@ export const pixiColors = {
   bgCard:       0xFFFFFF, // White
   bgCardHover:  0xF9F9FC, // Surface
   accent:       0x005EB8, // Medical Blue
-  accentDark:   0x00478D, // Primary
-  accentHover:  0x005DB6, // Surface Tint
-  success:      0x8BA88E, // Soft Sage
+  accentDark:   0x005EB8, // Medical Blue
+  accentHover:  0x005EB8, // Medical Blue
+  success:      0x005EB8, // Medical Blue
   error:        0xBA1A1A,
   warning:      0xD29922,
   textPrimary:  0x1A1C1E, // On-surface

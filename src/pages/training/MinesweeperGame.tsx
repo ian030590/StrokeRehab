@@ -64,17 +64,7 @@ const DEFAULT_BOARD_ROWS = BOARD_PRESETS[DEFAULT_BOARD_PRESET].rows;
 const DEFAULT_BOARD_COLS = BOARD_PRESETS[DEFAULT_BOARD_PRESET].cols;
 const DEFAULT_CUSTOM_BOARD_SIZE = 12;
 
-const NUMBER_COLORS = [
-  '#111827',
-  '#0038A8',
-  '#006B3C',
-  '#A40000',
-  '#4C1D95',
-  '#8A4B00',
-  '#005E73',
-  '#111827',
-  '#5C1A1B',
-];
+const MINESWEEPER_ACCENT = '#005EB8';
 
 const DIRECTIONS = [
   [-1, -1],
@@ -614,9 +604,9 @@ function drawCell(ctx: CanvasRenderingContext2D, cell: Cell, cellSize: number) {
   const innerY = y + gap;
   const innerSize = cellSize - gap * 2;
 
-  ctx.fillStyle = cell.revealed ? '#FFFFFF' : '#005EB8';
-  if (cell.flagged && !cell.revealed) ctx.fillStyle = '#FFD43B';
-  if (cell.revealed && cell.mine) ctx.fillStyle = '#D92D20';
+  ctx.fillStyle = cell.revealed ? '#FFFFFF' : MINESWEEPER_ACCENT;
+  if (cell.flagged && !cell.revealed) ctx.fillStyle = MINESWEEPER_ACCENT;
+  if (cell.revealed && cell.mine) ctx.fillStyle = MINESWEEPER_ACCENT;
   ctx.fillRect(innerX, innerY, innerSize, innerSize);
 
   ctx.strokeStyle = cell.revealed ? '#64748B' : '#FFFFFF';
@@ -636,7 +626,7 @@ function drawCell(ctx: CanvasRenderingContext2D, cell: Cell, cellSize: number) {
   }
 
   if (cell.adjacentMines > 0) {
-    ctx.fillStyle = NUMBER_COLORS[cell.adjacentMines] ?? '#111827';
+    ctx.fillStyle = MINESWEEPER_ACCENT;
     ctx.font = `800 ${Math.max(8, cellSize * 0.58)}px Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -655,7 +645,7 @@ function drawFlag(ctx: CanvasRenderingContext2D, x: number, y: number, cellSize:
   ctx.lineTo(poleX, bottomY);
   ctx.stroke();
 
-  ctx.fillStyle = '#B42318';
+  ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
   ctx.moveTo(poleX, topY);
   ctx.lineTo(x + cellSize * 0.74, y + cellSize * 0.34);

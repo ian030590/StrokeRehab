@@ -111,7 +111,7 @@ const DEFAULT_GAME_DURATION_SECONDS: GameDurationSeconds = 30;
 const DEFAULT_CUSTOM_GAME_DURATION_SECONDS = 120;
 const ENEMY_VISUAL_HEIGHT = 98;
 const ENEMY_SPAWN_Y = -ENEMY_VISUAL_HEIGHT - 8;
-const BACKGROUND_COLOR_OPTIONS = ['#F6F7F8', '#E8F3FF', '#EAF7EF', '#FFF4E6', '#F3EAFE', '#111827'] as const;
+const DEFAULT_BACKGROUND_COLOR = '#005EB8';
 const RECOGNIZER_POINTS = 64;
 const RECOGNIZER_SIZE = 200;
 const RDP_STATIONARY_POINT_DISTANCE_PX = 2.5;
@@ -177,7 +177,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [strokeWaitMs, setStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [customStrokeWaitMs, setCustomStrokeWaitMs] = useState(DEFAULT_JUDGE_DELAY_MS);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
-  const [backgroundColor, setBackgroundColor] = useState<string>(BACKGROUND_COLOR_OPTIONS[0]);
+  const backgroundColor = DEFAULT_BACKGROUND_COLOR;
   const [uploadedBackgroundUrl, setUploadedBackgroundUrl] = useState<string | null>(null);
   const [uploadedBackgroundName, setUploadedBackgroundName] = useState('未選擇圖像');
   const [hp, setHp] = useState(DEFAULT_HP);
@@ -960,33 +960,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       <span>背景顏色</span>
                       <strong>{backgroundColor}</strong>
                     </div>
-                    <div className="drawing-defense-color-palette" role="group" aria-label="背景色票">
-                      {BACKGROUND_COLOR_OPTIONS.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          className={`drawing-defense-color-swatch ${backgroundColor === color ? 'active' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setBackgroundMode('color');
-                            setBackgroundColor(color);
-                          }}
-                          aria-label={`背景顏色 ${color}`}
-                        />
-                      ))}
-                      <input
-                        className="drawing-defense-color-input"
-                        type="color"
-                        value={backgroundColor}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => {
-                          setBackgroundMode('color');
-                          setBackgroundColor(event.target.value);
-                        }}
-                        aria-label="自訂背景顏色"
-                      />
-                    </div>
+                    <span className="drawing-defense-option-meta">固定使用 #005EB8。</span>
                   </div>
                   <label
                     className={`drawing-defense-background-card ${backgroundMode === 'image' ? 'active' : ''}`}
