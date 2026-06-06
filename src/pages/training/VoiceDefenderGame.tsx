@@ -27,6 +27,7 @@ import {
   type VoiceVocabularyItem,
 } from './voiceDefenderVocabulary';
 import {
+  buildVoskGrammar,
   calculateBestSpeechSimilarity,
   normalizeSpeechText,
   VOICE_MATCH_SIMILARITY_THRESHOLD,
@@ -181,11 +182,21 @@ interface StartIssue {
   message: string;
 }
 
+const DEFAULT_MODEL_URLS: Record<VoiceLanguage, string> = {
+  zh: 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-cn-0.3.tar.gz',
+  en: 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
+};
+
+const DEFAULT_MODEL_BYTES: Record<VoiceLanguage, number> = {
+  zh: 33_235_437,
+  en: 41_184_862,
+};
+
 const MODEL_URLS: Record<VoiceLanguage, string> = {
   zh: import.meta.env.VITE_VOSK_MODEL_ZH_URL?.trim()
-    || 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-cn-0.3.tar.gz',
+    || DEFAULT_MODEL_URLS.zh,
   en: import.meta.env.VITE_VOSK_MODEL_EN_URL?.trim()
-    || 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
+    || DEFAULT_MODEL_URLS.en,
 };
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
@@ -509,6 +520,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     setModelError('');
     setBackgroundReadyLanguage(null);
     const cacheKey = `voice-defender-${targetLanguage}`;
+    const expectedModelBytes = MODEL_URLS[targetLanguage] === DEFAULT_MODEL_URLS[targetLanguage]
+      ? DEFAULT_MODEL_BYTES[targetLanguage]
+      : 0;
     let cachedUrl: CachedModelUrl | null = null;
     const subscribeToBackgroundDownload = () => startVoskModelBackgroundDownload(
       cacheKey,
@@ -530,6 +544,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       VOSK_MODEL_DOWNLOAD_TIMEOUT_MS,
       VOSK_MODEL_RETRY_DELAY_MS,
       VOSK_MODEL_MIN_BYTES,
+      expectedModelBytes,
     );
     backgroundDownloadUnsubscribeRef.current = subscribeToBackgroundDownload();
 
@@ -549,6 +564,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         },
         VOSK_MODEL_DOWNLOAD_TIMEOUT_MS,
         VOSK_MODEL_MIN_BYTES,
+        expectedModelBytes,
       );
       if (loadGenerationRef.current !== generation) {
         cachedUrl.revoke();
@@ -934,7 +950,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     }
     const audioContext = new AudioContext();
     await audioContext.resume();
-    const grammar = JSON.stringify(['[unk]', ...configRef.current.activeWords]);
+    const grammar = buildVoskGrammar(
+      configRef.current.activeWords,
+      configRef.current.language,
+    );
     const recognizer = new model.KaldiRecognizer(audioContext.sampleRate, grammar);
     recognizer.on('partialresult', (message) => {
       if ('result' in message && 'partial' in message.result) {

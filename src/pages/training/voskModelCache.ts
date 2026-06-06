@@ -35,12 +35,19 @@ export async function getCachedModelUrl(
   onStage?: (stage: VoskModelLoadStage) => void,
   downloadTimeoutMs = 90_000,
   minModelBytes = DEFAULT_MIN_MODEL_BYTES,
+  expectedModelBytes = 0,
 ): Promise<CachedModelUrl> {
   onStage?.('checking-cache');
   onProgress(0);
 
   const cacheRequest = createCacheRequest(cacheKey);
-  const cachedBlob = await readCachedModel(cacheRequest, sourceUrl, minModelBytes, onStage);
+  const cachedBlob = await readCachedModel(
+    cacheRequest,
+    sourceUrl,
+    minModelBytes,
+    expectedModelBytes,
+    onStage,
+  );
   if (cachedBlob) {
     onProgress(100);
     return createObjectUrl(cachedBlob);
@@ -57,6 +64,7 @@ export async function getCachedModelUrl(
       onStage,
       downloadTimeoutMs,
       minModelBytes,
+      expectedModelBytes,
     ).finally(() => {
       inFlightModelDownloads.delete(downloadKey);
     });
@@ -74,6 +82,7 @@ async function downloadModelBlob(
   onStage: ((stage: VoskModelLoadStage) => void) | undefined,
   downloadTimeoutMs: number,
   minModelBytes: number,
+  expectedModelBytes: number,
 ): Promise<Blob> {
   const abortController = new AbortController();
   const timeoutId = window.setTimeout(() => abortController.abort(), downloadTimeoutMs);
@@ -87,10 +96,24 @@ async function downloadModelBlob(
     }
 
     const totalBytes = Number(response.headers.get('content-length')) || 0;
+    if (
+      expectedModelBytes > 0
+      && totalBytes > 0
+      && totalBytes !== expectedModelBytes
+    ) {
+      throw new Error(
+        `Unexpected Vosk model size (${totalBytes}/${expectedModelBytes} bytes).`,
+      );
+    }
     const blob = response.body
       ? await readResponseBlob(response, totalBytes, onProgress)
       : await response.blob();
-    await validateModelBlob(blob, totalBytes, minModelBytes, true);
+    await validateModelBlob(
+      blob,
+      expectedModelBytes || totalBytes,
+      minModelBytes,
+      true,
+    );
 
     onProgress(100);
     onStage?.('saving-cache');
@@ -115,6 +138,7 @@ export function startVoskModelBackgroundDownload(
   downloadTimeoutMs = 90_000,
   retryDelayMs = 10_000,
   minModelBytes = DEFAULT_MIN_MODEL_BYTES,
+  expectedModelBytes = 0,
 ): () => void {
   const jobKey = `${cacheKey}\n${sourceUrl}`;
   let job = backgroundDownloadJobs.get(jobKey);
@@ -138,6 +162,7 @@ export function startVoskModelBackgroundDownload(
       downloadTimeoutMs,
       retryDelayMs,
       minModelBytes,
+      expectedModelBytes,
     );
   }
 
@@ -162,6 +187,7 @@ async function readCachedModel(
   request: Request,
   sourceUrl: string,
   minModelBytes: number,
+  expectedModelBytes: number,
   onStage?: (stage: VoskModelLoadStage) => void,
 ): Promise<Blob | null> {
   if (!('caches' in window)) return null;
@@ -177,6 +203,7 @@ async function readCachedModel(
       || response.headers.get(COMPLETE_HEADER) !== '1'
       || !Number.isSafeInteger(expectedSize)
       || expectedSize < minModelBytes
+      || (expectedModelBytes > 0 && expectedSize !== expectedModelBytes)
     ) {
       await cache.delete(request);
       return null;
@@ -185,7 +212,11 @@ async function readCachedModel(
     onStage?.('loading-cache');
     const blob = await response.blob();
     try {
-      await validateModelBlob(blob, expectedSize, minModelBytes);
+      await validateModelBlob(
+        blob,
+        expectedModelBytes || expectedSize,
+        minModelBytes,
+      );
     } catch (error) {
       console.warn('Cached Vosk model is incomplete; downloading it again.', error);
       await cache.delete(request);
@@ -282,6 +313,7 @@ async function runBackgroundDownload(
   downloadTimeoutMs: number,
   retryDelayMs: number,
   minModelBytes: number,
+  expectedModelBytes: number,
 ): Promise<void> {
   while (true) {
     job.snapshot = {
@@ -307,6 +339,7 @@ async function runBackgroundDownload(
         },
         downloadTimeoutMs,
         minModelBytes,
+        expectedModelBytes,
       );
       cachedUrl.revoke();
       job.snapshot = {
