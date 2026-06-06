@@ -39,6 +39,11 @@ import {
   type CachedModelUrl,
   type VoskModelLoadStage,
 } from './voskModelCache';
+import {
+  hasVoskVocabularyWord,
+  loadVoskVocabularyIndex,
+  type VoskVocabularyIndex,
+} from './voskVocabularyIndex';
 
 export { calculateSimilarity, levenshteinDistance } from './voiceDefenderSpeechMatching';
 
@@ -183,12 +188,12 @@ interface StartIssue {
 }
 
 const DEFAULT_MODEL_URLS: Record<VoiceLanguage, string> = {
-  zh: 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-cn-0.3.tar.gz',
+  zh: `${import.meta.env.BASE_URL}models/vosk-model-small-zh-tw-0.3.tar.gz`,
   en: 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
 };
 
 const DEFAULT_MODEL_BYTES: Record<VoiceLanguage, number> = {
-  zh: 33_235_437,
+  zh: 33_179_559,
   en: 41_184_862,
 };
 
@@ -197,6 +202,17 @@ const MODEL_URLS: Record<VoiceLanguage, string> = {
     || DEFAULT_MODEL_URLS.zh,
   en: import.meta.env.VITE_VOSK_MODEL_EN_URL?.trim()
     || DEFAULT_MODEL_URLS.en,
+};
+
+const MODEL_VOCABULARY_URLS: Record<VoiceLanguage, string> = {
+  zh: import.meta.env.VITE_VOSK_MODEL_ZH_VOCAB_URL?.trim()
+    || (MODEL_URLS.zh === DEFAULT_MODEL_URLS.zh
+      ? `${import.meta.env.BASE_URL}models/vosk-model-small-zh-tw-0.3-vocabulary.txt`
+      : ''),
+  en: import.meta.env.VITE_VOSK_MODEL_EN_VOCAB_URL?.trim()
+    || (MODEL_URLS.en === DEFAULT_MODEL_URLS.en
+      ? `${import.meta.env.BASE_URL}models/vosk-model-small-en-us-0.15-vocabulary.txt`
+      : ''),
 };
 
 const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
@@ -256,6 +272,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const recognitionEngineRef = useRef<RecognitionEngine | null>(null);
   const backgroundDownloadUnsubscribeRef = useRef<(() => void) | null>(null);
   const uploadedBackgroundUrlRef = useRef<string | null>(null);
+  const modelVocabularyIndexesRef = useRef<Partial<Record<VoiceLanguage, VoskVocabularyIndex>>>({});
   const recognitionSettingRef = useRef<HTMLElement | null>(null);
   const vocabularySettingRef = useRef<HTMLElement | null>(null);
   const microphoneSettingRef = useRef<HTMLElement | null>(null);
@@ -300,6 +317,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [uploadedBackgroundName, setUploadedBackgroundName] = useState(() => t('drawing.upload.noImage'));
   const [vocabulary, setVocabulary] = useState<VoiceVocabularyItem[]>(loadVoiceVocabulary);
   const [newWord, setNewWord] = useState('');
+  const [vocabularyWarning, setVocabularyWarning] = useState('');
+  const [vocabularyIndexStatus, setVocabularyIndexStatus] = useState<
+    Partial<Record<VoiceLanguage, 'loading' | 'ready' | 'error'>>
+  >({});
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
   const [modelLoadStage, setModelLoadStage] = useState<ModelLoadStage>('checking-cache');
   const [modelProgress, setModelProgress] = useState(0);
@@ -519,7 +540,23 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     setModelProgress(0);
     setModelError('');
     setBackgroundReadyLanguage(null);
-    const cacheKey = `voice-defender-${targetLanguage}`;
+    setVocabularyWarning('');
+    const vocabularyUrl = MODEL_VOCABULARY_URLS[targetLanguage];
+    if (vocabularyUrl && !modelVocabularyIndexesRef.current[targetLanguage]) {
+      setVocabularyIndexStatus((current) => ({ ...current, [targetLanguage]: 'loading' }));
+      void loadVoskVocabularyIndex(vocabularyUrl)
+        .then((index) => {
+          modelVocabularyIndexesRef.current[targetLanguage] = index;
+          setVocabularyIndexStatus((current) => ({ ...current, [targetLanguage]: 'ready' }));
+        })
+        .catch((error) => {
+          console.warn('Unable to load Vosk vocabulary index.', error);
+          setVocabularyIndexStatus((current) => ({ ...current, [targetLanguage]: 'error' }));
+        });
+    }
+    const cacheKey = targetLanguage === 'zh'
+      ? 'voice-defender-zh-tw-v1'
+      : `voice-defender-${targetLanguage}`;
     const expectedModelBytes = MODEL_URLS[targetLanguage] === DEFAULT_MODEL_URLS[targetLanguage]
       ? DEFAULT_MODEL_BYTES[targetLanguage]
       : 0;
@@ -1288,14 +1325,28 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     event.preventDefault();
     const word = newWord.trim();
     if (!word) return;
+    setVocabularyWarning('');
     const normalized = normalizeSpeechText(word);
     if (vocabulary.some((item) => item.language === language && normalizeSpeechText(item.word) === normalized)) {
       setNewWord('');
       return;
     }
+    const vocabularyIndex = modelVocabularyIndexesRef.current[language];
+    if (!vocabularyIndex) {
+      setVocabularyWarning(t(
+        vocabularyIndexStatus[language] === 'loading'
+          ? 'voice.vocabulary.modelChecking'
+          : 'voice.vocabulary.modelIndexUnavailable',
+      ));
+      return;
+    }
+    if (!hasVoskVocabularyWord(vocabularyIndex, word, language)) {
+      setVocabularyWarning(t('voice.vocabulary.unsupportedWord', { word }));
+      return;
+    }
     updateVocabulary((items) => [...items, createVoiceVocabularyItem(word, language)]);
     setNewWord('');
-  }, [language, newWord, updateVocabulary, vocabulary]);
+  }, [language, newWord, t, updateVocabulary, vocabulary, vocabularyIndexStatus]);
 
   const downloadResult = useCallback(() => {
     if (!result) return;
@@ -1596,10 +1647,20 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                       <input
                         id="voice-new-word"
                         value={newWord}
-                        onChange={(event) => setNewWord(event.target.value)}
+                        onChange={(event) => {
+                          setNewWord(event.target.value);
+                          setVocabularyWarning('');
+                        }}
                         placeholder={t('voice.vocabulary.placeholder')}
+                        aria-invalid={Boolean(vocabularyWarning)}
+                        aria-describedby={vocabularyWarning ? 'voice-vocabulary-warning' : undefined}
                       />
                       <button className="btn btn-primary" type="submit">{t('voice.vocabulary.addButton')}</button>
+                      {vocabularyWarning && (
+                        <p id="voice-vocabulary-warning" className="voice-vocabulary-warning" role="alert">
+                          {vocabularyWarning}
+                        </p>
+                      )}
                     </form>
                     <button
                       type="button"

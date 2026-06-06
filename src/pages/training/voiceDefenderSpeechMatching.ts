@@ -1,34 +1,7 @@
 export const VOICE_MATCH_SIMILARITY_THRESHOLD = 0.7;
 
-const TRADITIONAL_TO_SIMPLIFIED_CHINESE: Readonly<Record<string, string>> = {
-  蘋: '苹',
-  檸: '柠',
-  陽: '阳',
-  紅: '红',
-  藍: '蓝',
-  綠: '绿',
-  黃: '黄',
-  書: '书',
-  鉛: '铅',
-  筆: '笔',
-  鏡: '镜',
-  電: '电',
-  腦: '脑',
-  鑰: '钥',
-  傘: '伞',
-  躍: '跃',
-  說: '说',
-  話: '话',
-  聽: '听',
-  閱: '阅',
-  讀: '读',
-  寫: '写',
-  畫: '画',
-  師: '师',
-};
-
 export function normalizeSpeechText(value: string): string {
-  return toSimplifiedChinese(value)
+  return value
     .normalize('NFKC')
     .toLocaleLowerCase()
     .replace(/[^\p{L}\p{N}]/gu, '');
@@ -40,7 +13,7 @@ export function buildVoskGrammar(
 ): string {
   const phrases = words
     .map((word) => word.normalize('NFKC').trim().replace(/\s+/g, ' '))
-    .map((word) => language === 'zh' ? toSimplifiedChinese(word) : word.toLocaleLowerCase())
+    .map((word) => language === 'en' ? word.toLocaleLowerCase() : word)
     .filter(Boolean);
   return JSON.stringify([...new Set([...phrases, '[unk]'])]);
 }
@@ -88,10 +61,4 @@ export function calculateSimilarity(a: string, b: string): number {
   const maxLength = Math.max([...a].length, [...b].length);
   if (maxLength === 0) return 1;
   return 1 - levenshteinDistance(a, b) / maxLength;
-}
-
-function toSimplifiedChinese(value: string): string {
-  return [...value]
-    .map((character) => TRADITIONAL_TO_SIMPLIFIED_CHINESE[character] ?? character)
-    .join('');
 }
