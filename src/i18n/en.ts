@@ -509,6 +509,9 @@ export const en: Record<TranslationKey, string> = {
   'voice.results.language': 'Recognition Language',
   'voice.results.spawned': 'Enemies Spawned',
   'voice.results.hp': 'Remaining HP',
+  'voice.results.word': 'Word',
+  'voice.results.recognized': 'Recognized',
+  'voice.results.similarity': 'Similarity',
   'voice.results.playAgain': 'Play Again',
   'voice.results.back': 'Back to Vocabulary',
 

@@ -508,6 +508,9 @@ export const zh = {
   'voice.results.language': '辨識語言',
   'voice.results.spawned': '生成敵人',
   'voice.results.hp': '剩餘生命值',
+  'voice.results.word': '詞彙',
+  'voice.results.recognized': '辨識結果',
+  'voice.results.similarity': '相似度',
   'voice.results.playAgain': '再玩一次',
   'voice.results.back': '回到詞彙庫',
 

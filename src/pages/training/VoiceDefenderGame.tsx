@@ -1,4 +1,13 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type CSSProperties,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Application, Container, Graphics, Text, type Ticker } from 'pixi.js';
 import { initJsPsych } from 'jspsych';
 import type { KaldiRecognizer, Model } from 'vosk-browser';
@@ -36,9 +45,11 @@ type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type GamePhase = 'editor' | 'playing' | 'paused' | 'results';
 type ModelStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
 type ModelLoadStage = VoskModelLoadStage | 'initializing';
-type GameResult = 'Defeat' | 'Stopped';
+type GameResult = 'Victory' | 'Defeat' | 'Stopped';
 type MicrophoneStatus = 'pending' | 'testing' | 'ready' | 'silent' | 'muted' | 'disconnected' | 'denied';
 type RecognitionEngine = 'vosk' | 'web-speech';
+type BackgroundMode = 'stars' | 'color' | 'image';
+type GameDurationSeconds = number | null;
 
 interface VoiceDefenderGameProps {
   onExit: () => void;
@@ -76,6 +87,7 @@ interface SessionRecord {
   Language: VoiceLanguage;
   Recognition_Engine: RecognitionEngine;
   Difficulty: Difficulty;
+  Game_Time_Seconds: GameDurationSeconds;
   Starting_HP: number;
   Enemy_Speed: number;
   Total_Duration_Seconds: number;
@@ -191,14 +203,19 @@ const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   },
 };
 
-const HP_OPTIONS = [3, 5, 8] as const;
+const HP_OPTIONS = [1, 3, 5] as const;
+const GAME_DURATION_OPTIONS = [30, 60, 300, null] as const;
 const ENEMY_SPEED_OPTIONS = [5, 15, 30] as const;
-const DEFAULT_HP = 5;
+const DEFAULT_HP = 3;
 const DEFAULT_ENEMY_SPEED = 5;
-const ENEMY_WIDTH = 156;
-const ENEMY_HEIGHT = 76;
+const DEFAULT_GAME_DURATION_SECONDS: GameDurationSeconds = 30;
+const DEFAULT_CUSTOM_GAME_DURATION_SECONDS = 120;
+const ENEMY_VISUAL_HEIGHT = 98;
+const ENEMY_SPAWN_Y = -ENEMY_VISUAL_HEIGHT - 8;
+const DEFAULT_BACKGROUND_COLOR = '#005EB8';
 const MICROPHONE_SIGNAL_THRESHOLD = 0.006;
 const MICROPHONE_SILENCE_DELAY_MS = 1600;
+const starSkyBackgroundImage = `url(${import.meta.env.BASE_URL}assets/StarSky.png)`;
 const VOSK_MODEL_DOWNLOAD_TIMEOUT_MS = getPositiveNumber(
   import.meta.env.VITE_VOSK_MODEL_TIMEOUT_MS,
   90_000,
@@ -221,6 +238,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const speechRuntimeRef = useRef<SpeechRuntime | null>(null);
   const recognitionEngineRef = useRef<RecognitionEngine | null>(null);
   const backgroundDownloadUnsubscribeRef = useRef<(() => void) | null>(null);
+  const uploadedBackgroundUrlRef = useRef<string | null>(null);
   const microphoneTestRuntimeRef = useRef<MicrophoneTestRuntime | null>(null);
   const enemiesRef = useRef<Enemy[]>([]);
   const enemyResultsRef = useRef<EnemyResult[]>([]);
@@ -240,6 +258,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const configRef = useRef({
     language: 'zh' as VoiceLanguage,
     difficulty: 'Beginner' as Difficulty,
+    gameDurationSec: DEFAULT_GAME_DURATION_SECONDS,
     maxHp: DEFAULT_HP,
     speed: DEFAULT_ENEMY_SPEED,
     activeWords: [] as string[],
@@ -249,9 +268,16 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [phase, setPhaseState] = useState<GamePhase>('editor');
   const [language, setLanguage] = useState<VoiceLanguage>('zh');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
+  const [gameDurationSec, setGameDurationSec] = useState<GameDurationSeconds>(DEFAULT_GAME_DURATION_SECONDS);
+  const [customGameDurationSec, setCustomGameDurationSec] = useState(DEFAULT_CUSTOM_GAME_DURATION_SECONDS);
   const [maxHp, setMaxHp] = useState(DEFAULT_HP);
+  const [customHp, setCustomHp] = useState(DEFAULT_HP);
   const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [customSpeed, setCustomSpeed] = useState(DEFAULT_ENEMY_SPEED);
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
+  const backgroundColor = DEFAULT_BACKGROUND_COLOR;
+  const [uploadedBackgroundUrl, setUploadedBackgroundUrl] = useState<string | null>(null);
+  const [uploadedBackgroundName, setUploadedBackgroundName] = useState(() => t('drawing.upload.noImage'));
   const [vocabulary, setVocabulary] = useState<VoiceVocabularyItem[]>(loadVoiceVocabulary);
   const [newWord, setNewWord] = useState('');
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
@@ -267,6 +293,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [microphoneError, setMicrophoneError] = useState('');
   const [hp, setHp] = useState(DEFAULT_HP);
+  const [defeated, setDefeated] = useState(0);
   const [score, setScore] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recognizedText, setRecognizedText] = useState('');
@@ -284,7 +311,29 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const microphoneReady = microphoneStatus === 'ready';
   const recognitionReady = modelStatus === 'ready' || modelStatus === 'fallback';
   const canStart = recognitionReady && microphoneReady && activeWords.length > 0;
+  const isPresetGameDuration = GAME_DURATION_OPTIONS.includes(gameDurationSec as typeof GAME_DURATION_OPTIONS[number]);
+  const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
+  const gameDurationLabel = formatGameDuration(gameDurationSec, t);
+  const backgroundSummary =
+    backgroundMode === 'stars'
+      ? t('drawing.background.stars')
+      : backgroundMode === 'color'
+        ? backgroundColor
+        : t('drawing.background.customImage');
+  const backgroundModeLabel =
+    backgroundMode === 'stars'
+      ? t('drawing.background.image')
+      : backgroundMode === 'color'
+        ? t('drawing.background.color')
+        : t('drawing.background.customImage');
+  const backgroundStyle = useMemo<CSSProperties>(() => {
+    if (backgroundMode === 'stars') return { backgroundImage: starSkyBackgroundImage };
+    if (backgroundMode === 'image' && uploadedBackgroundUrl) {
+      return { backgroundImage: `url("${uploadedBackgroundUrl}")` };
+    }
+    return { backgroundImage: 'none', backgroundColor };
+  }, [backgroundColor, backgroundMode, uploadedBackgroundUrl]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -292,8 +341,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   }, []);
 
   useEffect(() => {
-    configRef.current = { language, difficulty, maxHp, speed, activeWords };
-  }, [activeWords, difficulty, language, maxHp, speed]);
+    configRef.current = { language, difficulty, gameDurationSec, maxHp, speed, activeWords };
+  }, [activeWords, difficulty, gameDurationSec, language, maxHp, speed]);
 
   useEffect(() => {
     saveVoiceVocabulary(vocabulary);
@@ -301,6 +350,12 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
   useEffect(() => {
     jsPsychRef.current = initJsPsych();
+  }, []);
+
+  useEffect(() => () => {
+    if (uploadedBackgroundUrlRef.current) {
+      URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
+    }
   }, []);
 
   const addMicrophoneTrackListeners = useCallback((track: MediaStreamTrack) => {
@@ -615,38 +670,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const width = app.renderer.width;
     const height = app.renderer.height;
     const background = new Graphics();
-    background.rect(0, 0, width, height).fill({ color: 0x07152b });
-    const grid = new Graphics();
-    for (let y = 70; y < height; y += 70) {
-      grid.moveTo(0, y).lineTo(width, y);
-    }
-    grid.stroke({ color: 0x1c3e66, width: 1, alpha: 0.32 });
-    const defense = new Graphics();
-    defense.rect(0, height - 92, width, 92).fill({ color: 0x0a2d4e, alpha: 0.96 });
-    defense.rect(0, height - 96, width, 5).fill({ color: 0x38bdf8 });
-    app.stage.addChild(background, grid, defense);
-  }, []);
-
-  const createHitEffect = useCallback((x: number, y: number) => {
-    const app = appRef.current;
-    if (!app) return;
-    const effect = new Graphics();
-    effect.circle(0, 0, 18).stroke({ color: 0x67e8f9, width: 5, alpha: 1 });
-    effect.x = x;
-    effect.y = y;
-    app.stage.addChild(effect);
-    let elapsed = 0;
-    const animate = (ticker: Ticker) => {
-      elapsed += ticker.deltaMS;
-      const progress = Math.min(1, elapsed / 260);
-      effect.scale.set(1 + progress * 2.2);
-      effect.alpha = 1 - progress;
-      if (progress >= 1) {
-        app.ticker.remove(animate);
-        effect.destroy();
-      }
-    };
-    app.ticker.add(animate);
+    background.rect(0, 0, width, height).fill({ color: 0x050816, alpha: 0.22 });
+    app.stage.addChild(background);
   }, []);
 
   const recordEnemyOutcome = useCallback((
@@ -676,6 +701,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       Language: configRef.current.language,
       Recognition_Engine: recognitionEngineRef.current ?? 'web-speech',
       Difficulty: configRef.current.difficulty,
+      Game_Time_Seconds: configRef.current.gameDurationSec,
       Starting_HP: configRef.current.maxHp,
       Enemy_Speed: configRef.current.speed,
       Total_Duration_Seconds: Number(metrics.elapsed.toFixed(1)),
@@ -688,6 +714,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       Enemy_Results: enemyResultsRef.current.map((item) => ({ ...item })),
     };
     setResult(record);
+    setDefeated(metrics.defeated);
     setPhase('results');
     void saveTrainingSessionRecord({
       userName: record.Participant_ID,
@@ -699,6 +726,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       details: {
         Language: record.Language,
         Recognition_Engine: record.Recognition_Engine,
+        Game_Time_Seconds: record.Game_Time_Seconds ?? t('training.infinite'),
         Starting_HP: record.Starting_HP,
         Enemy_Speed: record.Enemy_Speed,
         Total_Duration_Seconds: record.Total_Duration_Seconds,
@@ -747,13 +775,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     if (!matched) return;
     lastRecognitionRef.current = { text: recognitionKey, at: now };
     recordEnemyOutcome(matched.enemy, true, matched.transcript, matched.similarity);
-    createHitEffect(matched.enemy.x, matched.enemy.y);
     matched.enemy.node.destroy({ children: true });
     enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== matched.enemy.id);
     metricsRef.current.defeated += 1;
     metricsRef.current.score += Math.max(10, Math.round(100 * matched.similarity));
+    setDefeated(metricsRef.current.defeated);
     setScore(metricsRef.current.score);
-  }, [createHitEffect, recordEnemyOutcome]);
+  }, [recordEnemyOutcome]);
 
   const startListening = useCallback(async () => {
     await stopMicrophoneTest(false);
@@ -914,36 +942,40 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const word = words[Math.floor(Math.random() * words.length)];
     const enemyNumber = metricsRef.current.spawned + 1;
     const resultIndex = enemyResultsRef.current.length;
-    const x = ENEMY_WIDTH / 2 + 20 + Math.random() * Math.max(1, app.renderer.width - ENEMY_WIDTH - 40);
+    const wordLength = [...word].length;
+    const boardWidth = clamp(68 + Math.max(0, wordLength - 2) * 11, 88, 172);
+    const x = boardWidth / 2 + 12 + Math.random() * Math.max(1, app.renderer.width - boardWidth - 24);
     const node = new Container();
-    const body = new Graphics();
-    body.roundRect(-ENEMY_WIDTH / 2, -ENEMY_HEIGHT / 2, ENEMY_WIDTH, ENEMY_HEIGHT, 18)
-      .fill({ color: 0xf8fafc })
-      .stroke({ color: 0x38bdf8, width: 3 });
-    const eyeLeft = new Graphics().circle(-43, -8, 5).fill(0x0f172a);
-    const eyeRight = new Graphics().circle(43, -8, 5).fill(0x0f172a);
+    const monster = new Text({ text: '👾', style: { fontSize: 42 } });
+    monster.anchor.set(0.5);
+    monster.x = 0;
+    monster.y = 24;
+    const board = new Graphics();
+    board.roundRect(-boardWidth / 2, 48, boardWidth, 50, 6)
+      .fill(0xffffff)
+      .stroke({ color: 0xc2c6d4, width: 2 });
     const label = new Text({
       text: word,
       style: {
-        fill: 0x0f172a,
+        fill: 0x1a1c1e,
         fontFamily: 'Arial, sans-serif',
-        fontSize: word.length > 10 ? 19 : 24,
+        fontSize: wordLength > 10 ? 15 : wordLength > 6 ? 18 : 22,
         fontWeight: '700',
         align: 'center',
       },
     });
     label.anchor.set(0.5);
-    label.y = 14;
-    node.addChild(body, eyeLeft, eyeRight, label);
+    label.y = 73;
+    node.addChild(monster, board, label);
     node.x = x;
-    node.y = -ENEMY_HEIGHT;
+    node.y = ENEMY_SPAWN_Y;
     app.stage.addChild(node);
 
     const enemy: Enemy = {
       id: metricsRef.current.nextId++,
       word,
       x,
-      y: -ENEMY_HEIGHT,
+      y: ENEMY_SPAWN_Y,
       node,
       spawnedAtSec: metricsRef.current.elapsed,
       resultIndex,
@@ -968,7 +1000,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     if (!app) return;
 
     setMicrophoneError('');
-    configRef.current = { language, difficulty, maxHp, speed, activeWords };
+    configRef.current = { language, difficulty, gameDurationSec, maxHp, speed, activeWords };
     try {
       await startListening();
     } catch (error) {
@@ -992,6 +1024,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     wordMissesRef.current = {};
     lastRecognitionRef.current = { text: '', at: 0 };
     setHp(maxHp);
+    setDefeated(0);
     setScore(0);
     setElapsedSeconds(0);
     setRecognizedText('');
@@ -1002,6 +1035,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     clearEnemies,
     difficulty,
     drawStage,
+    gameDurationSec,
     language,
     maxHp,
     microphoneReady,
@@ -1011,6 +1045,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     startListening,
     t,
   ]);
+
+  const restartGame = useCallback(() => {
+    void startGame();
+  }, [startGame]);
 
   const returnToEditor = useCallback(() => {
     void stopListening();
@@ -1038,10 +1076,34 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     }
   }, [returnToEditor, setPhase, startListening, t]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (phaseRef.current === 'playing') pauseGame();
+      else if (phaseRef.current === 'paused') void resumeGame();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [pauseGame, resumeGame]);
+
   const handleExit = useCallback(() => {
     void stopListening();
     onExit();
   }, [onExit, stopListening]);
+
+  const handleBackgroundImageUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    if (uploadedBackgroundUrlRef.current) {
+      URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
+    }
+    const imageUrl = URL.createObjectURL(file);
+    uploadedBackgroundUrlRef.current = imageUrl;
+    setUploadedBackgroundUrl(imageUrl);
+    setUploadedBackgroundName(file.name);
+    setBackgroundMode('image');
+    event.target.value = '';
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1060,13 +1122,15 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       });
       if (cancelled) return;
       host.appendChild(app.canvas);
-      app.canvas.className = 'voice-defender-canvas';
+      app.canvas.className = 'drawing-defense-canvas voice-defender-canvas';
       drawStage(app);
       app.ticker.add((ticker: Ticker) => {
         if (phaseRef.current !== 'playing') return;
         const dt = Math.min(ticker.deltaMS / 1000, 0.05);
         const metrics = metricsRef.current;
         const config = DIFFICULTIES[configRef.current.difficulty];
+        const targetGameDurationSec = configRef.current.gameDurationSec;
+        const isTimeUnlimited = targetGameDurationSec === null;
         metrics.elapsed += dt;
         const nextElapsed = Math.floor(metrics.elapsed);
         setElapsedSeconds((current) => current === nextElapsed ? current : nextElapsed);
@@ -1077,21 +1141,23 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         } else {
           metrics.spawnTimer = 0;
         }
-        const shouldSpawn =
-          metrics.spawned === 0
-          || (config.spawnMode === 'after-clear-delay' && noActiveEnemies && metrics.spawnTimer >= config.spawnIntervalSec)
-          || (config.spawnMode === 'after-clear' && noActiveEnemies)
-          || (config.spawnMode === 'fixed-interval' && metrics.spawnTimer >= config.spawnIntervalSec);
-        if (shouldSpawn) {
-          metrics.spawnTimer = 0;
-          spawnEnemy(app);
+        if (isTimeUnlimited || metrics.elapsed < targetGameDurationSec) {
+          const shouldSpawn =
+            metrics.spawned === 0
+            || (config.spawnMode === 'after-clear-delay' && noActiveEnemies && metrics.spawnTimer >= config.spawnIntervalSec)
+            || (config.spawnMode === 'after-clear' && noActiveEnemies)
+            || (config.spawnMode === 'fixed-interval' && metrics.spawnTimer >= config.spawnIntervalSec);
+          if (shouldSpawn) {
+            metrics.spawnTimer = 0;
+            spawnEnemy(app);
+          }
         }
 
-        const defenseY = app.renderer.height - 96;
+        const defenseY = app.renderer.height - ENEMY_VISUAL_HEIGHT;
         for (const enemy of [...enemiesRef.current]) {
           enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
-          if (enemy.y + ENEMY_HEIGHT / 2 < defenseY) continue;
+          if (enemy.y <= defenseY) continue;
           recordEnemyOutcome(enemy, false);
           enemy.node.destroy({ children: true });
           enemiesRef.current = enemiesRef.current.filter((item) => item.id !== enemy.id);
@@ -1100,7 +1166,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           setHp(metrics.hp);
         }
 
-        if (metrics.hp <= 0) finishGame('Defeat');
+        if (metrics.hp <= 0) {
+          finishGame('Defeat');
+          return;
+        }
+        if (!isTimeUnlimited && metrics.elapsed >= targetGameDurationSec && metrics.hp > 0) {
+          finishGame('Victory');
+        }
       });
     };
 
@@ -1134,9 +1206,17 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     downloadCsvFile(toCsv(result), `voice_defender_${Date.now()}.csv`);
   }, [result]);
 
+  const timeProgressText = useMemo(() => {
+    if (gameDurationSec === null) return `${elapsedSeconds}s / ${t('training.infinite')}`;
+    return `${Math.min(elapsedSeconds, gameDurationSec)}/${gameDurationSec}s`;
+  }, [elapsedSeconds, gameDurationSec, t]);
+
   return (
-    <div className={`voice-defender voice-defender-phase-${phase}`}>
-      <div ref={pixiHostRef} className="voice-defender-stage" />
+    <div
+      className={`drawing-defense voice-defender drawing-defense-phase-${phase === 'editor' ? 'menu' : phase} voice-defender-phase-${phase}`}
+      style={backgroundStyle}
+    >
+      <div ref={pixiHostRef} className="drawing-defense-stage voice-defender-stage" />
 
       {showInAppBrowserNotice && (
         <div className="voice-browser-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-browser-notice-title">
@@ -1152,54 +1232,15 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
       {phase === 'editor' && (
         <div className="training-panel">
-          <div className="training-config voice-defender-config">
+          <div className="training-config">
             <header className="training-config-header">
               <div>
                 <span className="training-config-label">{t('voice.configLabel')}</span>
                 <h1>{t('voice.title')}</h1>
               </div>
-              <div className={`voice-model-status voice-model-status-${modelStatus}`}>
-                <span>{getModelStatusText(modelStatus, modelLoadStage, modelProgress, t)}</span>
-                <progress max="100" value={modelProgress} />
-              </div>
             </header>
 
-            <div className="training-config-body voice-defender-config-body">
-              <section className="training-setting training-setting-wide">
-                <div className="training-setting-header">
-                  <div>
-                    <h2>{t('voice.config.language')}</h2>
-                    <p>{t('voice.config.languageDesc')}</p>
-                  </div>
-                  <span>{t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</span>
-                </div>
-                <div className="training-option-grid training-option-grid-three">
-                  {(['zh', 'en'] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`training-option ${language === option ? 'active' : ''}`}
-                      onClick={() => setLanguage(option)}
-                    >
-                      <span className="training-option-title">
-                        {t(option === 'zh' ? 'voice.language.zh' : 'voice.language.en')}
-                      </span>
-                      <span className="training-option-meta">
-                        {t(option === 'zh' ? 'voice.language.zhModel' : 'voice.language.enModel')}
-                      </span>
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="training-option"
-                    onClick={() => void loadModel(language)}
-                  >
-                    <span className="training-option-title">{t('voice.model.reload')}</span>
-                    <span className="training-option-meta">{modelError || t('voice.model.cacheHint')}</span>
-                  </button>
-                </div>
-              </section>
-
+            <div className="training-config-body">
               <section className="training-setting">
                 <div className="training-setting-header">
                   <div>
@@ -1231,7 +1272,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                   </div>
                   <span>{maxHp}</span>
                 </div>
-                <div className="training-option-grid training-option-grid-three">
+                <div className="training-option-grid training-option-grid-four">
                   {HP_OPTIONS.map((option) => (
                     <button
                       key={option}
@@ -1242,6 +1283,83 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                       <span className="training-option-title">{t('voice.hpValue', { value: option })}</span>
                     </button>
                   ))}
+                  <label
+                    className={`training-option training-option-custom ${isCustomHp ? 'active' : ''}`}
+                    onClick={() => setMaxHp(customHp)}
+                  >
+                    <span className="training-option-title">{t('training.custom')}</span>
+                    <input
+                      className="training-number-input"
+                      type="number"
+                      min="1"
+                      max="20"
+                      step="1"
+                      value={customHp}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 20);
+                        setCustomHp(value);
+                        setMaxHp(value);
+                      }}
+                      onFocus={() => setMaxHp(customHp)}
+                      aria-label={t('drawing.config.customHp')}
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className="training-setting training-setting-wide">
+                <div className="training-setting-header">
+                  <div>
+                    <h2>{t('drawing.config.gameDuration')}</h2>
+                    <p>{gameDurationLabel}</p>
+                  </div>
+                  <span>
+                    {gameDurationSec === DEFAULT_GAME_DURATION_SECONDS
+                      ? t('training.default')
+                      : isPresetGameDuration
+                        ? t('training.optional')
+                        : t('training.custom')}
+                  </span>
+                </div>
+                <div className="training-option-grid training-duration-grid">
+                  {GAME_DURATION_OPTIONS.filter((option) => option !== null).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`training-option ${gameDurationSec === option ? 'active' : ''}`}
+                      onClick={() => setGameDurationSec(option)}
+                    >
+                      <span className="training-option-title">{formatGameDuration(option, t)}</span>
+                    </button>
+                  ))}
+                  <label
+                    className={`training-option training-option-custom ${!isPresetGameDuration ? 'active' : ''}`}
+                    onClick={() => setGameDurationSec(customGameDurationSec)}
+                  >
+                    <span className="training-option-title">{t('training.custom')}</span>
+                    <input
+                      className="training-number-input"
+                      type="number"
+                      min="1"
+                      max="1800"
+                      step="1"
+                      value={customGameDurationSec}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 1800);
+                        setCustomGameDurationSec(value);
+                        setGameDurationSec(value);
+                      }}
+                      onFocus={() => setGameDurationSec(customGameDurationSec)}
+                      aria-label={t('drawing.config.customDuration')}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`training-option ${gameDurationSec === null ? 'active' : ''}`}
+                    onClick={() => setGameDurationSec(null)}
+                  >
+                    <span className="training-option-title">{t('drawing.config.infiniteMode')}</span>
+                  </button>
                 </div>
               </section>
 
@@ -1286,6 +1404,45 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                       aria-label={t('voice.config.customEnemySpeed')}
                     />
                   </label>
+                </div>
+              </section>
+
+              <section className="training-setting training-setting-wide">
+                <div className="training-setting-header">
+                  <div>
+                    <h2>{t('voice.config.language')}</h2>
+                    <p>{t('voice.config.languageDesc')}</p>
+                  </div>
+                  <span>{t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</span>
+                </div>
+                <div className="training-option-grid training-option-grid-three">
+                  {(['zh', 'en'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`training-option ${language === option ? 'active' : ''}`}
+                      onClick={() => setLanguage(option)}
+                    >
+                      <span className="training-option-title">
+                        {t(option === 'zh' ? 'voice.language.zh' : 'voice.language.en')}
+                      </span>
+                      <span className="training-option-meta">
+                        {t(option === 'zh' ? 'voice.language.zhModel' : 'voice.language.enModel')}
+                      </span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="training-option"
+                    onClick={() => void loadModel(language)}
+                  >
+                    <span className="training-option-title">{t('voice.model.reload')}</span>
+                    <span className="training-option-meta">{modelError || t('voice.model.cacheHint')}</span>
+                  </button>
+                </div>
+                <div className={`voice-model-status voice-model-status-${modelStatus}`}>
+                  <span>{getModelStatusText(modelStatus, modelLoadStage, modelProgress, t)}</span>
+                  <progress max="100" value={modelProgress} />
                 </div>
               </section>
 
@@ -1393,17 +1550,72 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                   </button>
                 </div>
               </section>
+
+              <section className="training-setting training-setting-wide">
+                <div className="training-setting-header">
+                  <div>
+                    <h2>{t('drawing.config.background')}</h2>
+                    <p>{backgroundSummary}</p>
+                  </div>
+                  <span>{backgroundModeLabel}</span>
+                </div>
+                <div className="drawing-defense-background-controls">
+                  <button
+                    type="button"
+                    className={`training-option ${backgroundMode === 'stars' ? 'active' : ''}`}
+                    onClick={() => setBackgroundMode('stars')}
+                  >
+                    <span className="training-option-title">{t('drawing.config.starBackground')}</span>
+                    <span className="training-option-meta">{t('drawing.config.currentTexture')}</span>
+                  </button>
+                  <div
+                    className={`drawing-defense-background-card ${backgroundMode === 'color' ? 'active' : ''}`}
+                    onClick={() => setBackgroundMode('color')}
+                  >
+                    <div className="drawing-defense-background-card-header">
+                      <span>{t('drawing.config.backgroundColor')}</span>
+                      <strong>{backgroundColor}</strong>
+                    </div>
+                    <span className="training-option-meta">{t('drawing.config.fixedColor')}</span>
+                  </div>
+                  <label
+                    className={`drawing-defense-background-card ${backgroundMode === 'image' ? 'active' : ''}`}
+                    onClick={() => {
+                      if (uploadedBackgroundUrl) setBackgroundMode('image');
+                    }}
+                  >
+                    <div className="drawing-defense-background-card-header">
+                      <span>{t('drawing.background.customImage')}</span>
+                      <strong>
+                        {uploadedBackgroundUrl ? t('drawing.config.uploaded') : t('drawing.config.notUploaded')}
+                      </strong>
+                    </div>
+                    <span className="training-option-meta">{uploadedBackgroundName}</span>
+                    <span className="drawing-defense-upload-action">{t('drawing.config.selectImage')}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={handleBackgroundImageUpload}
+                      aria-label={t('drawing.config.uploadAria')}
+                    />
+                  </label>
+                </div>
+              </section>
             </div>
 
             <div className="training-config-footer">
               <div className="training-config-summary">
                 <strong>{t(activeConfig.labelKey)}</strong>
+                <span>{gameDurationLabel}</span>
+                <span>{t('voice.hpValue', { value: maxHp })}</span>
                 <span>{t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</span>
                 {recognitionEngine && (
                   <span>{t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}</span>
                 )}
                 <span>{t('voice.config.speedValue', { value: speed })}</span>
                 <span>{t('voice.vocabulary.activeCount', { active: activeWords.length, total: languageVocabulary.length })}</span>
+                <span>{backgroundSummary}</span>
               </div>
               <div className="training-config-actions">
                 <button
@@ -1411,7 +1623,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                   disabled={!canStart}
                   onClick={() => void startGame()}
                 >
-                  {t('training.startGame')}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <polygon points="5,3 19,12 5,21" />
+                  </svg>
+                  {t('training.start')}
                 </button>
                 <button className="btn btn-ghost btn-lg" onClick={handleExit}>{t('training.cancel')}</button>
               </div>
@@ -1420,14 +1635,16 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         </div>
       )}
 
-      {(phase === 'playing' || phase === 'paused') && (
-        <div className="voice-defender-hud">
+      {phase !== 'results' && (
+        <div className="drawing-defense-hud">
           <div><strong>{t('voice.hud.hp')}</strong> {hp}/{maxHp}</div>
-          <div><strong>{t('voice.hud.score')}</strong> {score}</div>
-          <div><strong>{t('voice.hud.time')}</strong> {elapsedSeconds}s</div>
+          <div><strong>{t('voice.results.defeated')}</strong> {defeated}</div>
+          <div><strong>{t('voice.hud.time')}</strong> {timeProgressText}</div>
           <div>
             <strong>{t('voice.hud.engine')}</strong>{' '}
-            {t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}
+            {recognitionEngine
+              ? t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')
+              : '-'}
           </div>
           {phase === 'playing' && (
             <div className={`voice-listening-indicator voice-listening-${microphoneStatus}`}>
@@ -1439,48 +1656,66 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           {phase === 'playing' && (
             <button className="btn btn-sm btn-secondary" onClick={pauseGame}>{t('training.pause')}</button>
           )}
-          <button className="btn btn-sm btn-ghost" onClick={() => finishGame('Stopped')}>{t('voice.finish')}</button>
+          {(phase === 'playing' || phase === 'paused') && (
+            <button className="btn btn-sm btn-ghost" onClick={() => finishGame('Stopped')}>{t('voice.finish')}</button>
+          )}
         </div>
       )}
 
       {phase === 'paused' && (
         <div className="training-panel training-panel-compact">
           <h1>{t('voice.pause.title')}</h1>
-          <p>{t('voice.pause.desc')}</p>
-          <div className="training-actions">
-            <button className="btn btn-primary btn-lg" onClick={() => void resumeGame()}>{t('training.continueGame')}</button>
-            <button className="btn btn-ghost btn-lg" onClick={returnToEditor}>{t('training.returnSettings')}</button>
-          </div>
+          <button className="btn btn-primary btn-lg" onClick={() => void resumeGame()}>{t('training.continueGame')}</button>
+          <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
+          <button className="btn btn-ghost btn-lg" onClick={returnToEditor}>{t('training.returnMenu')}</button>
         </div>
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container voice-defender-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container drawing-defense-results-container voice-defender-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
             <h1>{t('voice.results.title')}</h1>
             <div className="training-result-summary">
+              <span><small>{t('drawing.results.user')}</small><strong>{result.Participant_ID}</strong></span>
+              <span>
+                <small>{t('drawing.results.defeatedEnemies')}</small>
+                <strong>{result.Enemies_Defeated}/{result.Enemies_Spawned}</strong>
+              </span>
               <span><small>{t('voice.results.survival')}</small><strong>{result.Total_Duration_Seconds}s</strong></span>
-              <span><small>{t('voice.results.defeated')}</small><strong>{result.Enemies_Defeated}</strong></span>
               <span><small>{t('voice.results.score')}</small><strong>{result.Score}</strong></span>
-              <span><small>{t('voice.results.trouble')}</small><strong>{result.Most_Difficult_Word || '-'}</strong></span>
             </div>
             <table className="results-table">
-              <tbody>
-                <tr><th>{t('voice.results.language')}</th><td>{t(result.Language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</td></tr>
+              <thead>
                 <tr>
-                  <th>{t('voice.hud.engine')}</th>
-                  <td>{t(result.Recognition_Engine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}</td>
+                  <th>#</th>
+                  <th>{t('voice.results.word')}</th>
+                  <th>{t('voice.results.recognized')}</th>
+                  <th>{t('voice.results.similarity')}</th>
+                  <th>{t('drawing.results.reactionTime')}</th>
+                  <th>{t('drawing.results.defeated')}</th>
                 </tr>
-                <tr><th>{t('voice.config.enemySpeed')}</th><td>{t('voice.config.speedValue', { value: result.Enemy_Speed })}</td></tr>
-                <tr><th>{t('voice.results.spawned')}</th><td>{result.Enemies_Spawned}</td></tr>
-                <tr><th>{t('voice.results.hp')}</th><td>{result.HP_Remaining}/{result.Starting_HP}</td></tr>
+              </thead>
+              <tbody>
+                {result.Enemy_Results.map((enemyResult) => (
+                  <tr key={enemyResult.Enemy_Number}>
+                    <td>{enemyResult.Enemy_Number}</td>
+                    <td>{enemyResult.Word}</td>
+                    <td>{enemyResult.Recognized_Text || '-'}</td>
+                    <td>{enemyResult.Similarity_Percent === null ? '-' : `${enemyResult.Similarity_Percent}%`}</td>
+                    <td>
+                      {enemyResult.Reaction_Time_Seconds === null ? '-' : `${enemyResult.Reaction_Time_Seconds}s`}
+                    </td>
+                    <td className={enemyResult.Defeated ? 'result-success' : 'result-fail'}>
+                      {enemyResult.Defeated ? t('drawing.results.success') : t('drawing.results.notDefeated')}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             <div className="results-actions">
-              <button className="btn btn-primary btn-lg" onClick={() => void startGame()}>{t('voice.results.playAgain')}</button>
-              <button className="btn btn-secondary btn-lg" onClick={returnToEditor}>{t('voice.results.back')}</button>
-              <button className="btn btn-secondary btn-lg" onClick={downloadResult}>{t('exp.downloadCsv')}</button>
-              <button className="btn btn-ghost btn-lg" onClick={handleExit}>{t('training.returnMenu')}</button>
+              <button className="btn btn-primary btn-lg" onClick={downloadResult}>{t('training.downloadCsvScores')}</button>
+              <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.playAgain')}</button>
+              <button className="btn btn-ghost btn-lg" onClick={returnToEditor}>{t('training.returnSettings')}</button>
             </div>
           </div>
         </div>
@@ -1563,6 +1798,10 @@ function getMostDifficultWord(misses: Record<string, number>): string {
   return Object.entries(misses).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
 }
 
+function formatGameDuration(duration: GameDurationSeconds, t: TFunction): string {
+  return duration === null ? t('drawing.config.infiniteMode') : t('training.secondsShort', { value: duration });
+}
+
 function toCsv(record: SessionRecord): string {
   const columns = [
     'Test_Date',
@@ -1570,6 +1809,7 @@ function toCsv(record: SessionRecord): string {
     'Language',
     'Recognition_Engine',
     'Difficulty',
+    'Game_Time_Seconds',
     'Starting_HP',
     'Enemy_Speed',
     'Total_Duration_Seconds',
@@ -1593,6 +1833,7 @@ function toCsv(record: SessionRecord): string {
     record.Language,
     record.Recognition_Engine,
     record.Difficulty,
+    record.Game_Time_Seconds ?? 'Infinite',
     record.Starting_HP,
     record.Enemy_Speed,
     record.Total_Duration_Seconds,
