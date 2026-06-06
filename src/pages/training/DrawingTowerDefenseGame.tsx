@@ -296,7 +296,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setDefeated(metrics.defeated);
     setElapsedSeconds(Math.floor(metrics.elapsed));
     setPhase('results');
-    saveTrainingSessionRecord({
+    void saveTrainingSessionRecord({
       userName: record.Participant_ID,
       moduleId: 'motor-training',
       gameId: 'drawing-defense',

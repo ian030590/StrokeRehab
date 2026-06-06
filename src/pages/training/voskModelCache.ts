@@ -1,13 +1,8 @@
-const DATABASE_NAME = 'vision-trainer-model-cache';
-const DATABASE_VERSION = 1;
-const STORE_NAME = 'models';
+const CACHE_NAME = 'stroke-trainer-vosk-models-v1';
+const CACHE_KEY_PREFIX = '__vosk_model_cache__';
+const SOURCE_URL_HEADER = 'X-Stroke-Trainer-Model-Source';
 
-interface CachedModel {
-  key: string;
-  blob: Blob;
-  sourceUrl: string;
-  savedAt: string;
-}
+export type VoskModelLoadStage = 'checking-cache' | 'loading-cache' | 'downloading' | 'saving-cache';
 
 export interface CachedModelUrl {
   url: string;
@@ -18,17 +13,20 @@ export async function getCachedModelUrl(
   cacheKey: string,
   sourceUrl: string,
   onProgress: (progress: number) => void,
+  onStage?: (stage: VoskModelLoadStage) => void,
 ): Promise<CachedModelUrl> {
-  const cached = await readCachedModel(cacheKey).catch((error) => {
-    console.warn('IndexedDB model cache is unavailable.', error);
-    return null;
-  });
-  if (cached?.sourceUrl === sourceUrl) {
+  onStage?.('checking-cache');
+  onProgress(0);
+
+  const cacheRequest = createCacheRequest(cacheKey);
+  const cachedBlob = await readCachedModel(cacheRequest, sourceUrl, onStage);
+  if (cachedBlob) {
     onProgress(100);
-    return createObjectUrl(cached.blob);
+    return createObjectUrl(cachedBlob);
   }
 
-  const response = await fetch(sourceUrl);
+  onStage?.('downloading');
+  const response = await fetch(sourceUrl, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`Unable to download Vosk model (${response.status}).`);
   }
@@ -37,17 +35,55 @@ export async function getCachedModelUrl(
   const blob = response.body
     ? await readResponseBlob(response, totalBytes, onProgress)
     : await response.blob();
+  if (blob.size === 0) {
+    throw new Error('Downloaded Vosk model is empty.');
+  }
 
   onProgress(100);
-  await writeCachedModel({
-    key: cacheKey,
-    blob,
-    sourceUrl,
-    savedAt: new Date().toISOString(),
-  }).catch((error) => {
-    console.warn('Unable to cache Vosk model in IndexedDB.', error);
+  onStage?.('saving-cache');
+  await writeCachedModel(cacheRequest, sourceUrl, blob).catch((error) => {
+    console.warn('Unable to cache Vosk model with the Cache API.', error);
   });
   return createObjectUrl(blob);
+}
+
+async function readCachedModel(
+  request: Request,
+  sourceUrl: string,
+  onStage?: (stage: VoskModelLoadStage) => void,
+): Promise<Blob | null> {
+  if (!('caches' in window)) return null;
+
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const response = await cache.match(request);
+    if (!response) return null;
+    if (!response.ok || response.headers.get(SOURCE_URL_HEADER) !== sourceUrl) {
+      await cache.delete(request);
+      return null;
+    }
+
+    onStage?.('loading-cache');
+    const blob = await response.blob();
+    if (blob.size === 0) {
+      await cache.delete(request);
+      return null;
+    }
+    return blob;
+  } catch (error) {
+    console.warn('Cache API model lookup failed; using network download.', error);
+    return null;
+  }
+}
+
+async function writeCachedModel(request: Request, sourceUrl: string, blob: Blob): Promise<void> {
+  if (!('caches' in window)) return;
+  const cache = await caches.open(CACHE_NAME);
+  const headers = new Headers({
+    'Content-Type': blob.type || 'application/gzip',
+    [SOURCE_URL_HEADER]: sourceUrl,
+  });
+  await cache.put(request, new Response(blob, { status: 200, headers }));
 }
 
 async function readResponseBlob(
@@ -77,48 +113,17 @@ async function readResponseBlob(
   });
 }
 
+function createCacheRequest(cacheKey: string): Request {
+  const cacheUrl = new URL(`${CACHE_KEY_PREFIX}/${encodeURIComponent(cacheKey)}`, window.location.href);
+  cacheUrl.search = '';
+  cacheUrl.hash = '';
+  return new Request(cacheUrl.toString(), { method: 'GET' });
+}
+
 function createObjectUrl(blob: Blob): CachedModelUrl {
   const url = URL.createObjectURL(blob);
   return {
     url,
     revoke: () => URL.revokeObjectURL(url),
   };
-}
-
-async function readCachedModel(key: string): Promise<CachedModel | null> {
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readonly');
-    const request = transaction.objectStore(STORE_NAME).get(key);
-    request.onsuccess = () => resolve((request.result as CachedModel | undefined) ?? null);
-    request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
-  });
-}
-
-async function writeCachedModel(model: CachedModel): Promise<void> {
-  const database = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite');
-    transaction.objectStore(STORE_NAME).put(model);
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => reject(transaction.error);
-  });
-}
-
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: 'key' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
 }

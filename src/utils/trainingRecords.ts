@@ -8,6 +8,10 @@ type TFunction = (key: TranslationKey, params?: Record<string, string | number>)
 export const TRAINING_RECORDS_CHANGED_EVENT = 'vision-trainer-training-records-changed';
 
 const TRAINING_RECORDS_KEY = `${STORAGE_PREFIX}training_records_v1`;
+const TRAINING_RECORDS_DATABASE_NAME = 'stroke-trainer-training-records';
+const TRAINING_RECORDS_DATABASE_VERSION = 1;
+const TRAINING_RECORDS_STORE_NAME = 'records';
+let legacyMigrationPromise: Promise<void> | null = null;
 
 const MODULE_TITLE_KEYS: Record<string, TranslationKey> = {
   'motor-training': 'home.module.motor.title',
@@ -99,24 +103,21 @@ const BASE_CSV_COLUMNS: CsvColumn[] = [
   { key: 'Difficulty', label: 'Difficulty' },
 ];
 
-export function getTrainingRecords(): TrainingRecord[] {
+export async function getTrainingRecords(): Promise<TrainingRecord[]> {
   try {
-    const raw = localStorage.getItem(TRAINING_RECORDS_KEY);
-    if (!raw) return [];
-
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
+    await ensureLegacyTrainingRecordsMigrated();
+    const storedRecords = await readAllTrainingRecords();
+    return storedRecords
       .map(toTrainingRecord)
-      .filter((record): record is TrainingRecord => record !== null);
+      .filter((record): record is TrainingRecord => record !== null)
+      .sort((left, right) => left.savedAt.localeCompare(right.savedAt));
   } catch (error) {
     console.warn('Unable to read saved training records.', error);
     return [];
   }
 }
 
-export function saveTrainingRecord(args: SaveTrainingRecordArgs): TrainingRecord | null {
+export async function saveTrainingRecord(args: SaveTrainingRecordArgs): Promise<TrainingRecord | null> {
   if (args.results.length === 0) return null;
   const now = new Date();
 
@@ -136,7 +137,7 @@ export function saveTrainingRecord(args: SaveTrainingRecordArgs): TrainingRecord
   return appendTrainingRecord(record);
 }
 
-export function saveTrainingSessionRecord(args: SaveTrainingSessionRecordArgs): TrainingRecord | null {
+export async function saveTrainingSessionRecord(args: SaveTrainingSessionRecordArgs): Promise<TrainingRecord | null> {
   const now = new Date();
   const details = normalizeCsvRow(args.details);
   const detailRows = args.detailRows
@@ -161,10 +162,10 @@ export function saveTrainingSessionRecord(args: SaveTrainingSessionRecordArgs): 
   return appendTrainingRecord(record);
 }
 
-function appendTrainingRecord(record: TrainingRecord): TrainingRecord | null {
+async function appendTrainingRecord(record: TrainingRecord): Promise<TrainingRecord | null> {
   try {
-    const records = getTrainingRecords();
-    localStorage.setItem(TRAINING_RECORDS_KEY, JSON.stringify([...records, record]));
+    await ensureLegacyTrainingRecordsMigrated();
+    await writeTrainingRecord(record);
     window.dispatchEvent(new Event(TRAINING_RECORDS_CHANGED_EVENT));
     return record;
   } catch (error) {
@@ -173,8 +174,8 @@ function appendTrainingRecord(record: TrainingRecord): TrainingRecord | null {
   }
 }
 
-export function downloadAllTrainingRecordsCsv(t: TFunction): boolean {
-  const records = getTrainingRecords();
+export async function downloadAllTrainingRecordsCsv(t: TFunction): Promise<boolean> {
+  const records = await getTrainingRecords();
   if (records.length === 0) return false;
 
   const now = new Date();
@@ -185,6 +186,107 @@ export function downloadAllTrainingRecordsCsv(t: TFunction): boolean {
 
   downloadCsvFile(buildTrainingRecordsCsv(records, t), filename);
   return true;
+}
+
+async function ensureLegacyTrainingRecordsMigrated(): Promise<void> {
+  if (!legacyMigrationPromise) {
+    legacyMigrationPromise = migrateLegacyTrainingRecords().catch((error) => {
+      legacyMigrationPromise = null;
+      throw error;
+    });
+  }
+  await legacyMigrationPromise;
+}
+
+async function migrateLegacyTrainingRecords(): Promise<void> {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(TRAINING_RECORDS_KEY);
+  } catch (error) {
+    console.warn('Unable to inspect legacy training records.', error);
+    return;
+  }
+  if (!raw) return;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    console.warn('Unable to parse legacy training records.', error);
+    return;
+  }
+  if (!Array.isArray(parsed)) return;
+
+  const records = parsed
+    .map(toTrainingRecord)
+    .filter((record): record is TrainingRecord => record !== null);
+  await writeTrainingRecords(records);
+  try {
+    localStorage.removeItem(TRAINING_RECORDS_KEY);
+  } catch (error) {
+    console.warn('Legacy training records were migrated but could not be removed.', error);
+  }
+}
+
+async function readAllTrainingRecords(): Promise<unknown[]> {
+  const database = await openTrainingRecordsDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(TRAINING_RECORDS_STORE_NAME, 'readonly');
+    const request = transaction.objectStore(TRAINING_RECORDS_STORE_NAME).getAll();
+    request.onsuccess = () => resolve(request.result as unknown[]);
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => database.close();
+    transaction.onabort = () => {
+      database.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+async function writeTrainingRecord(record: TrainingRecord): Promise<void> {
+  await writeTrainingRecords([record]);
+}
+
+async function writeTrainingRecords(records: TrainingRecord[]): Promise<void> {
+  if (records.length === 0) return;
+  const database = await openTrainingRecordsDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(TRAINING_RECORDS_STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(TRAINING_RECORDS_STORE_NAME);
+    records.forEach((record) => store.put(record));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+function openTrainingRecordsDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('IndexedDB is unavailable.'));
+      return;
+    }
+    const request = indexedDB.open(TRAINING_RECORDS_DATABASE_NAME, TRAINING_RECORDS_DATABASE_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(TRAINING_RECORDS_STORE_NAME)) {
+        const store = database.createObjectStore(TRAINING_RECORDS_STORE_NAME, { keyPath: 'id' });
+        store.createIndex('savedAt', 'savedAt');
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('Training records database upgrade was blocked.'));
+  });
 }
 
 export function buildTrainingRecordsCsv(records: TrainingRecord[], t: TFunction): string {

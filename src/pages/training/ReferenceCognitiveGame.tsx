@@ -183,7 +183,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     setResult(record);
     setHud(summarizeState(state, metricsRef.current.elapsed, effectiveLimit, t));
     setPhase('results');
-    saveTrainingSessionRecord({
+    void saveTrainingSessionRecord({
       userName: record.Participant_ID,
       moduleId: 'cognitive-training',
       gameId: record.Game_ID,

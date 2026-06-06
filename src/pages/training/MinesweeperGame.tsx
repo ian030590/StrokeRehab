@@ -148,7 +148,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
     setElapsedSeconds(Math.floor(duration));
     setResult(record);
     setPhase('results');
-    saveTrainingSessionRecord({
+    void saveTrainingSessionRecord({
       userName: record.Participant_ID,
       moduleId: 'cognitive-training',
       gameId: 'minesweeper',

@@ -12,6 +12,7 @@ export function Navbar() {
   const location = useLocation();
   const [activeUserName, setActiveUserName] = useState(getActiveUser);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDownloadingScores, setIsDownloadingScores] = useState(false);
   const activeTrainingModule =
     location.pathname === '/' || location.pathname === '/motor-training'
       ? 'motor-training'
@@ -36,12 +37,18 @@ export function Navbar() {
   const toggleMenu = () => setIsMenuOpen((open) => !open);
   const closeMenu = () => setIsMenuOpen(false);
   const trainingLinkClass = (moduleId: string) => `navbar-link ${activeTrainingModule === moduleId ? 'active' : ''}`;
-  const handleDownloadScores = () => {
-    const downloaded = downloadAllTrainingRecordsCsv(t);
-    if (!downloaded) {
-      window.alert(t('nav.noScores'));
+  const handleDownloadScores = async () => {
+    if (isDownloadingScores) return;
+    setIsDownloadingScores(true);
+    try {
+      const downloaded = await downloadAllTrainingRecordsCsv(t);
+      if (!downloaded) {
+        window.alert(t('nav.noScores'));
+      }
+      closeMenu();
+    } finally {
+      setIsDownloadingScores(false);
     }
-    closeMenu();
   };
 
   return (
@@ -117,7 +124,12 @@ export function Navbar() {
 
           <div className="navbar-tools">
             <div className="navbar-records">
-              <button type="button" className="btn btn-primary btn-sm navbar-download-btn" onClick={handleDownloadScores}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm navbar-download-btn"
+                disabled={isDownloadingScores}
+                onClick={() => void handleDownloadScores()}
+              >
                 {t('nav.downloadScores')}
               </button>
               <span className="navbar-backup-reminder">{t('nav.scoresBackupReminder')}</span>

@@ -17,11 +17,16 @@ import {
   type VoiceLanguage,
   type VoiceVocabularyItem,
 } from './voiceDefenderVocabulary';
-import { getCachedModelUrl, type CachedModelUrl } from './voskModelCache';
+import {
+  getCachedModelUrl,
+  type CachedModelUrl,
+  type VoskModelLoadStage,
+} from './voskModelCache';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type GamePhase = 'editor' | 'playing' | 'paused' | 'results';
 type ModelStatus = 'idle' | 'loading' | 'ready' | 'error';
+type ModelLoadStage = VoskModelLoadStage | 'initializing';
 type GameResult = 'Defeat' | 'Stopped';
 type MicrophoneStatus = 'pending' | 'testing' | 'ready' | 'silent' | 'muted' | 'disconnected' | 'denied';
 
@@ -170,8 +175,12 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [vocabulary, setVocabulary] = useState<VoiceVocabularyItem[]>(loadVoiceVocabulary);
   const [newWord, setNewWord] = useState('');
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
+  const [modelLoadStage, setModelLoadStage] = useState<ModelLoadStage>('checking-cache');
   const [modelProgress, setModelProgress] = useState(0);
   const [modelError, setModelError] = useState('');
+  const [showInAppBrowserNotice, setShowInAppBrowserNotice] = useState(
+    () => typeof navigator !== 'undefined' && isLineOrFacebookInAppBrowser(navigator.userAgent),
+  );
   const [microphoneStatus, setMicrophoneStatus] = useState<MicrophoneStatus>('pending');
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [microphoneError, setMicrophoneError] = useState('');
@@ -284,6 +293,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     cachedModelUrlRef.current?.revoke();
     cachedModelUrlRef.current = null;
     setModelStatus('loading');
+    setModelLoadStage('checking-cache');
     setModelProgress(0);
     setModelError('');
 
@@ -293,7 +303,12 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         MODEL_URLS[targetLanguage],
         (progress) => {
           if (loadGenerationRef.current === generation) {
-            setModelProgress(Math.round(progress * 0.9));
+            setModelProgress(progress);
+          }
+        },
+        (stage) => {
+          if (loadGenerationRef.current === generation) {
+            setModelLoadStage(stage);
           }
         },
       );
@@ -302,7 +317,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         return;
       }
       cachedModelUrlRef.current = cachedUrl;
-      setModelProgress(95);
+      setModelLoadStage('initializing');
       const { createModel } = await import('vosk-browser');
       const model = await createModel(cachedUrl.url, -1);
       if (loadGenerationRef.current !== generation) {
@@ -513,7 +528,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     };
     setResult(record);
     setPhase('results');
-    saveTrainingSessionRecord({
+    void saveTrainingSessionRecord({
       userName: record.Participant_ID,
       moduleId: 'speech-training',
       gameId: 'voice-defender',
@@ -890,6 +905,18 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     <div className={`voice-defender voice-defender-phase-${phase}`}>
       <div ref={pixiHostRef} className="voice-defender-stage" />
 
+      {showInAppBrowserNotice && (
+        <div className="voice-browser-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-browser-notice-title">
+          <div className="voice-browser-notice">
+            <h2 id="voice-browser-notice-title">{t('voice.browserNotice.title')}</h2>
+            <p>{t('voice.browserNotice.desc')}</p>
+            <button className="btn btn-primary btn-lg" type="button" onClick={() => setShowInAppBrowserNotice(false)}>
+              {t('btn.confirm')}
+            </button>
+          </div>
+        </div>
+      )}
+
       {phase === 'editor' && (
         <div className="training-panel">
           <div className="training-config voice-defender-config">
@@ -899,7 +926,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <h1>{t('voice.title')}</h1>
               </div>
               <div className={`voice-model-status voice-model-status-${modelStatus}`}>
-                <span>{getModelStatusText(modelStatus, modelProgress, t)}</span>
+                <span>{getModelStatusText(modelStatus, modelLoadStage, modelProgress, t)}</span>
                 <progress max="100" value={modelProgress} />
               </div>
             </header>
@@ -1218,11 +1245,25 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   );
 }
 
-function getModelStatusText(status: ModelStatus, progress: number, t: TFunction): string {
+function getModelStatusText(
+  status: ModelStatus,
+  stage: ModelLoadStage,
+  progress: number,
+  t: TFunction,
+): string {
   if (status === 'ready') return t('voice.model.ready');
   if (status === 'error') return t('voice.model.error');
-  if (status === 'loading') return t('voice.model.loading', { value: progress });
+  if (status === 'loading' && stage === 'checking-cache') return t('voice.model.checkingCache');
+  if (status === 'loading' && stage === 'loading-cache') return t('voice.model.loadingCache');
+  if (status === 'loading' && stage === 'downloading') return t('voice.model.downloading', { value: progress });
+  if (status === 'loading' && stage === 'saving-cache') return t('voice.model.savingCache');
+  if (status === 'loading' && stage === 'initializing') return t('voice.model.initializing');
   return t('voice.model.waiting');
+}
+
+export function isLineOrFacebookInAppBrowser(userAgent: string): boolean {
+  return /\bLine\/[\d.]+/i.test(userAgent)
+    || /(FBAN|FBAV|FB_IAB|FBIOS|FB4A|MESSENGER)/i.test(userAgent);
 }
 
 function getMicrophoneStatusText(status: MicrophoneStatus, t: TFunction): string {
