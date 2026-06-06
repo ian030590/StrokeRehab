@@ -725,7 +725,7 @@ function getBoardStats(board: Cell[][]) {
 }
 
 function formatSeconds(value: number, t: (key: TranslationKey, params?: Record<string, string | number>) => string) {
-  return `${value}${t('training.secondsShort')}`;
+  return t('training.secondsShort', { value });
 }
 
 function toCsv(records: SessionRecord[]): string {

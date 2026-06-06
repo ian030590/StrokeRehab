@@ -615,7 +615,7 @@ function formatLimit(value: SessionLimitSeconds, t: TFunction) {
 }
 
 function formatSeconds(value: number, t: TFunction) {
-  return `${value}${t('training.secondsShort')}`;
+  return t('training.secondsShort', { value });
 }
 
 function toCsv(records: SessionRecord[]): string {

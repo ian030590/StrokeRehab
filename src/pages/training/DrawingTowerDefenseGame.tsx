@@ -1847,11 +1847,11 @@ function toCsv(records: SessionRecord[], t: TFunction): string {
 }
 
 function formatGameDuration(duration: GameDurationSeconds, t: TFunction): string {
-  return duration === null ? t('drawing.config.infiniteMode') : `${duration}${t('training.secondsShort')}`;
+  return duration === null ? t('drawing.config.infiniteMode') : t('training.secondsShort', { value: duration });
 }
 
 function formatSeconds(value: number, t: TFunction): string {
-  return `${value}${t('training.secondsShort')}`;
+  return t('training.secondsShort', { value });
 }
 
 function getShapeLabel(shape: ShapeId, t: TFunction): string {
