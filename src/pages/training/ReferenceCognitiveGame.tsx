@@ -108,7 +108,6 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
 
   const meta = getModuleMeta(gameId);
   const metaTitle = t(meta.titleKey);
-  const metaReferenceTitle = t(meta.referenceTitleKey);
   const metaDescription = t(meta.descriptionKey);
   const metaFocus = t(meta.focusKey);
   const activeConfig = DIFFICULTIES[difficulty];
@@ -367,113 +366,109 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       )}
 
       {phase === 'menu' && (
-        <div className="drawing-defense-panel">
-          <div className="drawing-defense-config cognitive-config">
-            <header className="drawing-defense-config-header">
+        <div className="training-panel">
+          <div className="training-config cognitive-config">
+            <header className="training-config-header">
               <div>
-                <span className="drawing-defense-config-label">{t('cognitive.source.javascriptGames')}</span>
+                <span className="training-config-label">{t('training.cognitive.configLabel')}</span>
                 <h1>{metaTitle}</h1>
-              </div>
-              <div className="drawing-defense-config-stats">
-                <span>{metaReferenceTitle}</span>
-                <span>{metaFocus}</span>
               </div>
             </header>
 
-            <div className="drawing-defense-config-body">
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+            <div className="training-config-body">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('cognitive.config.difficulty')}</h2>
                     <p>{activeDifficultyDescription}</p>
                   </div>
                   <span>{activeDifficultyLabel}</span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
+                <div className="training-option-grid training-option-grid-three">
                   {Object.entries(DIFFICULTIES).map(([key, value]) => (
                     <button
                       key={key}
                       type="button"
-                      className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
+                      className={`training-option ${difficulty === key ? 'active' : ''}`}
                       onClick={() => setDifficulty(key as Difficulty)}
                     >
-                      <span className="drawing-defense-option-title">{t(value.labelKey)}</span>
-                      <span className="drawing-defense-option-meta">{t(value.descriptionKey)}</span>
+                      <span className="training-option-title">{t(value.labelKey)}</span>
+                      <span className="training-option-meta">{t(value.descriptionKey)}</span>
                     </button>
                   ))}
                 </div>
               </section>
 
               {gameId === 'reaction-time' ? (
-                <section className="drawing-defense-setting">
-                  <div className="drawing-defense-setting-header">
+                <section className="training-setting">
+                  <div className="training-setting-header">
                     <div>
                       <h2>{t('cognitive.config.reactionTrials')}</h2>
                       <p>{t('cognitive.config.reactionTrialsDesc')}</p>
                     </div>
                     <span>{t('training.count', { value: reactionTrials })}</span>
                   </div>
-                  <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
+                  <div className="training-option-grid training-option-grid-three">
                     {REACTION_TRIAL_OPTIONS.map((value) => (
                       <button
                         key={value}
                         type="button"
-                        className={`drawing-defense-option ${reactionTrials === value ? 'active' : ''}`}
+                        className={`training-option ${reactionTrials === value ? 'active' : ''}`}
                         onClick={() => setReactionTrials(value)}
                       >
-                        <span className="drawing-defense-option-title">{t('training.count', { value })}</span>
+                        <span className="training-option-title">{t('training.count', { value })}</span>
                       </button>
                     ))}
                   </div>
                 </section>
               ) : gameId === 'whack-a-mole' ? (
-                <section className="drawing-defense-setting">
-                  <div className="drawing-defense-setting-header">
+                <section className="training-setting">
+                  <div className="training-setting-header">
                     <div>
                       <h2>{t('cognitive.config.trainingDuration')}</h2>
                       <p>{t('cognitive.config.trainingDurationDesc')}</p>
                     </div>
                     <span>{formatSeconds(whackDurationSec, t)}</span>
                   </div>
-                  <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
+                  <div className="training-option-grid training-option-grid-three">
                     {WHACK_DURATION_OPTIONS.map((value) => (
                       <button
                         key={value}
                         type="button"
-                        className={`drawing-defense-option ${whackDurationSec === value ? 'active' : ''}`}
+                        className={`training-option ${whackDurationSec === value ? 'active' : ''}`}
                         onClick={() => setWhackDurationSec(value)}
                       >
-                        <span className="drawing-defense-option-title">{formatSeconds(value, t)}</span>
+                        <span className="training-option-title">{formatSeconds(value, t)}</span>
                       </button>
                     ))}
                   </div>
                 </section>
               ) : (
-                <section className="drawing-defense-setting">
-                  <div className="drawing-defense-setting-header">
+                <section className="training-setting">
+                  <div className="training-setting-header">
                     <div>
                       <h2>{t('cognitive.config.timeLimit')}</h2>
                       <p>{sessionLimitSec === null ? t('cognitive.config.noTimeLimit') : t('cognitive.config.finishWithin', { seconds: sessionLimitSec })}</p>
                     </div>
                     <span>{formatLimit(sessionLimitSec, t)}</span>
                   </div>
-                  <div className="drawing-defense-option-grid drawing-defense-duration-grid">
+                  <div className="training-option-grid training-duration-grid">
                     {SESSION_LIMIT_OPTIONS.map((value) => (
                       <button
                         key={String(value)}
                         type="button"
-                        className={`drawing-defense-option ${sessionLimitSec === value ? 'active' : ''}`}
+                        className={`training-option ${sessionLimitSec === value ? 'active' : ''}`}
                         onClick={() => setSessionLimitSec(value)}
                       >
-                        <span className="drawing-defense-option-title">{formatLimit(value, t)}</span>
+                        <span className="training-option-title">{formatLimit(value, t)}</span>
                       </button>
                     ))}
                   </div>
                 </section>
               )}
 
-              <section className="drawing-defense-setting drawing-defense-setting-wide">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting training-setting-wide">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('cognitive.config.focusTitle')}</h2>
                     <p>{metaDescription}</p>
@@ -483,13 +478,13 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
               </section>
             </div>
 
-            <div className="drawing-defense-config-footer">
-              <div className="drawing-defense-config-summary">
+            <div className="training-config-footer">
+              <div className="training-config-summary">
                 <strong>{metaTitle}</strong>
                 <span>{activeDifficultyLabel}</span>
                 <span>{gameId === 'reaction-time' ? t('training.count', { value: reactionTrials }) : formatLimit(effectiveLimit, t)}</span>
               </div>
-              <div className="drawing-defense-config-actions">
+              <div className="training-config-actions">
                 <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>{t('training.startGame')}</button>
                 <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.cancel')}</button>
               </div>
@@ -499,10 +494,10 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       )}
 
       {phase === 'paused' && (
-        <div className="drawing-defense-panel drawing-defense-panel-compact">
+        <div className="training-panel training-panel-compact">
           <h1>{t('cognitive.pause.title')}</h1>
           <p>{t('cognitive.pause.desc', { label: hud.primaryLabel, value: hud.primaryValue, seconds: elapsedSeconds })}</p>
-          <div className="drawing-defense-actions">
+          <div className="training-actions">
             <button className="btn btn-primary btn-lg" onClick={resumeGame}>{t('training.continueTraining')}</button>
             <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
             <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnMenu')}</button>
@@ -514,7 +509,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
         <div className="experiment-container cognitive-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
             <h1>{result.Game_Result === 'Victory' ? t('cognitive.results.complete') : t('cognitive.results.ended')}</h1>
-            <div className="drawing-defense-result-summary">
+            <div className="training-result-summary">
               <span>
                 <small>{t('cognitive.results.score')}</small>
                 <strong>{result.Score}</strong>

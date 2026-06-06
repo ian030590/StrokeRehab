@@ -733,65 +733,65 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       </div>}
 
       {phase === 'menu' && (
-        <div className="drawing-defense-panel">
-          <div className="drawing-defense-config">
-            <header className="drawing-defense-config-header">
+        <div className="training-panel">
+          <div className="training-config">
+            <header className="training-config-header">
               <div>
-                <span className="drawing-defense-config-label">{t('drawing.config.label')}</span>
+                <span className="training-config-label">{t('drawing.config.label')}</span>
                 <h1>{t('training.drawing.title')}</h1>
               </div>
             </header>
 
-            <div className="drawing-defense-config-body">
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+            <div className="training-config-body">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('cognitive.config.difficulty')}</h2>
                     <p>{activeDifficultyDescription}</p>
                   </div>
                   <span>{activeDifficultyLabel}</span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
+                <div className="training-option-grid training-option-grid-three">
                   {Object.entries(DIFFICULTIES).map(([key, value]) => (
                     <button
                       key={key}
                       type="button"
-                      className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
+                      className={`training-option ${difficulty === key ? 'active' : ''}`}
                       onClick={() => setDifficulty(key as Difficulty)}
                     >
-                      <span className="drawing-defense-option-title">{t(value.labelKey)}</span>
-                      <span className="drawing-defense-option-meta">{t(value.descriptionKey)}</span>
+                      <span className="training-option-title">{t(value.labelKey)}</span>
+                      <span className="training-option-meta">{t(value.descriptionKey)}</span>
                     </button>
                   ))}
                 </div>
               </section>
 
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('drawing.config.hp')}</h2>
                     <p>{t('drawing.config.hpValue', { value: maxHp })}</p>
                   </div>
                   <span>{isCustomHp ? t('training.custom') : t('training.default')}</span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-option-grid-four">
+                <div className="training-option-grid training-option-grid-four">
                   {HP_OPTIONS.map((option) => (
                     <button
                       key={option}
                       type="button"
-                      className={`drawing-defense-option ${maxHp === option ? 'active' : ''}`}
+                      className={`training-option ${maxHp === option ? 'active' : ''}`}
                       onClick={() => setMaxHp(option)}
                     >
-                      <span className="drawing-defense-option-title">{t('drawing.config.hpValue', { value: option })}</span>
+                      <span className="training-option-title">{t('drawing.config.hpValue', { value: option })}</span>
                     </button>
                   ))}
                   <label
-                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomHp ? 'active' : ''}`}
+                    className={`training-option training-option-custom ${isCustomHp ? 'active' : ''}`}
                     onClick={() => setMaxHp(customHp)}
                   >
-                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
+                    <span className="training-option-title">{t('training.custom')}</span>
                     <input
-                      className="drawing-defense-number-input"
+                      className="training-number-input"
                       type="number"
                       min="1"
                       max="20"
@@ -809,8 +809,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 </div>
               </section>
 
-              <section className="drawing-defense-setting drawing-defense-setting-wide">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting training-setting-wide">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('drawing.config.gameDuration')}</h2>
                     <p>{gameDurationLabel}</p>
@@ -819,24 +819,24 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                     {gameDurationSec === DEFAULT_GAME_DURATION_SECONDS ? t('training.default') : isPresetGameDuration ? t('training.optional') : t('training.custom')}
                   </span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-duration-grid">
+                <div className="training-option-grid training-duration-grid">
                   {GAME_DURATION_OPTIONS.filter((option) => option !== null).map((option) => (
                     <button
                       key={option}
                       type="button"
-                      className={`drawing-defense-option ${gameDurationSec === option ? 'active' : ''}`}
+                      className={`training-option ${gameDurationSec === option ? 'active' : ''}`}
                       onClick={() => setGameDurationSec(option)}
                     >
-                      <span className="drawing-defense-option-title">{formatGameDuration(option, t)}</span>
+                      <span className="training-option-title">{formatGameDuration(option, t)}</span>
                     </button>
                   ))}
                   <label
-                    className={`drawing-defense-option drawing-defense-option-custom ${!isPresetGameDuration ? 'active' : ''}`}
+                    className={`training-option training-option-custom ${!isPresetGameDuration ? 'active' : ''}`}
                     onClick={() => setGameDurationSec(customGameDurationSec)}
                   >
-                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
+                    <span className="training-option-title">{t('training.custom')}</span>
                     <input
-                      className="drawing-defense-number-input"
+                      className="training-number-input"
                       type="number"
                       min="1"
                       max="1800"
@@ -853,41 +853,41 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                   </label>
                   <button
                     type="button"
-                    className={`drawing-defense-option ${gameDurationSec === null ? 'active' : ''}`}
+                    className={`training-option ${gameDurationSec === null ? 'active' : ''}`}
                     onClick={() => setGameDurationSec(null)}
                   >
-                    <span className="drawing-defense-option-title">{t('drawing.config.infiniteMode')}</span>
+                    <span className="training-option-title">{t('drawing.config.infiniteMode')}</span>
                   </button>
                 </div>
               </section>
 
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('drawing.config.enemySpeed')}</h2>
                     <p>{t('drawing.config.speedValue', { value: speed })}</p>
                   </div>
                   <span>{isCustomSpeed ? t('training.custom') : t('training.default')}</span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-speed-grid">
+                <div className="training-option-grid training-speed-grid">
                   {ENEMY_SPEED_OPTIONS.map((option) => (
                     <button
                       key={option}
                       type="button"
-                      className={`drawing-defense-option ${speed === option ? 'active' : ''}`}
+                      className={`training-option ${speed === option ? 'active' : ''}`}
                       onClick={() => setSpeed(option)}
                     >
-                      <span className="drawing-defense-option-title">{option}</span>
-                      <span className="drawing-defense-option-meta">{t('drawing.config.speedUnit')}</span>
+                      <span className="training-option-title">{option}</span>
+                      <span className="training-option-meta">{t('drawing.config.speedUnit')}</span>
                     </button>
                   ))}
                   <label
-                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomSpeed ? 'active' : ''}`}
+                    className={`training-option training-option-custom ${isCustomSpeed ? 'active' : ''}`}
                     onClick={() => setSpeed(customSpeed)}
                   >
-                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
+                    <span className="training-option-title">{t('training.custom')}</span>
                     <input
-                      className="drawing-defense-number-input"
+                      className="training-number-input"
                       type="number"
                       min="1"
                       max="170"
@@ -905,15 +905,15 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 </div>
               </section>
 
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('drawing.config.strictness')}</h2>
                     <p>{strictness}%</p>
                   </div>
                 </div>
                 <input
-                  className="drawing-defense-slider"
+                  className="training-slider"
                   type="range"
                   min={MIN_RECOGNITION_STRICTNESS}
                   max={MAX_RECOGNITION_STRICTNESS}
@@ -923,31 +923,31 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 />
               </section>
 
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('drawing.config.strokeWait')}</h2>
                     <p>{t('drawing.config.waitValue', { value: strokeWaitMs })}</p>
                   </div>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-wait-grid">
+                <div className="training-option-grid training-wait-grid">
                   {STROKE_WAIT_OPTIONS.map((wait) => (
                     <button
                       key={wait}
                       type="button"
-                      className={`drawing-defense-option ${strokeWaitMs === wait ? 'active' : ''}`}
+                      className={`training-option ${strokeWaitMs === wait ? 'active' : ''}`}
                       onClick={() => setStrokeWaitMs(wait)}
                     >
-                      <span className="drawing-defense-option-title">{wait / 1000}s</span>
+                      <span className="training-option-title">{wait / 1000}s</span>
                     </button>
                   ))}
                   <label
-                    className={`drawing-defense-option drawing-defense-option-custom ${!STROKE_WAIT_OPTIONS.includes(strokeWaitMs as typeof STROKE_WAIT_OPTIONS[number]) ? 'active' : ''}`}
+                    className={`training-option training-option-custom ${!STROKE_WAIT_OPTIONS.includes(strokeWaitMs as typeof STROKE_WAIT_OPTIONS[number]) ? 'active' : ''}`}
                     onClick={() => setStrokeWaitMs(customStrokeWaitMs)}
                   >
-                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
+                    <span className="training-option-title">{t('training.custom')}</span>
                     <input
-                      className="drawing-defense-number-input"
+                      className="training-number-input"
                       type="number"
                       min="180"
                       max="600"
@@ -965,8 +965,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 </div>
               </section>
 
-              <section className="drawing-defense-setting drawing-defense-setting-wide">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting training-setting-wide">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('drawing.config.background')}</h2>
                     <p>{backgroundSummary}</p>
@@ -976,11 +976,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <div className="drawing-defense-background-controls">
                   <button
                     type="button"
-                    className={`drawing-defense-option ${backgroundMode === 'stars' ? 'active' : ''}`}
+                    className={`training-option ${backgroundMode === 'stars' ? 'active' : ''}`}
                     onClick={() => setBackgroundMode('stars')}
                   >
-                    <span className="drawing-defense-option-title">{t('drawing.config.starBackground')}</span>
-                    <span className="drawing-defense-option-meta">{t('drawing.config.currentTexture')}</span>
+                    <span className="training-option-title">{t('drawing.config.starBackground')}</span>
+                    <span className="training-option-meta">{t('drawing.config.currentTexture')}</span>
                   </button>
                   <div
                     className={`drawing-defense-background-card ${backgroundMode === 'color' ? 'active' : ''}`}
@@ -990,7 +990,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       <span>{t('drawing.config.backgroundColor')}</span>
                       <strong>{backgroundColor}</strong>
                     </div>
-                    <span className="drawing-defense-option-meta">{t('drawing.config.fixedColor')}</span>
+                    <span className="training-option-meta">{t('drawing.config.fixedColor')}</span>
                   </div>
                   <label
                     className={`drawing-defense-background-card ${backgroundMode === 'image' ? 'active' : ''}`}
@@ -1002,7 +1002,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                       <span>{t('drawing.background.customImage')}</span>
                       <strong>{uploadedBackgroundUrl ? t('drawing.config.uploaded') : t('drawing.config.notUploaded')}</strong>
                     </div>
-                    <span className="drawing-defense-option-meta">{uploadedBackgroundName}</span>
+                    <span className="training-option-meta">{uploadedBackgroundName}</span>
                     <span className="drawing-defense-upload-action">{t('drawing.config.selectImage')}</span>
                     <input
                       type="file"
@@ -1016,8 +1016,8 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               </section>
             </div>
 
-            <div className="drawing-defense-config-footer">
-              <div className="drawing-defense-config-summary">
+            <div className="training-config-footer">
+              <div className="training-config-summary">
                 <strong>{activeDifficultyLabel}</strong>
                 <span>{gameDurationLabel}</span>
                 <span>{t('drawing.config.hpValue', { value: maxHp })}</span>
@@ -1026,7 +1026,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <span>{t('drawing.config.waitValue', { value: strokeWaitMs })}</span>
                 <span>{backgroundSummary}</span>
               </div>
-              <div className="drawing-defense-config-actions">
+              <div className="training-config-actions">
                 <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <polygon points="5,3 19,12 5,21" />
@@ -1041,7 +1041,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       )}
 
       {phase === 'paused' && (
-        <div className="drawing-defense-panel drawing-defense-panel-compact">
+        <div className="training-panel training-panel-compact">
           <h1>{t('drawing.pause.title')}</h1>
           <button className="btn btn-primary btn-lg" onClick={resumeGame}>{t('training.continueGame')}</button>
           <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
@@ -1053,7 +1053,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         <div className="experiment-container drawing-defense-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
             <h1>{t('drawing.results.complete')}</h1>
-            <div className="drawing-defense-result-summary">
+            <div className="training-result-summary">
               <span>
                 <small>{t('drawing.results.user')}</small>
                 <strong>{result.Participant_ID}</strong>

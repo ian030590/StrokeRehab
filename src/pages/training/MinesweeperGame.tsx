@@ -293,66 +293,66 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   return (
     <div className={`minesweeper-game minesweeper-phase-${phase}`}>
       {phase === 'menu' && (
-        <div className="drawing-defense-panel">
-          <div className="drawing-defense-config">
-            <header className="drawing-defense-config-header">
+        <div className="training-panel">
+          <div className="training-config">
+            <header className="training-config-header">
               <div>
-                <span className="drawing-defense-config-label">{t('minesweeper.config.label')}</span>
+                <span className="training-config-label">{t('training.cognitive.configLabel')}</span>
                 <h1>{gameTitle}</h1>
               </div>
             </header>
 
-            <div className="drawing-defense-config-body">
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+            <div className="training-config-body">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('cognitive.config.difficulty')}</h2>
                     <p>{activeDifficultyDescription}</p>
                   </div>
                   <span>{activeDifficultyLabel}</span>
                 </div>
-                <div className="drawing-defense-option-grid drawing-defense-option-grid-three">
+                <div className="training-option-grid training-option-grid-three">
                   {Object.entries(DIFFICULTIES).map(([key, value]) => (
                     <button
                       key={key}
                       type="button"
-                      className={`drawing-defense-option ${difficulty === key ? 'active' : ''}`}
+                      className={`training-option ${difficulty === key ? 'active' : ''}`}
                       onClick={() => setDifficulty(key as MinesweeperDifficulty)}
                     >
-                      <span className="drawing-defense-option-title">{t(value.labelKey)}</span>
-                      <span className="drawing-defense-option-meta">{t(value.descriptionKey)}</span>
+                      <span className="training-option-title">{t(value.labelKey)}</span>
+                      <span className="training-option-meta">{t(value.descriptionKey)}</span>
                     </button>
                   ))}
                 </div>
               </section>
 
-              <section className="drawing-defense-setting">
-                <div className="drawing-defense-setting-header">
+              <section className="training-setting">
+                <div className="training-setting-header">
                   <div>
                     <h2>{t('minesweeper.config.boardSize')}</h2>
                     <p>{selectedBoardConfig.rows}x{selectedBoardConfig.cols}</p>
                   </div>
                   <span>{isCustomBoardSize ? t('training.custom') : t('training.default')}</span>
                 </div>
-                <div className="drawing-defense-option-grid minesweeper-preset-grid">
+                <div className="training-option-grid minesweeper-preset-grid">
                   {Object.entries(BOARD_PRESETS).map(([id, preset]) => (
                     <button
                       key={id}
                       type="button"
-                      className={`drawing-defense-option ${boardPreset === id ? 'active' : ''}`}
+                      className={`training-option ${boardPreset === id ? 'active' : ''}`}
                       onClick={() => setBoardPreset(id as BoardPresetId)}
                     >
-                      <span className="drawing-defense-option-title">{preset.label}</span>
-                      <span className="drawing-defense-option-meta">{t(preset.descriptionKey)}</span>
+                      <span className="training-option-title">{preset.label}</span>
+                      <span className="training-option-meta">{t(preset.descriptionKey)}</span>
                     </button>
                   ))}
                   <label
-                    className={`drawing-defense-option drawing-defense-option-custom ${isCustomBoardSize ? 'active' : ''}`}
+                    className={`training-option training-option-custom ${isCustomBoardSize ? 'active' : ''}`}
                     onClick={() => setBoardPreset('custom')}
                   >
-                    <span className="drawing-defense-option-title">{t('training.custom')}</span>
+                    <span className="training-option-title">{t('training.custom')}</span>
                     <input
-                      className="drawing-defense-number-input"
+                      className="training-number-input"
                       type="number"
                       min="4"
                       max="100"
@@ -371,14 +371,14 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
               </section>
             </div>
 
-            <div className="drawing-defense-config-footer">
-              <div className="drawing-defense-config-summary">
+            <div className="training-config-footer">
+              <div className="training-config-summary">
                 <strong>{activeDifficultyLabel}</strong>
                 <span>{selectedBoardConfig.label}</span>
                 <span>{t('minesweeper.config.density', { value: selectedDensityPercent })}</span>
                 <span>{t('minesweeper.config.mineCount', { value: selectedMineCount })}</span>
               </div>
-              <div className="drawing-defense-config-actions">
+              <div className="training-config-actions">
                 <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
                   {t('training.startGame')}
                 </button>
@@ -418,10 +418,10 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
       )}
 
       {phase === 'paused' && (
-        <div className="drawing-defense-panel drawing-defense-panel-compact">
+        <div className="training-panel training-panel-compact">
           <h1>{t('minesweeper.pause.title')}</h1>
           <p>{t('minesweeper.pause.desc', { seconds: elapsedSeconds })}</p>
-          <div className="drawing-defense-actions">
+          <div className="training-actions">
             <button className="btn btn-primary btn-lg" onClick={resumeGame}>{t('training.continueGame')}</button>
             <button className="btn btn-secondary btn-lg" onClick={restartGame}>{t('training.restart')}</button>
             <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnSettings')}</button>
@@ -433,7 +433,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
         <div className="experiment-container minesweeper-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
             <h1>{result.Game_Result === 'Victory' ? t('minesweeper.results.victory') : t('minesweeper.results.defeat')}</h1>
-            <div className="drawing-defense-result-summary">
+            <div className="training-result-summary">
               <span>
                 <small>{t('minesweeper.results.correctFlags')}</small>
                 <strong>{result.Correctly_Flagged_Mines}</strong>
