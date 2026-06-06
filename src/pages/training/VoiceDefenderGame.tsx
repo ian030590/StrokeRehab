@@ -6,7 +6,7 @@ import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
-import { csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
+import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import type { TFunction } from './types';
 import {
@@ -23,6 +23,7 @@ type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type GamePhase = 'editor' | 'playing' | 'paused' | 'results';
 type ModelStatus = 'idle' | 'loading' | 'ready' | 'error';
 type GameResult = 'Defeat' | 'Stopped';
+type MicrophoneStatus = 'pending' | 'testing' | 'ready' | 'silent' | 'muted' | 'disconnected' | 'denied';
 
 interface VoiceDefenderGameProps {
   onExit: () => void;
@@ -31,9 +32,8 @@ interface VoiceDefenderGameProps {
 interface DifficultyConfig {
   labelKey: TranslationKey;
   descriptionKey: TranslationKey;
-  speed: number;
-  spawnMinSec: number;
-  spawnMaxSec: number;
+  spawnMode: 'after-clear-delay' | 'after-clear' | 'fixed-interval';
+  spawnIntervalSec: number;
 }
 
 interface Enemy {
@@ -61,6 +61,7 @@ interface SessionRecord {
   Language: VoiceLanguage;
   Difficulty: Difficulty;
   Starting_HP: number;
+  Enemy_Speed: number;
   Total_Duration_Seconds: number;
   Enemies_Spawned: number;
   Enemies_Defeated: number;
@@ -78,6 +79,16 @@ interface SpeechRuntime {
   processor: ScriptProcessorNode;
   mute: GainNode;
   recognizer: KaldiRecognizer;
+  removeTrackListeners: () => void;
+}
+
+interface MicrophoneTestRuntime {
+  stream: MediaStream;
+  audioContext: AudioContext;
+  source: MediaStreamAudioSourceNode;
+  analyser: AnalyserNode;
+  animationFrame: number;
+  removeTrackListeners: () => void;
 }
 
 const MODEL_URLS: Record<VoiceLanguage, string> = {
@@ -91,31 +102,32 @@ const DIFFICULTIES: Record<Difficulty, DifficultyConfig> = {
   Beginner: {
     labelKey: 'voice.diff.beginner',
     descriptionKey: 'voice.diff.beginnerDesc',
-    speed: 32,
-    spawnMinSec: 2.8,
-    spawnMaxSec: 4.2,
+    spawnMode: 'after-clear-delay',
+    spawnIntervalSec: 2,
   },
   Intermediate: {
     labelKey: 'voice.diff.intermediate',
     descriptionKey: 'voice.diff.intermediateDesc',
-    speed: 48,
-    spawnMinSec: 2,
-    spawnMaxSec: 3.2,
+    spawnMode: 'after-clear',
+    spawnIntervalSec: 0,
   },
   Advanced: {
     labelKey: 'voice.diff.advanced',
     descriptionKey: 'voice.diff.advancedDesc',
-    speed: 66,
-    spawnMinSec: 1.2,
-    spawnMaxSec: 2.2,
+    spawnMode: 'fixed-interval',
+    spawnIntervalSec: 3,
   },
 };
 
 const HP_OPTIONS = [3, 5, 8] as const;
+const ENEMY_SPEED_OPTIONS = [5, 15, 30] as const;
 const DEFAULT_HP = 5;
+const DEFAULT_ENEMY_SPEED = 5;
 const SIMILARITY_THRESHOLD = 0.75;
 const ENEMY_WIDTH = 156;
 const ENEMY_HEIGHT = 76;
+const MICROPHONE_SIGNAL_THRESHOLD = 0.006;
+const MICROPHONE_SILENCE_DELAY_MS = 1600;
 
 export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const { t } = useT();
@@ -124,6 +136,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const modelRef = useRef<Model | null>(null);
   const cachedModelUrlRef = useRef<CachedModelUrl | null>(null);
   const speechRuntimeRef = useRef<SpeechRuntime | null>(null);
+  const microphoneTestRuntimeRef = useRef<MicrophoneTestRuntime | null>(null);
   const enemiesRef = useRef<Enemy[]>([]);
   const enemyResultsRef = useRef<EnemyResult[]>([]);
   const wordMissesRef = useRef<Record<string, number>>({});
@@ -137,13 +150,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     spawned: 0,
     defeated: 0,
     spawnTimer: 0,
-    nextSpawnSec: 0.5,
     nextId: 1,
   });
   const configRef = useRef({
     language: 'zh' as VoiceLanguage,
     difficulty: 'Beginner' as Difficulty,
     maxHp: DEFAULT_HP,
+    speed: DEFAULT_ENEMY_SPEED,
     activeWords: [] as string[],
   });
   const jsPsychRef = useRef<ReturnType<typeof initJsPsych> | null>(null);
@@ -152,12 +165,15 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [language, setLanguage] = useState<VoiceLanguage>('zh');
   const [difficulty, setDifficulty] = useState<Difficulty>('Beginner');
   const [maxHp, setMaxHp] = useState(DEFAULT_HP);
+  const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
+  const [customSpeed, setCustomSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [vocabulary, setVocabulary] = useState<VoiceVocabularyItem[]>(loadVoiceVocabulary);
   const [newWord, setNewWord] = useState('');
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
   const [modelProgress, setModelProgress] = useState(0);
   const [modelError, setModelError] = useState('');
-  const [microphoneReady, setMicrophoneReady] = useState(false);
+  const [microphoneStatus, setMicrophoneStatus] = useState<MicrophoneStatus>('pending');
+  const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [microphoneError, setMicrophoneError] = useState('');
   const [hp, setHp] = useState(DEFAULT_HP);
   const [score, setScore] = useState(0);
@@ -174,7 +190,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     () => languageVocabulary.filter((item) => item.isActive).map((item) => item.word),
     [languageVocabulary],
   );
+  const microphoneReady = microphoneStatus === 'ready';
   const canStart = modelStatus === 'ready' && microphoneReady && activeWords.length > 0;
+  const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -182,8 +200,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   }, []);
 
   useEffect(() => {
-    configRef.current = { language, difficulty, maxHp, activeWords };
-  }, [activeWords, difficulty, language, maxHp]);
+    configRef.current = { language, difficulty, maxHp, speed, activeWords };
+  }, [activeWords, difficulty, language, maxHp, speed]);
 
   useEffect(() => {
     saveVoiceVocabulary(vocabulary);
@@ -193,20 +211,61 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     jsPsychRef.current = initJsPsych();
   }, []);
 
-  const stopListening = useCallback(async () => {
+  const addMicrophoneTrackListeners = useCallback((track: MediaStreamTrack) => {
+    const handleEnded = () => {
+      setMicrophoneLevel(0);
+      setMicrophoneStatus('disconnected');
+    };
+    const handleMute = () => {
+      setMicrophoneLevel(0);
+      setMicrophoneStatus('muted');
+    };
+    const handleUnmute = () => {
+      setMicrophoneStatus('testing');
+    };
+    track.addEventListener('ended', handleEnded);
+    track.addEventListener('mute', handleMute);
+    track.addEventListener('unmute', handleUnmute);
+    return () => {
+      track.removeEventListener('ended', handleEnded);
+      track.removeEventListener('mute', handleMute);
+      track.removeEventListener('unmute', handleUnmute);
+    };
+  }, []);
+
+  const stopMicrophoneTest = useCallback(async (resetStatus = true) => {
+    const runtime = microphoneTestRuntimeRef.current;
+    microphoneTestRuntimeRef.current = null;
+    if (runtime) {
+      window.cancelAnimationFrame(runtime.animationFrame);
+      runtime.removeTrackListeners();
+      runtime.source.disconnect();
+      runtime.stream.getTracks().forEach((track) => track.stop());
+      if (runtime.audioContext.state !== 'closed') {
+        await runtime.audioContext.close().catch(() => undefined);
+      }
+    }
+    setMicrophoneLevel(0);
+    if (resetStatus) setMicrophoneStatus('disconnected');
+  }, []);
+
+  const stopListening = useCallback(async (resetStatus = true) => {
     const runtime = speechRuntimeRef.current;
     speechRuntimeRef.current = null;
-    if (!runtime) return;
-
-    runtime.processor.onaudioprocess = null;
-    runtime.source.disconnect();
-    runtime.processor.disconnect();
-    runtime.mute.disconnect();
-    runtime.stream.getTracks().forEach((track) => track.stop());
-    runtime.recognizer.remove();
-    if (runtime.audioContext.state !== 'closed') {
-      await runtime.audioContext.close().catch(() => undefined);
+    if (runtime) {
+      runtime.processor.onaudioprocess = null;
+      runtime.removeTrackListeners();
+      runtime.source.disconnect();
+      runtime.processor.disconnect();
+      runtime.mute.disconnect();
+      runtime.stream.getTracks().forEach((track) => track.stop());
+      runtime.recognizer.remove();
+      if (runtime.audioContext.state !== 'closed') {
+        await runtime.audioContext.close().catch(() => undefined);
+      }
     }
+    setMicrophoneLevel(0);
+    if (resetStatus) setMicrophoneStatus('disconnected');
   }, []);
 
   useEffect(() => {
@@ -263,24 +322,36 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   }, [t]);
 
   useEffect(() => {
-    void stopListening();
-    setMicrophoneReady(false);
+    void stopListening(false);
+    void stopMicrophoneTest(false);
+    setMicrophoneStatus('pending');
+    setMicrophoneLevel(0);
     setMicrophoneError('');
     void loadModel(language);
-  }, [language, loadModel, stopListening]);
+  }, [language, loadModel, stopListening, stopMicrophoneTest]);
 
   useEffect(() => () => {
     loadGenerationRef.current += 1;
-    void stopListening();
+    void stopListening(false);
+    void stopMicrophoneTest(false);
     modelRef.current?.terminate();
     cachedModelUrlRef.current?.revoke();
     enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
     enemiesRef.current = [];
-  }, [stopListening]);
+  }, [stopListening, stopMicrophoneTest]);
 
   const testMicrophone = useCallback(async () => {
+    await stopListening(false);
+    await stopMicrophoneTest(false);
     setMicrophoneError('');
+    setMicrophoneLevel(0);
+    setMicrophoneStatus('testing');
+    let pendingStream: MediaStream | null = null;
+    let pendingAudioContext: AudioContext | null = null;
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(t('voice.microphone.denied'));
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: false,
         audio: {
@@ -289,14 +360,75 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           channelCount: 1,
         },
       });
-      stream.getTracks().forEach((track) => track.stop());
-      setMicrophoneReady(true);
+      pendingStream = stream;
+      const track = stream.getAudioTracks()[0];
+      if (!track || track.readyState !== 'live') {
+        throw new Error(t('voice.microphone.denied'));
+      }
+
+      const audioContext = new AudioContext();
+      pendingAudioContext = audioContext;
+      await audioContext.resume();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.72;
+      source.connect(analyser);
+
+      const removeTrackListeners = addMicrophoneTrackListeners(track);
+      const samples = new Uint8Array(analyser.fftSize);
+      const startedAt = performance.now();
+      let lastSignalAt = 0;
+      let lastRenderAt = 0;
+      const runtime: MicrophoneTestRuntime = {
+        stream,
+        audioContext,
+        source,
+        analyser,
+        animationFrame: 0,
+        removeTrackListeners,
+      };
+      microphoneTestRuntimeRef.current = runtime;
+      pendingStream = null;
+      pendingAudioContext = null;
+
+      const updateMeter = (now: number) => {
+        if (microphoneTestRuntimeRef.current !== runtime) return;
+        analyser.getByteTimeDomainData(samples);
+        const rms = calculateByteRms(samples);
+        if (now - lastRenderAt >= 70) {
+          setMicrophoneLevel(toMeterLevel(rms));
+          lastRenderAt = now;
+        }
+
+        if (track.readyState !== 'live') {
+          setMicrophoneStatus('disconnected');
+        } else if (!track.enabled || track.muted) {
+          setMicrophoneStatus('muted');
+        } else if (rms >= MICROPHONE_SIGNAL_THRESHOLD) {
+          lastSignalAt = now;
+          setMicrophoneStatus('ready');
+        } else if (
+          now - startedAt >= MICROPHONE_SILENCE_DELAY_MS
+          && (lastSignalAt === 0 || now - lastSignalAt >= MICROPHONE_SILENCE_DELAY_MS)
+        ) {
+          setMicrophoneStatus('silent');
+        }
+
+        runtime.animationFrame = window.requestAnimationFrame(updateMeter);
+      };
+      runtime.animationFrame = window.requestAnimationFrame(updateMeter);
     } catch (error) {
       console.warn('Microphone permission was not granted.', error);
-      setMicrophoneReady(false);
+      pendingStream?.getTracks().forEach((track) => track.stop());
+      if (pendingAudioContext && pendingAudioContext.state !== 'closed') {
+        await pendingAudioContext.close().catch(() => undefined);
+      }
+      await stopMicrophoneTest(false);
+      setMicrophoneStatus('denied');
       setMicrophoneError(t('voice.microphone.denied'));
     }
-  }, [t]);
+  }, [addMicrophoneTrackListeners, stopListening, stopMicrophoneTest, t]);
 
   const clearEnemies = useCallback(() => {
     enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
@@ -369,6 +501,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       Language: configRef.current.language,
       Difficulty: configRef.current.difficulty,
       Starting_HP: configRef.current.maxHp,
+      Enemy_Speed: configRef.current.speed,
       Total_Duration_Seconds: Number(metrics.elapsed.toFixed(1)),
       Enemies_Spawned: metrics.spawned,
       Enemies_Defeated: metrics.defeated,
@@ -390,6 +523,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       details: {
         Language: record.Language,
         Starting_HP: record.Starting_HP,
+        Enemy_Speed: record.Enemy_Speed,
         Total_Duration_Seconds: record.Total_Duration_Seconds,
         Enemies_Spawned: record.Enemies_Spawned,
         Enemies_Defeated: record.Enemies_Defeated,
@@ -443,7 +577,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const startListening = useCallback(async () => {
     const model = modelRef.current;
     if (!model) throw new Error(t('voice.model.notReady'));
-    await stopListening();
+    await stopMicrophoneTest(false);
+    await stopListening(false);
+    setMicrophoneLevel(0);
+    setMicrophoneStatus('testing');
 
     const stream = await navigator.mediaDevices.getUserMedia({
       video: false,
@@ -453,6 +590,11 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         channelCount: 1,
       },
     });
+    const track = stream.getAudioTracks()[0];
+    if (!track || track.readyState !== 'live') {
+      stream.getTracks().forEach((streamTrack) => streamTrack.stop());
+      throw new Error(t('voice.microphone.denied'));
+    }
     const audioContext = new AudioContext();
     await audioContext.resume();
     const grammar = JSON.stringify(['[unk]', ...configRef.current.activeWords]);
@@ -476,9 +618,29 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const source = audioContext.createMediaStreamSource(stream);
     const processor = audioContext.createScriptProcessor(4096, 1, 1);
     const mute = audioContext.createGain();
+    const removeTrackListeners = addMicrophoneTrackListeners(track);
+    const startedAt = performance.now();
+    let lastSignalAt = 0;
     mute.gain.value = 0;
     processor.onaudioprocess = (event) => {
       try {
+        const samples = event.inputBuffer.getChannelData(0);
+        const rms = calculateFloatRms(samples);
+        const now = performance.now();
+        setMicrophoneLevel(toMeterLevel(rms));
+        if (track.readyState !== 'live') {
+          setMicrophoneStatus('disconnected');
+        } else if (!track.enabled || track.muted) {
+          setMicrophoneStatus('muted');
+        } else if (rms >= MICROPHONE_SIGNAL_THRESHOLD) {
+          lastSignalAt = now;
+          setMicrophoneStatus('ready');
+        } else if (
+          now - startedAt >= MICROPHONE_SILENCE_DELAY_MS
+          && (lastSignalAt === 0 || now - lastSignalAt >= MICROPHONE_SILENCE_DELAY_MS)
+        ) {
+          setMicrophoneStatus('silent');
+        }
         recognizer.acceptWaveform(event.inputBuffer);
       } catch (error) {
         console.warn('Unable to process microphone audio.', error);
@@ -487,8 +649,16 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     source.connect(processor);
     processor.connect(mute);
     mute.connect(audioContext.destination);
-    speechRuntimeRef.current = { stream, audioContext, source, processor, mute, recognizer };
-  }, [handleRecognition, stopListening, t]);
+    speechRuntimeRef.current = {
+      stream,
+      audioContext,
+      source,
+      processor,
+      mute,
+      recognizer,
+      removeTrackListeners,
+    };
+  }, [addMicrophoneTrackListeners, handleRecognition, stopListening, stopMicrophoneTest, t]);
 
   const spawnEnemy = useCallback((app: Application) => {
     const words = configRef.current.activeWords;
@@ -543,12 +713,14 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   }, []);
 
   const startGame = useCallback(async () => {
-    if (!verifySelectedTrainingUser(t) || !canStart) return;
+    if (!verifySelectedTrainingUser(t)) return;
+    if (modelStatus !== 'ready' || activeWords.length === 0) return;
+    if (phaseRef.current === 'editor' && !microphoneReady) return;
     const app = appRef.current;
     if (!app) return;
 
     setMicrophoneError('');
-    configRef.current = { language, difficulty, maxHp, activeWords };
+    configRef.current = { language, difficulty, maxHp, speed, activeWords };
     try {
       await startListening();
     } catch (error) {
@@ -566,7 +738,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       spawned: 0,
       defeated: 0,
       spawnTimer: 0,
-      nextSpawnSec: 0.3,
       nextId: 1,
     };
     enemyResultsRef.current = [];
@@ -580,13 +751,15 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     setPhase('playing');
   }, [
     activeWords,
-    canStart,
     clearEnemies,
     difficulty,
     drawStage,
     language,
     maxHp,
+    microphoneReady,
+    modelStatus,
     setPhase,
+    speed,
     startListening,
     t,
   ]);
@@ -647,19 +820,28 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         const metrics = metricsRef.current;
         const config = DIFFICULTIES[configRef.current.difficulty];
         metrics.elapsed += dt;
-        metrics.spawnTimer += dt;
         const nextElapsed = Math.floor(metrics.elapsed);
         setElapsedSeconds((current) => current === nextElapsed ? current : nextElapsed);
 
-        if (metrics.spawnTimer >= metrics.nextSpawnSec) {
+        const noActiveEnemies = enemiesRef.current.length === 0;
+        if (config.spawnMode === 'fixed-interval' || noActiveEnemies) {
+          metrics.spawnTimer += dt;
+        } else {
           metrics.spawnTimer = 0;
-          metrics.nextSpawnSec = randomBetween(config.spawnMinSec, config.spawnMaxSec);
+        }
+        const shouldSpawn =
+          metrics.spawned === 0
+          || (config.spawnMode === 'after-clear-delay' && noActiveEnemies && metrics.spawnTimer >= config.spawnIntervalSec)
+          || (config.spawnMode === 'after-clear' && noActiveEnemies)
+          || (config.spawnMode === 'fixed-interval' && metrics.spawnTimer >= config.spawnIntervalSec);
+        if (shouldSpawn) {
+          metrics.spawnTimer = 0;
           spawnEnemy(app);
         }
 
         const defenseY = app.renderer.height - 96;
         for (const enemy of [...enemiesRef.current]) {
-          enemy.y += config.speed * dt;
+          enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
           if (enemy.y + ENEMY_HEIGHT / 2 < defenseY) continue;
           recordEnemyOutcome(enemy, false);
@@ -803,6 +985,50 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 </div>
               </section>
 
+              <section className="training-setting">
+                <div className="training-setting-header">
+                  <div>
+                    <h2>{t('voice.config.enemySpeed')}</h2>
+                    <p>{t('voice.config.speedValue', { value: speed })}</p>
+                  </div>
+                  <span>{isCustomSpeed ? t('training.custom') : t('training.default')}</span>
+                </div>
+                <div className="training-option-grid training-speed-grid">
+                  {ENEMY_SPEED_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={`training-option ${speed === option ? 'active' : ''}`}
+                      onClick={() => setSpeed(option)}
+                    >
+                      <span className="training-option-title">{option}</span>
+                      <span className="training-option-meta">{t('voice.config.speedUnit')}</span>
+                    </button>
+                  ))}
+                  <label
+                    className={`training-option training-option-custom ${isCustomSpeed ? 'active' : ''}`}
+                    onClick={() => setSpeed(customSpeed)}
+                  >
+                    <span className="training-option-title">{t('training.custom')}</span>
+                    <input
+                      className="training-number-input"
+                      type="number"
+                      min="1"
+                      max="170"
+                      step="1"
+                      value={customSpeed}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 170);
+                        setCustomSpeed(value);
+                        setSpeed(value);
+                      }}
+                      onFocus={() => setSpeed(customSpeed)}
+                      aria-label={t('voice.config.customEnemySpeed')}
+                    />
+                  </label>
+                </div>
+              </section>
+
               <section className="training-setting training-setting-wide voice-vocabulary-setting">
                 <div className="training-setting-header">
                   <div>
@@ -877,17 +1103,35 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 </div>
               </section>
 
-              <section className="training-setting training-setting-wide voice-microphone-setting">
+              <section className={`training-setting training-setting-wide voice-microphone-setting voice-microphone-${microphoneStatus}`}>
                 <div className="training-setting-header">
                   <div>
                     <h2>{t('voice.microphone.title')}</h2>
                     <p>{microphoneError || t('voice.microphone.desc')}</p>
                   </div>
-                  <span>{microphoneReady ? t('voice.microphone.ready') : t('voice.microphone.pending')}</span>
+                  <span>{getMicrophoneStatusText(microphoneStatus, t)}</span>
                 </div>
-                <button className="btn btn-secondary" type="button" onClick={() => void testMicrophone()}>
-                  {t('voice.microphone.test')}
-                </button>
+                <div className="voice-microphone-controls">
+                  <div className="voice-volume-meter-group">
+                    <div className="voice-volume-meter-label">
+                      <span>{t('voice.microphone.level')}</span>
+                      <strong>{Math.round(microphoneLevel * 100)}%</strong>
+                    </div>
+                    <div
+                      className="voice-volume-meter"
+                      role="progressbar"
+                      aria-label={t('voice.microphone.level')}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(microphoneLevel * 100)}
+                    >
+                      <span style={{ width: `${Math.round(microphoneLevel * 100)}%` }} />
+                    </div>
+                  </div>
+                  <button className="btn btn-secondary" type="button" onClick={() => void testMicrophone()}>
+                    {t('voice.microphone.test')}
+                  </button>
+                </div>
               </section>
             </div>
 
@@ -895,6 +1139,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
               <div className="training-config-summary">
                 <strong>{t(activeConfig.labelKey)}</strong>
                 <span>{t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</span>
+                <span>{t('voice.config.speedValue', { value: speed })}</span>
                 <span>{t('voice.vocabulary.activeCount', { active: activeWords.length, total: languageVocabulary.length })}</span>
               </div>
               <div className="training-config-actions">
@@ -918,9 +1163,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           <div><strong>{t('voice.hud.score')}</strong> {score}</div>
           <div><strong>{t('voice.hud.time')}</strong> {elapsedSeconds}s</div>
           {phase === 'playing' && (
-            <div className="voice-listening-indicator">
+            <div className={`voice-listening-indicator voice-listening-${microphoneStatus}`}>
               <span aria-hidden="true" />
-              <strong>{t('voice.hud.listening')}</strong>
+              <strong>{getMicrophoneStatusText(microphoneStatus, t)}</strong>
             </div>
           )}
           <div><strong>{t('voice.hud.heard')}</strong> {recognizedText || '-'}</div>
@@ -955,6 +1200,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             <table className="results-table">
               <tbody>
                 <tr><th>{t('voice.results.language')}</th><td>{t(result.Language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</td></tr>
+                <tr><th>{t('voice.config.enemySpeed')}</th><td>{t('voice.config.speedValue', { value: result.Enemy_Speed })}</td></tr>
                 <tr><th>{t('voice.results.spawned')}</th><td>{result.Enemies_Spawned}</td></tr>
                 <tr><th>{t('voice.results.hp')}</th><td>{result.HP_Remaining}/{result.Starting_HP}</td></tr>
               </tbody>
@@ -977,6 +1223,37 @@ function getModelStatusText(status: ModelStatus, progress: number, t: TFunction)
   if (status === 'error') return t('voice.model.error');
   if (status === 'loading') return t('voice.model.loading', { value: progress });
   return t('voice.model.waiting');
+}
+
+function getMicrophoneStatusText(status: MicrophoneStatus, t: TFunction): string {
+  if (status === 'testing') return t('voice.microphone.testing');
+  if (status === 'ready') return t('voice.microphone.ready');
+  if (status === 'silent') return t('voice.microphone.silent');
+  if (status === 'muted') return t('voice.microphone.muted');
+  if (status === 'disconnected') return t('voice.microphone.disconnected');
+  if (status === 'denied') return t('voice.microphone.deniedStatus');
+  return t('voice.microphone.pending');
+}
+
+function calculateByteRms(samples: Uint8Array): number {
+  let sumSquares = 0;
+  for (const sample of samples) {
+    const normalized = (sample - 128) / 128;
+    sumSquares += normalized * normalized;
+  }
+  return Math.sqrt(sumSquares / samples.length);
+}
+
+function calculateFloatRms(samples: Float32Array): number {
+  let sumSquares = 0;
+  for (const sample of samples) {
+    sumSquares += sample * sample;
+  }
+  return Math.sqrt(sumSquares / samples.length);
+}
+
+function toMeterLevel(rms: number): number {
+  return clamp(Math.sqrt(rms) * 2.2, 0, 1);
 }
 
 function normalizeSpeechText(value: string): string {
@@ -1019,10 +1296,6 @@ function getMostDifficultWord(misses: Record<string, number>): string {
   return Object.entries(misses).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
 }
 
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
 function toCsv(record: SessionRecord): string {
   const columns = [
     'Test_Date',
@@ -1030,6 +1303,7 @@ function toCsv(record: SessionRecord): string {
     'Language',
     'Difficulty',
     'Starting_HP',
+    'Enemy_Speed',
     'Total_Duration_Seconds',
     'Enemies_Spawned',
     'Enemies_Defeated',
@@ -1051,6 +1325,7 @@ function toCsv(record: SessionRecord): string {
     record.Language,
     record.Difficulty,
     record.Starting_HP,
+    record.Enemy_Speed,
     record.Total_Duration_Seconds,
     record.Enemies_Spawned,
     record.Enemies_Defeated,
