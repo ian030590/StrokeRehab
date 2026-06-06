@@ -102,4 +102,15 @@ DRAWING_UPLOAD_ALLOWED_ORIGINS=https://your-frontend.example.com
 
 GitHub Pages only supports static files and cannot execute `functions/api/drawing-samples.js`. If deploying to GitHub Pages, you need to point `VITE_DRAWING_SAMPLE_UPLOAD_URL` to another service capable of executing this API.
 
+## Voice Defender Models
+
+Voice Defender downloads the selected Vosk model in the browser and caches the archive in IndexedDB. The default Chinese and English models can be replaced with self-hosted `.tar.gz` model archives:
+
+```text
+VITE_VOSK_MODEL_ZH_URL=https://your-cdn.example.com/vosk-model-small-cn.tar.gz
+VITE_VOSK_MODEL_EN_URL=https://your-cdn.example.com/vosk-model-small-en-us.tar.gz
+```
+
+The model host must allow cross-origin requests. Microphone audio is processed locally by Vosk Browser and is not uploaded.
+
 > **Disclaimer:** This application is for programming practice and experimental purposes, and is not intended as medical diagnosis, treatment, or rehabilitation advice. If you have medical needs, please seek professional medical assistance.
