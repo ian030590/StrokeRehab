@@ -2605,6 +2605,65 @@ body #webgazer-calibrate-container #calibration-point {
   color: var(--error);
 }
 
+.voice-start-invalid {
+  position: relative;
+  border-radius: var(--radius-m);
+  background: rgba(220, 38, 38, 0.06);
+  outline: 3px solid rgba(220, 38, 38, 0.88);
+  outline-offset: -3px;
+  box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.1);
+}
+
+.voice-start-invalid .training-setting-header h2 {
+  color: var(--error);
+}
+
+.voice-start-validation {
+  flex: 0 0 auto;
+  margin: 14px 28px 0;
+  padding: 14px 16px;
+  border: 2px solid var(--error);
+  border-radius: var(--radius-m);
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+.voice-start-validation strong {
+  font-size: 16px;
+}
+
+.voice-start-validation p {
+  margin: 4px 0 8px;
+  color: inherit;
+  font-size: 13px;
+}
+
+.voice-start-validation ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.voice-background-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.voice-background-color-picker input {
+  width: 36px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  background: #ffffff;
+  cursor: pointer;
+}
+
 .voice-vocabulary-editor {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.55fr);
@@ -2845,6 +2904,10 @@ body #webgazer-calibrate-container #calibration-point {
 }
 
 @media (max-width: 720px) {
+  .voice-start-validation {
+    margin: 12px 18px 0;
+  }
+
   .drawing-defense-hud {
     top: 8px;
     right: 8px;

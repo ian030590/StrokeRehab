@@ -50,6 +50,7 @@ type MicrophoneStatus = 'pending' | 'testing' | 'ready' | 'silent' | 'muted' | '
 type RecognitionEngine = 'vosk' | 'web-speech';
 type BackgroundMode = 'stars' | 'color' | 'image';
 type GameDurationSeconds = number | null;
+type StartRequirement = 'recognition' | 'vocabulary' | 'microphone';
 
 interface VoiceDefenderGameProps {
   onExit: () => void;
@@ -175,6 +176,11 @@ interface MicrophoneTestRuntime {
   removeTrackListeners: () => void;
 }
 
+interface StartIssue {
+  requirement: StartRequirement;
+  message: string;
+}
+
 const MODEL_URLS: Record<VoiceLanguage, string> = {
   zh: import.meta.env.VITE_VOSK_MODEL_ZH_URL?.trim()
     || 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-cn-0.3.tar.gz',
@@ -239,6 +245,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const recognitionEngineRef = useRef<RecognitionEngine | null>(null);
   const backgroundDownloadUnsubscribeRef = useRef<(() => void) | null>(null);
   const uploadedBackgroundUrlRef = useRef<string | null>(null);
+  const recognitionSettingRef = useRef<HTMLElement | null>(null);
+  const vocabularySettingRef = useRef<HTMLElement | null>(null);
+  const microphoneSettingRef = useRef<HTMLElement | null>(null);
   const microphoneTestRuntimeRef = useRef<MicrophoneTestRuntime | null>(null);
   const enemiesRef = useRef<Enemy[]>([]);
   const enemyResultsRef = useRef<EnemyResult[]>([]);
@@ -275,7 +284,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [speed, setSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [customSpeed, setCustomSpeed] = useState(DEFAULT_ENEMY_SPEED);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('stars');
-  const backgroundColor = DEFAULT_BACKGROUND_COLOR;
+  const [backgroundColor, setBackgroundColor] = useState(DEFAULT_BACKGROUND_COLOR);
   const [uploadedBackgroundUrl, setUploadedBackgroundUrl] = useState<string | null>(null);
   const [uploadedBackgroundName, setUploadedBackgroundName] = useState(() => t('drawing.upload.noImage'));
   const [vocabulary, setVocabulary] = useState<VoiceVocabularyItem[]>(loadVoiceVocabulary);
@@ -298,6 +307,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recognizedText, setRecognizedText] = useState('');
   const [result, setResult] = useState<SessionRecord | null>(null);
+  const [showStartValidation, setShowStartValidation] = useState(false);
 
   const activeConfig = DIFFICULTIES[difficulty];
   const languageVocabulary = useMemo(
@@ -310,7 +320,43 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   );
   const microphoneReady = microphoneStatus === 'ready';
   const recognitionReady = modelStatus === 'ready' || modelStatus === 'fallback';
-  const canStart = recognitionReady && microphoneReady && activeWords.length > 0;
+  const startIssues = useMemo<StartIssue[]>(() => {
+    const issues: StartIssue[] = [];
+    if (!recognitionReady) {
+      issues.push({
+        requirement: 'recognition',
+        message: modelStatus === 'loading'
+          ? t('voice.startBlocked.modelLoading')
+          : modelError || t('voice.startBlocked.modelUnavailable'),
+      });
+    }
+    if (activeWords.length === 0) {
+      issues.push({
+        requirement: 'vocabulary',
+        message: t('voice.startBlocked.vocabulary'),
+      });
+    }
+    if (!microphoneReady) {
+      issues.push({
+        requirement: 'microphone',
+        message: getMicrophoneStartIssue(microphoneStatus, microphoneError, t),
+      });
+    }
+    return issues;
+  }, [
+    activeWords.length,
+    microphoneError,
+    microphoneReady,
+    microphoneStatus,
+    modelError,
+    modelStatus,
+    recognitionReady,
+    t,
+  ]);
+  const invalidStartRequirements = useMemo(
+    () => new Set(startIssues.map((issue) => issue.requirement)),
+    [startIssues],
+  );
   const isPresetGameDuration = GAME_DURATION_OPTIONS.includes(gameDurationSec as typeof GAME_DURATION_OPTIONS[number]);
   const isCustomHp = !HP_OPTIONS.includes(maxHp as typeof HP_OPTIONS[number]);
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
@@ -339,6 +385,22 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     phaseRef.current = next;
     setPhaseState(next);
   }, []);
+
+  const scrollToStartRequirement = useCallback((requirement: StartRequirement) => {
+    const target =
+      requirement === 'recognition'
+        ? recognitionSettingRef.current
+        : requirement === 'vocabulary'
+          ? vocabularySettingRef.current
+          : microphoneSettingRef.current;
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  useEffect(() => {
+    if (showStartValidation && startIssues.length === 0) {
+      setShowStartValidation(false);
+    }
+  }, [showStartValidation, startIssues.length]);
 
   useEffect(() => {
     configRef.current = { language, difficulty, gameDurationSec, maxHp, speed, activeWords };
@@ -1006,6 +1068,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     } catch (error) {
       console.error('Unable to start voice recognition.', error);
       setMicrophoneError(error instanceof Error ? error.message : t('voice.microphone.denied'));
+      setMicrophoneStatus('disconnected');
+      setShowStartValidation(true);
+      window.requestAnimationFrame(() => scrollToStartRequirement('microphone'));
       return;
     }
 
@@ -1030,6 +1095,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     setRecognizedText('');
     setResult(null);
     setPhase('playing');
+    setShowStartValidation(false);
   }, [
     activeWords,
     clearEnemies,
@@ -1040,11 +1106,22 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     maxHp,
     microphoneReady,
     recognitionReady,
+    scrollToStartRequirement,
     setPhase,
     speed,
     startListening,
     t,
   ]);
+
+  const handleStartGame = useCallback(async () => {
+    setShowStartValidation(true);
+    if (startIssues.length > 0) {
+      window.requestAnimationFrame(() => scrollToStartRequirement(startIssues[0].requirement));
+      return;
+    }
+    setShowStartValidation(false);
+    await startGame();
+  }, [scrollToStartRequirement, startGame, startIssues]);
 
   const restartGame = useCallback(() => {
     void startGame();
@@ -1407,7 +1484,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 </div>
               </section>
 
-              <section className="training-setting training-setting-wide">
+              <section
+                ref={recognitionSettingRef}
+                className={`training-setting training-setting-wide ${
+                  showStartValidation && invalidStartRequirements.has('recognition') ? 'voice-start-invalid' : ''
+                }`}
+                aria-invalid={showStartValidation && invalidStartRequirements.has('recognition')}
+              >
                 <div className="training-setting-header">
                   <div>
                     <h2>{t('voice.config.language')}</h2>
@@ -1446,7 +1529,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 </div>
               </section>
 
-              <section className="training-setting training-setting-wide voice-vocabulary-setting">
+              <section
+                ref={vocabularySettingRef}
+                className={`training-setting training-setting-wide voice-vocabulary-setting ${
+                  showStartValidation && invalidStartRequirements.has('vocabulary') ? 'voice-start-invalid' : ''
+                }`}
+                aria-invalid={showStartValidation && invalidStartRequirements.has('vocabulary')}
+              >
                 <div className="training-setting-header">
                   <div>
                     <h2>{t('voice.vocabulary.title')}</h2>
@@ -1520,7 +1609,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 </div>
               </section>
 
-              <section className={`training-setting training-setting-wide voice-microphone-setting voice-microphone-${microphoneStatus}`}>
+              <section
+                ref={microphoneSettingRef}
+                className={`training-setting training-setting-wide voice-microphone-setting voice-microphone-${microphoneStatus} ${
+                  showStartValidation && invalidStartRequirements.has('microphone') ? 'voice-start-invalid' : ''
+                }`}
+                aria-invalid={showStartValidation && invalidStartRequirements.has('microphone')}
+              >
                 <div className="training-setting-header">
                   <div>
                     <h2>{t('voice.microphone.title')}</h2>
@@ -1574,9 +1669,23 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                   >
                     <div className="drawing-defense-background-card-header">
                       <span>{t('drawing.config.backgroundColor')}</span>
-                      <strong>{backgroundColor}</strong>
+                      <label
+                        className="voice-background-color-picker"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <input
+                          type="color"
+                          value={backgroundColor}
+                          onChange={(event) => {
+                            setBackgroundColor(event.target.value);
+                            setBackgroundMode('color');
+                          }}
+                          aria-label={t('voice.config.backgroundColorAria')}
+                        />
+                        <strong>{backgroundColor.toUpperCase()}</strong>
+                      </label>
                     </div>
-                    <span className="training-option-meta">{t('drawing.config.fixedColor')}</span>
+                    <span className="training-option-meta">{t('voice.config.backgroundColorHint')}</span>
                   </div>
                   <label
                     className={`drawing-defense-background-card ${backgroundMode === 'image' ? 'active' : ''}`}
@@ -1604,6 +1713,18 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
               </section>
             </div>
 
+            {showStartValidation && startIssues.length > 0 && (
+              <div className="voice-start-validation" role="alert" aria-live="assertive">
+                <strong>{t('voice.startBlocked.title')}</strong>
+                <p>{t('voice.startBlocked.desc')}</p>
+                <ul>
+                  {startIssues.map((issue) => (
+                    <li key={issue.requirement}>{issue.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="training-config-footer">
               <div className="training-config-summary">
                 <strong>{t(activeConfig.labelKey)}</strong>
@@ -1620,8 +1741,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
               <div className="training-config-actions">
                 <button
                   className="btn btn-primary btn-lg config-start-btn"
-                  disabled={!canStart}
-                  onClick={() => void startGame()}
+                  onClick={() => void handleStartGame()}
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <polygon points="5,3 19,12 5,21" />
@@ -1757,6 +1877,19 @@ function getMicrophoneStatusText(status: MicrophoneStatus, t: TFunction): string
   if (status === 'disconnected') return t('voice.microphone.disconnected');
   if (status === 'denied') return t('voice.microphone.deniedStatus');
   return t('voice.microphone.pending');
+}
+
+function getMicrophoneStartIssue(
+  status: MicrophoneStatus,
+  error: string,
+  t: TFunction,
+): string {
+  if (status === 'testing') return t('voice.startBlocked.microphoneTesting');
+  if (status === 'silent') return t('voice.startBlocked.microphoneSilent');
+  if (status === 'muted') return t('voice.startBlocked.microphoneMuted');
+  if (status === 'disconnected') return error || t('voice.startBlocked.microphoneDisconnected');
+  if (status === 'denied') return error || t('voice.startBlocked.microphoneDenied');
+  return t('voice.startBlocked.microphonePending');
 }
 
 function calculateByteRms(samples: Uint8Array): number {
