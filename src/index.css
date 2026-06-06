@@ -2592,6 +2592,10 @@ body #webgazer-calibrate-container #calibration-point {
   color: var(--success);
 }
 
+.voice-model-status-fallback {
+  color: #b45309;
+}
+
 .voice-model-status-error {
   color: var(--error);
 }

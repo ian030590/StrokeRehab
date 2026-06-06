@@ -104,13 +104,18 @@ GitHub Pages only supports static files and cannot execute `functions/api/drawin
 
 ## Voice Defender Models
 
-Voice Defender downloads the selected Vosk model in the browser and caches the archive in IndexedDB. The default Chinese and English models can be replaced with self-hosted `.tar.gz` model archives:
+Voice Defender first checks the browser Cache API for the selected Vosk model. If it is missing, the app downloads and caches the archive. The default Chinese and English models and download timeout can be configured with:
 
 ```text
 VITE_VOSK_MODEL_ZH_URL=https://your-cdn.example.com/vosk-model-small-cn.tar.gz
 VITE_VOSK_MODEL_EN_URL=https://your-cdn.example.com/vosk-model-small-en-us.tar.gz
+VITE_VOSK_MODEL_TIMEOUT_MS=90000
+VITE_VOSK_MODEL_RETRY_MS=10000
+VITE_VOSK_MODEL_MIN_BYTES=1048576
 ```
 
-The model host must allow cross-origin requests. Microphone audio is processed locally by Vosk Browser and is not uploaded.
+The model host must allow cross-origin requests. Downloads begin only after Voice Defender is opened. If a download fails, the page keeps retrying in the background until a complete model is cached or the browser tab closes, including while Web Speech gameplay continues or the user navigates elsewhere in the app. Cached archives must include completion metadata, match their recorded byte length, meet the configured minimum size, and have a gzip signature; incomplete or legacy cache entries are deleted and downloaded again.
+
+If the model download or initialization fails, Voice Defender automatically falls back to the browser Web Speech API and compares transcripts with visible word cards using Levenshtein similarity. Vosk audio is processed locally; Web Speech processing depends on the browser and may use its online speech service.
 
 > **Disclaimer:** This application is for programming practice and experimental purposes, and is not intended as medical diagnosis, treatment, or rehabilitation advice. If you have medical needs, please seek professional medical assistance.

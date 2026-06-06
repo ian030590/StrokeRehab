@@ -18,17 +18,27 @@ import {
   type VoiceVocabularyItem,
 } from './voiceDefenderVocabulary';
 import {
+  calculateBestSpeechSimilarity,
+  normalizeSpeechText,
+  VOICE_MATCH_SIMILARITY_THRESHOLD,
+} from './voiceDefenderSpeechMatching';
+import {
+  deleteCachedModel,
   getCachedModelUrl,
+  startVoskModelBackgroundDownload,
   type CachedModelUrl,
   type VoskModelLoadStage,
 } from './voskModelCache';
 
+export { calculateSimilarity, levenshteinDistance } from './voiceDefenderSpeechMatching';
+
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 type GamePhase = 'editor' | 'playing' | 'paused' | 'results';
-type ModelStatus = 'idle' | 'loading' | 'ready' | 'error';
+type ModelStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
 type ModelLoadStage = VoskModelLoadStage | 'initializing';
 type GameResult = 'Defeat' | 'Stopped';
 type MicrophoneStatus = 'pending' | 'testing' | 'ready' | 'silent' | 'muted' | 'disconnected' | 'denied';
+type RecognitionEngine = 'vosk' | 'web-speech';
 
 interface VoiceDefenderGameProps {
   onExit: () => void;
@@ -64,6 +74,7 @@ interface SessionRecord {
   Test_Date: string;
   Participant_ID: string;
   Language: VoiceLanguage;
+  Recognition_Engine: RecognitionEngine;
   Difficulty: Difficulty;
   Starting_HP: number;
   Enemy_Speed: number;
@@ -77,7 +88,8 @@ interface SessionRecord {
   Enemy_Results: EnemyResult[];
 }
 
-interface SpeechRuntime {
+interface VoskSpeechRuntime {
+  kind: 'vosk';
   stream: MediaStream;
   audioContext: AudioContext;
   source: MediaStreamAudioSourceNode;
@@ -86,6 +98,61 @@ interface SpeechRuntime {
   recognizer: KaldiRecognizer;
   removeTrackListeners: () => void;
 }
+
+interface WebSpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface WebSpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [index: number]: WebSpeechRecognitionAlternative;
+}
+
+interface WebSpeechRecognitionResultList {
+  readonly length: number;
+  [index: number]: WebSpeechRecognitionResult;
+}
+
+interface WebSpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: WebSpeechRecognitionResultList;
+}
+
+interface WebSpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface WebSpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onaudiostart: (() => void) | null;
+  onsoundstart: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onresult: ((event: WebSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: WebSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+interface WebSpeechRecognitionConstructor {
+  new (): WebSpeechRecognition;
+}
+
+interface WebSpeechRuntime {
+  kind: 'web-speech';
+  recognition: WebSpeechRecognition;
+  shouldRestart: boolean;
+  restartTimer: number | null;
+}
+
+type SpeechRuntime = VoskSpeechRuntime | WebSpeechRuntime;
 
 interface MicrophoneTestRuntime {
   stream: MediaStream;
@@ -128,11 +195,22 @@ const HP_OPTIONS = [3, 5, 8] as const;
 const ENEMY_SPEED_OPTIONS = [5, 15, 30] as const;
 const DEFAULT_HP = 5;
 const DEFAULT_ENEMY_SPEED = 5;
-const SIMILARITY_THRESHOLD = 0.75;
 const ENEMY_WIDTH = 156;
 const ENEMY_HEIGHT = 76;
 const MICROPHONE_SIGNAL_THRESHOLD = 0.006;
 const MICROPHONE_SILENCE_DELAY_MS = 1600;
+const VOSK_MODEL_DOWNLOAD_TIMEOUT_MS = getPositiveNumber(
+  import.meta.env.VITE_VOSK_MODEL_TIMEOUT_MS,
+  90_000,
+);
+const VOSK_MODEL_RETRY_DELAY_MS = getPositiveNumber(
+  import.meta.env.VITE_VOSK_MODEL_RETRY_MS,
+  10_000,
+);
+const VOSK_MODEL_MIN_BYTES = getPositiveNumber(
+  import.meta.env.VITE_VOSK_MODEL_MIN_BYTES,
+  1_048_576,
+);
 
 export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const { t } = useT();
@@ -141,6 +219,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const modelRef = useRef<Model | null>(null);
   const cachedModelUrlRef = useRef<CachedModelUrl | null>(null);
   const speechRuntimeRef = useRef<SpeechRuntime | null>(null);
+  const recognitionEngineRef = useRef<RecognitionEngine | null>(null);
+  const backgroundDownloadUnsubscribeRef = useRef<(() => void) | null>(null);
   const microphoneTestRuntimeRef = useRef<MicrophoneTestRuntime | null>(null);
   const enemiesRef = useRef<Enemy[]>([]);
   const enemyResultsRef = useRef<EnemyResult[]>([]);
@@ -178,6 +258,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [modelLoadStage, setModelLoadStage] = useState<ModelLoadStage>('checking-cache');
   const [modelProgress, setModelProgress] = useState(0);
   const [modelError, setModelError] = useState('');
+  const [recognitionEngine, setRecognitionEngine] = useState<RecognitionEngine | null>(null);
+  const [backgroundReadyLanguage, setBackgroundReadyLanguage] = useState<VoiceLanguage | null>(null);
   const [showInAppBrowserNotice, setShowInAppBrowserNotice] = useState(
     () => typeof navigator !== 'undefined' && isLineOrFacebookInAppBrowser(navigator.userAgent),
   );
@@ -200,7 +282,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     [languageVocabulary],
   );
   const microphoneReady = microphoneStatus === 'ready';
-  const canStart = modelStatus === 'ready' && microphoneReady && activeWords.length > 0;
+  const recognitionReady = modelStatus === 'ready' || modelStatus === 'fallback';
+  const canStart = recognitionReady && microphoneReady && activeWords.length > 0;
   const isCustomSpeed = !ENEMY_SPEED_OPTIONS.includes(speed as typeof ENEMY_SPEED_OPTIONS[number]);
 
   const setPhase = useCallback((next: GamePhase) => {
@@ -261,7 +344,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const stopListening = useCallback(async (resetStatus = true) => {
     const runtime = speechRuntimeRef.current;
     speechRuntimeRef.current = null;
-    if (runtime) {
+    if (runtime?.kind === 'vosk') {
       runtime.processor.onaudioprocess = null;
       runtime.removeTrackListeners();
       runtime.source.disconnect();
@@ -272,6 +355,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       if (runtime.audioContext.state !== 'closed') {
         await runtime.audioContext.close().catch(() => undefined);
       }
+    } else if (runtime?.kind === 'web-speech') {
+      runtime.shouldRestart = false;
+      if (runtime.restartTimer !== null) {
+        window.clearTimeout(runtime.restartTimer);
+      }
+      runtime.recognition.onend = null;
+      runtime.recognition.abort();
     }
     setMicrophoneLevel(0);
     if (resetStatus) setMicrophoneStatus('disconnected');
@@ -288,18 +378,47 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const loadModel = useCallback(async (targetLanguage: VoiceLanguage) => {
     const generation = loadGenerationRef.current + 1;
     loadGenerationRef.current = generation;
+    backgroundDownloadUnsubscribeRef.current?.();
+    backgroundDownloadUnsubscribeRef.current = null;
     modelRef.current?.terminate();
     modelRef.current = null;
     cachedModelUrlRef.current?.revoke();
     cachedModelUrlRef.current = null;
+    recognitionEngineRef.current = null;
+    setRecognitionEngine(null);
     setModelStatus('loading');
     setModelLoadStage('checking-cache');
     setModelProgress(0);
     setModelError('');
+    setBackgroundReadyLanguage(null);
+    const cacheKey = `voice-defender-${targetLanguage}`;
+    let cachedUrl: CachedModelUrl | null = null;
+    const subscribeToBackgroundDownload = () => startVoskModelBackgroundDownload(
+      cacheKey,
+      MODEL_URLS[targetLanguage],
+      (snapshot) => {
+        if (loadGenerationRef.current !== generation) return;
+        setModelLoadStage(snapshot.stage);
+        setModelProgress(snapshot.progress);
+        if (snapshot.status === 'ready') {
+          setModelError(t('voice.model.backgroundReady'));
+          setBackgroundReadyLanguage(targetLanguage);
+        } else if (snapshot.status === 'retrying') {
+          setModelError(t('voice.model.backgroundRetry', {
+            attempt: snapshot.attempt,
+            error: snapshot.error,
+          }));
+        }
+      },
+      VOSK_MODEL_DOWNLOAD_TIMEOUT_MS,
+      VOSK_MODEL_RETRY_DELAY_MS,
+      VOSK_MODEL_MIN_BYTES,
+    );
+    backgroundDownloadUnsubscribeRef.current = subscribeToBackgroundDownload();
 
     try {
-      const cachedUrl = await getCachedModelUrl(
-        `voice-defender-${targetLanguage}`,
+      cachedUrl = await getCachedModelUrl(
+        cacheKey,
         MODEL_URLS[targetLanguage],
         (progress) => {
           if (loadGenerationRef.current === generation) {
@@ -311,6 +430,8 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             setModelLoadStage(stage);
           }
         },
+        VOSK_MODEL_DOWNLOAD_TIMEOUT_MS,
+        VOSK_MODEL_MIN_BYTES,
       );
       if (loadGenerationRef.current !== generation) {
         cachedUrl.revoke();
@@ -323,16 +444,41 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       if (loadGenerationRef.current !== generation) {
         model.terminate();
         cachedUrl.revoke();
+        if (cachedModelUrlRef.current === cachedUrl) {
+          cachedModelUrlRef.current = null;
+        }
         return;
       }
       modelRef.current = model;
+      setBackgroundReadyLanguage(null);
+      recognitionEngineRef.current = 'vosk';
+      setRecognitionEngine('vosk');
       setModelProgress(100);
       setModelStatus('ready');
     } catch (error) {
       if (loadGenerationRef.current !== generation) return;
-      console.error('Unable to load Vosk model.', error);
-      setModelStatus('error');
-      setModelError(error instanceof Error ? error.message : t('voice.model.error'));
+      console.warn('Unable to load Vosk model; attempting Web Speech API fallback.', error);
+      const errorMessage = error instanceof Error ? error.message : t('voice.model.error');
+      if (cachedUrl) {
+        if (cachedModelUrlRef.current === cachedUrl) {
+          cachedModelUrlRef.current = null;
+        }
+        cachedUrl.revoke();
+        await deleteCachedModel(cacheKey);
+        setBackgroundReadyLanguage(null);
+        backgroundDownloadUnsubscribeRef.current?.();
+        backgroundDownloadUnsubscribeRef.current = subscribeToBackgroundDownload();
+      }
+      if (getWebSpeechRecognitionConstructor()) {
+        recognitionEngineRef.current = 'web-speech';
+        setRecognitionEngine('web-speech');
+        setModelProgress(100);
+        setModelStatus('fallback');
+        setModelError(`${errorMessage} ${t('voice.model.fallbackHint')}`);
+      } else {
+        setModelStatus('error');
+        setModelError(`${errorMessage} ${t('voice.model.webSpeechUnavailable')}`);
+      }
     }
   }, [t]);
 
@@ -345,8 +491,22 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     void loadModel(language);
   }, [language, loadModel, stopListening, stopMicrophoneTest]);
 
+  useEffect(() => {
+    if (
+      backgroundReadyLanguage !== language
+      || (phase !== 'editor' && phase !== 'results')
+      || (modelStatus !== 'fallback' && modelStatus !== 'error')
+    ) {
+      return;
+    }
+    setBackgroundReadyLanguage(null);
+    void loadModel(language);
+  }, [backgroundReadyLanguage, language, loadModel, modelStatus, phase]);
+
   useEffect(() => () => {
     loadGenerationRef.current += 1;
+    backgroundDownloadUnsubscribeRef.current?.();
+    backgroundDownloadUnsubscribeRef.current = null;
     void stopListening(false);
     void stopMicrophoneTest(false);
     modelRef.current?.terminate();
@@ -514,6 +674,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       Test_Date: formatTestDate(new Date()),
       Participant_ID: getActiveUser() || 'Unknown',
       Language: configRef.current.language,
+      Recognition_Engine: recognitionEngineRef.current ?? 'web-speech',
       Difficulty: configRef.current.difficulty,
       Starting_HP: configRef.current.maxHp,
       Enemy_Speed: configRef.current.speed,
@@ -537,6 +698,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       trainingDate: record.Test_Date,
       details: {
         Language: record.Language,
+        Recognition_Engine: record.Recognition_Engine,
         Starting_HP: record.Starting_HP,
         Enemy_Speed: record.Enemy_Speed,
         Total_Duration_Seconds: record.Total_Duration_Seconds,
@@ -556,31 +718,35 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     );
   }, [clearEnemies, recordEnemyOutcome, setPhase, stopListening, t]);
 
-  const handleRecognition = useCallback((transcript: string) => {
+  const handleRecognition = useCallback((transcripts: string[]) => {
     if (phaseRef.current !== 'playing') return;
-    const normalizedTranscript = normalizeSpeechText(transcript);
-    if (!normalizedTranscript) return;
-    setRecognizedText(transcript);
+    const usableTranscripts = transcripts
+      .map((transcript) => transcript.trim())
+      .filter((transcript) => normalizeSpeechText(transcript));
+    if (usableTranscripts.length === 0) return;
+    setRecognizedText(usableTranscripts[0]);
 
     const now = performance.now();
+    const recognitionKey = usableTranscripts.map(normalizeSpeechText).join('|');
     if (
-      lastRecognitionRef.current.text === normalizedTranscript
+      lastRecognitionRef.current.text === recognitionKey
       && now - lastRecognitionRef.current.at < 650
     ) {
       return;
     }
 
     const matched = enemiesRef.current
-      .map((enemy) => ({
+      .flatMap((enemy) => usableTranscripts.map((transcript) => ({
         enemy,
-        similarity: calculateSimilarity(normalizedTranscript, normalizeSpeechText(enemy.word)),
-      }))
-      .filter((candidate) => candidate.similarity > SIMILARITY_THRESHOLD)
+        transcript,
+        similarity: calculateBestSpeechSimilarity(transcript, enemy.word),
+      })))
+      .filter((candidate) => candidate.similarity >= VOICE_MATCH_SIMILARITY_THRESHOLD)
       .sort((a, b) => b.enemy.y - a.enemy.y || b.similarity - a.similarity)[0];
 
     if (!matched) return;
-    lastRecognitionRef.current = { text: normalizedTranscript, at: now };
-    recordEnemyOutcome(matched.enemy, true, transcript, matched.similarity);
+    lastRecognitionRef.current = { text: recognitionKey, at: now };
+    recordEnemyOutcome(matched.enemy, true, matched.transcript, matched.similarity);
     createHitEffect(matched.enemy.x, matched.enemy.y);
     matched.enemy.node.destroy({ children: true });
     enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== matched.enemy.id);
@@ -590,13 +756,79 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   }, [createHitEffect, recordEnemyOutcome]);
 
   const startListening = useCallback(async () => {
-    const model = modelRef.current;
-    if (!model) throw new Error(t('voice.model.notReady'));
     await stopMicrophoneTest(false);
     await stopListening(false);
     setMicrophoneLevel(0);
     setMicrophoneStatus('testing');
 
+    const engine = recognitionEngineRef.current;
+    if (engine === 'web-speech') {
+      const SpeechRecognitionConstructor = getWebSpeechRecognitionConstructor();
+      if (!SpeechRecognitionConstructor) {
+        throw new Error(t('voice.model.webSpeechUnavailable'));
+      }
+
+      const recognition = new SpeechRecognitionConstructor();
+      const runtime: WebSpeechRuntime = {
+        kind: 'web-speech',
+        recognition,
+        shouldRestart: true,
+        restartTimer: null,
+      };
+      recognition.lang = configRef.current.language === 'zh' ? 'zh-TW' : 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 5;
+      recognition.onaudiostart = () => setMicrophoneStatus('testing');
+      recognition.onsoundstart = () => setMicrophoneStatus('ready');
+      recognition.onspeechstart = () => setMicrophoneStatus('ready');
+      recognition.onresult = (event) => {
+        const transcripts = new Set<string>();
+        for (let resultIndex = event.resultIndex; resultIndex < event.results.length; resultIndex += 1) {
+          const result = event.results[resultIndex];
+          for (let alternativeIndex = 0; alternativeIndex < result.length; alternativeIndex += 1) {
+            transcripts.add(result[alternativeIndex].transcript);
+          }
+        }
+        setMicrophoneStatus('ready');
+        handleRecognition([...transcripts]);
+      };
+      recognition.onerror = (event) => {
+        if (event.error === 'aborted' || event.error === 'no-speech') return;
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          runtime.shouldRestart = false;
+          setMicrophoneStatus('denied');
+        }
+        setMicrophoneError(event.message || event.error);
+      };
+      recognition.onend = () => {
+        if (speechRuntimeRef.current !== runtime || !runtime.shouldRestart) return;
+        runtime.restartTimer = window.setTimeout(() => {
+          if (speechRuntimeRef.current !== runtime || !runtime.shouldRestart) return;
+          try {
+            recognition.start();
+          } catch (error) {
+            console.warn('Unable to restart Web Speech recognition.', error);
+          }
+        }, 250);
+      };
+
+      speechRuntimeRef.current = runtime;
+      try {
+        recognition.start();
+      } catch (error) {
+        speechRuntimeRef.current = null;
+        runtime.shouldRestart = false;
+        throw error;
+      }
+      return;
+    }
+
+    const model = modelRef.current;
+    if (!model || engine !== 'vosk') throw new Error(t('voice.model.notReady'));
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(t('voice.microphone.denied'));
+    }
     const stream = await navigator.mediaDevices.getUserMedia({
       video: false,
       audio: {
@@ -616,12 +848,12 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const recognizer = new model.KaldiRecognizer(audioContext.sampleRate, grammar);
     recognizer.on('partialresult', (message) => {
       if ('result' in message && 'partial' in message.result) {
-        handleRecognition(message.result.partial);
+        handleRecognition([message.result.partial]);
       }
     });
     recognizer.on('result', (message) => {
       if ('result' in message && 'text' in message.result) {
-        handleRecognition(message.result.text);
+        handleRecognition([message.result.text]);
       }
     });
     recognizer.on('error', (message) => {
@@ -665,6 +897,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     processor.connect(mute);
     mute.connect(audioContext.destination);
     speechRuntimeRef.current = {
+      kind: 'vosk',
       stream,
       audioContext,
       source,
@@ -729,7 +962,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
   const startGame = useCallback(async () => {
     if (!verifySelectedTrainingUser(t)) return;
-    if (modelStatus !== 'ready' || activeWords.length === 0) return;
+    if (!recognitionReady || activeWords.length === 0) return;
     if (phaseRef.current === 'editor' && !microphoneReady) return;
     const app = appRef.current;
     if (!app) return;
@@ -772,7 +1005,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     language,
     maxHp,
     microphoneReady,
-    modelStatus,
+    recognitionReady,
     setPhase,
     speed,
     startListening,
@@ -1166,6 +1399,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
               <div className="training-config-summary">
                 <strong>{t(activeConfig.labelKey)}</strong>
                 <span>{t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</span>
+                {recognitionEngine && (
+                  <span>{t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}</span>
+                )}
                 <span>{t('voice.config.speedValue', { value: speed })}</span>
                 <span>{t('voice.vocabulary.activeCount', { active: activeWords.length, total: languageVocabulary.length })}</span>
               </div>
@@ -1189,6 +1425,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           <div><strong>{t('voice.hud.hp')}</strong> {hp}/{maxHp}</div>
           <div><strong>{t('voice.hud.score')}</strong> {score}</div>
           <div><strong>{t('voice.hud.time')}</strong> {elapsedSeconds}s</div>
+          <div>
+            <strong>{t('voice.hud.engine')}</strong>{' '}
+            {t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}
+          </div>
           {phase === 'playing' && (
             <div className={`voice-listening-indicator voice-listening-${microphoneStatus}`}>
               <span aria-hidden="true" />
@@ -1227,6 +1467,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             <table className="results-table">
               <tbody>
                 <tr><th>{t('voice.results.language')}</th><td>{t(result.Language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</td></tr>
+                <tr>
+                  <th>{t('voice.hud.engine')}</th>
+                  <td>{t(result.Recognition_Engine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}</td>
+                </tr>
                 <tr><th>{t('voice.config.enemySpeed')}</th><td>{t('voice.config.speedValue', { value: result.Enemy_Speed })}</td></tr>
                 <tr><th>{t('voice.results.spawned')}</th><td>{result.Enemies_Spawned}</td></tr>
                 <tr><th>{t('voice.results.hp')}</th><td>{result.HP_Remaining}/{result.Starting_HP}</td></tr>
@@ -1252,6 +1496,10 @@ function getModelStatusText(
   t: TFunction,
 ): string {
   if (status === 'ready') return t('voice.model.ready');
+  if (status === 'fallback' && progress < 100) {
+    return t('voice.model.fallbackDownloading', { value: progress });
+  }
+  if (status === 'fallback') return t('voice.model.fallback');
   if (status === 'error') return t('voice.model.error');
   if (status === 'loading' && stage === 'checking-cache') return t('voice.model.checkingCache');
   if (status === 'loading' && stage === 'loading-cache') return t('voice.model.loadingCache');
@@ -1297,40 +1545,18 @@ function toMeterLevel(rms: number): number {
   return clamp(Math.sqrt(rms) * 2.2, 0, 1);
 }
 
-function normalizeSpeechText(value: string): string {
-  return value
-    .normalize('NFKC')
-    .toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}]/gu, '');
+function getWebSpeechRecognitionConstructor(): WebSpeechRecognitionConstructor | null {
+  if (typeof window === 'undefined') return null;
+  const browserWindow = window as Window & {
+    SpeechRecognition?: WebSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: WebSpeechRecognitionConstructor;
+  };
+  return browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition ?? null;
 }
 
-export function levenshteinDistance(a: string, b: string): number {
-  if (a === b) return 0;
-  if (!a) return [...b].length;
-  if (!b) return [...a].length;
-  const left = [...a];
-  const right = [...b];
-  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-
-  left.forEach((leftChar, leftIndex) => {
-    const current = [leftIndex + 1];
-    right.forEach((rightChar, rightIndex) => {
-      current[rightIndex + 1] = Math.min(
-        current[rightIndex] + 1,
-        previous[rightIndex + 1] + 1,
-        previous[rightIndex] + (leftChar === rightChar ? 0 : 1),
-      );
-    });
-    previous = current;
-  });
-
-  return previous[right.length];
-}
-
-export function calculateSimilarity(a: string, b: string): number {
-  const maxLength = Math.max([...a].length, [...b].length);
-  if (maxLength === 0) return 1;
-  return 1 - levenshteinDistance(a, b) / maxLength;
+function getPositiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function getMostDifficultWord(misses: Record<string, number>): string {
@@ -1342,6 +1568,7 @@ function toCsv(record: SessionRecord): string {
     'Test_Date',
     'Participant_ID',
     'Language',
+    'Recognition_Engine',
     'Difficulty',
     'Starting_HP',
     'Enemy_Speed',
@@ -1364,6 +1591,7 @@ function toCsv(record: SessionRecord): string {
     record.Test_Date,
     record.Participant_ID,
     record.Language,
+    record.Recognition_Engine,
     record.Difficulty,
     record.Starting_HP,
     record.Enemy_Speed,
