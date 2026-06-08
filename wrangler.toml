@@ -2,10 +2,4 @@ name = "stroke-trainer"
 compatibility_date = "2026-06-04"
 pages_build_output_dir = "dist"
 
-[vars]
-# 稍後您可以在此處或透過 Cloudflare 後台填入真實的 R2 公開網址
-VITE_VOSK_MODEL_ZH_URL = "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-zh-tw-0.3.tar.gz"
-VITE_VOSK_MODEL_EN_URL = "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-en-us-0.15.tar.gz"
-VITE_VOSK_MODEL_ZH_VOCAB_URL = "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-zh-tw-0.3-vocabulary.txt"
-VITE_VOSK_MODEL_EN_VOCAB_URL = "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-en-us-0.15-vocabulary.txt"
-VITE_VOSK_MODEL_MIN_BYTES = "31457280"
+# 環境變數已移至 Cloudflare Pages 後台管理 (Settings > Environment variables)

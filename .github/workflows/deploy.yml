@@ -36,11 +36,11 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_VOSK_MODEL_ZH_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-zh-tw-0.3.tar.gz"
-          VITE_VOSK_MODEL_EN_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-en-us-0.15.tar.gz"
-          VITE_VOSK_MODEL_ZH_VOCAB_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-zh-tw-0.3-vocabulary.txt"
-          VITE_VOSK_MODEL_EN_VOCAB_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-en-us-0.15-vocabulary.txt"
-          VITE_VOSK_MODEL_MIN_BYTES: "31457280"
+          VITE_VOSK_MODEL_ZH_URL: ${{ secrets.VITE_VOSK_MODEL_ZH_URL }}
+          VITE_VOSK_MODEL_EN_URL: ${{ secrets.VITE_VOSK_MODEL_EN_URL }}
+          VITE_VOSK_MODEL_ZH_VOCAB_URL: ${{ secrets.VITE_VOSK_MODEL_ZH_VOCAB_URL }}
+          VITE_VOSK_MODEL_EN_VOCAB_URL: ${{ secrets.VITE_VOSK_MODEL_EN_VOCAB_URL }}
+          VITE_VOSK_MODEL_MIN_BYTES: ${{ secrets.VITE_VOSK_MODEL_MIN_BYTES }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
