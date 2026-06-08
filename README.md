@@ -12,7 +12,7 @@ StrokeTrainer is a rehabilitation training web application built on **React + Pi
 - **React Router v7** — Client-side routing
 - **Vite** — Fast development and build tool
 
-## Feature Overview
+## Feature Overview 
 
 This system currently includes three major rehabilitation training modules:
 
