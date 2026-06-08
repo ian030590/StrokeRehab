@@ -1,3 +1,11 @@
 name = "stroke-trainer"
 compatibility_date = "2026-06-04"
 pages_build_output_dir = "dist"
+
+[vars]
+# 稍後您可以在此處或透過 Cloudflare 後台填入真實的 R2 公開網址
+VITE_VOSK_MODEL_ZH_URL = ""
+VITE_VOSK_MODEL_EN_URL = ""
+VITE_VOSK_MODEL_ZH_VOCAB_URL = ""
+VITE_VOSK_MODEL_EN_VOCAB_URL = ""
+VITE_VOSK_MODEL_MIN_BYTES = "34603008"

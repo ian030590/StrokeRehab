@@ -3,7 +3,7 @@ const CACHE_KEY_PREFIX = '__vosk_model_cache__';
 const SOURCE_URL_HEADER = 'X-Stroke-Trainer-Model-Source';
 const COMPLETE_HEADER = 'X-Stroke-Trainer-Model-Complete';
 const SIZE_HEADER = 'X-Stroke-Trainer-Model-Size';
-const DEFAULT_MIN_MODEL_BYTES = 1_048_576;
+const DEFAULT_MIN_MODEL_BYTES = 34_603_008;
 
 export type VoskModelLoadStage = 'checking-cache' | 'loading-cache' | 'downloading' | 'saving-cache';
 
