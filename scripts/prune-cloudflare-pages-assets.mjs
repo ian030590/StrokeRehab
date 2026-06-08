@@ -9,12 +9,14 @@ const hasExternalZhModelUrl = Boolean(process.env.VITE_VOSK_MODEL_ZH_URL?.trim()
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(rootDir, 'dist');
 const bundledZhModelPath = path.join(distDir, 'models', 'vosk-model-small-zh-tw-0.3.tar.gz');
+const bundledEnModelPath = path.join(distDir, 'models', 'vosk-model-small-en-us-0.15.tar.gz');
 
 if (!force && !isCloudflarePagesBuild && !hasExternalZhModelUrl) {
   process.exit(0);
 }
 
 await removeIfExists(bundledZhModelPath);
+await removeIfExists(bundledEnModelPath);
 
 const oversizedFiles = await findOversizedFiles(distDir);
 if (oversizedFiles.length > 0) {
