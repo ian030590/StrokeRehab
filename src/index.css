@@ -352,37 +352,37 @@ body[data-ui-font-bold="true"] .app-layout :where(
   -webkit-backdrop-filter: none;
 }
 
-.navbar.navbar-sidebar .navbar-links {
+.navbar.navbar-sidebar .navbar-menu .navbar-links {
   flex-direction: column;
   width: 100%;
 }
 
-.navbar.navbar-sidebar .navbar-tools {
+.navbar.navbar-sidebar .navbar-menu .navbar-tools {
   flex-direction: column;
   align-items: flex-start;
   gap: 16px;
   width: 100%;
 }
 
-.navbar.navbar-sidebar .navbar-records {
+.navbar.navbar-sidebar .navbar-menu .navbar-records {
   flex-direction: column;
   align-items: flex-start;
   max-width: none;
   width: 100%;
 }
 
-.navbar.navbar-sidebar .navbar-download-btn {
+.navbar.navbar-sidebar .navbar-menu .navbar-download-btn {
   width: 100%;
 }
 
-.navbar.navbar-sidebar .navbar-backup-reminder {
+.navbar.navbar-sidebar .navbar-menu .navbar-backup-reminder {
   display: block;
   max-width: none;
   font-size: calc(13px * var(--ui-font-scale));
   line-height: 1.5;
 }
 
-.navbar.navbar-sidebar .navbar-link {
+.navbar.navbar-sidebar .navbar-menu .navbar-link {
   width: 100%;
   text-align: left;
   padding: 12px 16px;
