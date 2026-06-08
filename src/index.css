@@ -425,16 +425,29 @@ body[data-ui-font-bold="true"] .app-layout :where(
 }
 
 .font-setting-control {
-  min-width: min(360px, 100%);
-  display: grid;
-  grid-template-columns: auto minmax(140px, 1fr) auto;
+  min-width: min(420px, 100%);
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
-.font-setting-control input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent);
+.font-setting-control .setting-value {
+  min-width: 64px;
+  text-align: center;
+}
+
+.typography-setting-control,
+.sound-setting-control {
+  min-width: min(560px, 100%);
+}
+
+.font-setting-control .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .app-layout .navbar-brand {
@@ -604,8 +617,16 @@ body[data-ui-font-bold="true"] .app-layout :where(
 @media (max-width: 640px) {
   .font-setting-control {
     width: 100%;
-    grid-template-columns: 1fr;
-    justify-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .font-setting-control .setting-value {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .font-setting-control .btn {
+    flex: 1 1 auto;
   }
 }
 

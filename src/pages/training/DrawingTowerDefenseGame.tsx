@@ -4,6 +4,7 @@ import { initJsPsych } from 'jspsych';
 import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedback } from '../../utils/soundManager';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
@@ -263,6 +264,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
   const finishGame = useCallback((gameResult: GameResult) => {
     if (phaseRef.current === 'results') return;
+    playGameEndSound(gameResult, jsPsychRef);
     if (recognitionTimerRef.current !== null) {
       window.clearTimeout(recognitionTimerRef.current);
       recognitionTimerRef.current = null;
@@ -503,6 +505,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       const matched = Boolean(matchedTarget);
       queueDrawingSampleUpload(strokesRef.current, recognition, target, matched);
       if (matchedTarget) {
+        playSuccessSound(jsPsychRef);
         recordEnemyOutcome(matchedTarget, true);
         matchedTarget.node.destroy({ children: true });
         enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== matchedTarget.id);
@@ -518,6 +521,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
 
   const startGame = useCallback(() => {
     if (!verifySelectedTrainingUser(t)) return;
+    prepareAudioFeedback(jsPsychRef);
 
     const app = appRef.current;
     if (!app) return;
@@ -628,6 +632,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
           enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
           if (enemy.y > defenseY) {
+            playFailureSound(jsPsychRef);
             recordEnemyOutcome(enemy, false);
             enemy.node.destroy({ children: true });
             enemiesRef.current = enemiesRef.current.filter((item) => item.id !== enemy.id);

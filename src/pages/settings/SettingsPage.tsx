@@ -75,6 +75,18 @@ function GeneralTab({ refresh }: { refresh: () => void }) {
   const { t, lang, setLang } = useT();
   const uiFontSizePx = getSetting('uiFontSizePx');
   const uiFontBold = getSetting('uiFontBold');
+  const auditoryFeedbackEnabled = getSetting('auditoryFeedbackEnabled');
+  const soundVolume = getSetting('soundVolume');
+  const setUiFontSize = (nextSizePx: number) => {
+    const clampedSizePx = Math.min(MAX_UI_FONT_SIZE_PX, Math.max(MIN_UI_FONT_SIZE_PX, nextSizePx));
+    setSetting('uiFontSizePx', clampedSizePx);
+    refresh();
+  };
+  const setSoundVolume = (nextVolume: number) => {
+    const clampedVolume = Math.min(100, Math.max(0, nextVolume));
+    setSetting('soundVolume', clampedVolume);
+    refresh();
+  };
 
   return (
     <div className="fade-in">
@@ -104,51 +116,51 @@ function GeneralTab({ refresh }: { refresh: () => void }) {
       <div className="setting-row">
         <div className="setting-info">
           <h3>{t('settings.fontSize.title')}</h3>
-          <p>{t('settings.fontSize.desc')}</p>
+          <p>
+            {t('settings.fontSize.desc')}<br />
+            {t('settings.fontBold.desc')}
+          </p>
         </div>
-        <div className="font-setting-control">
+        <div className="font-setting-control typography-setting-control">
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            disabled={uiFontSizePx <= MIN_UI_FONT_SIZE_PX}
+            aria-label={t('settings.fontSize.decrease')}
+            onClick={() => setUiFontSize(uiFontSizePx - 1)}
+          >
+            {t('settings.fontSize.decrease')}
+          </button>
           <span className="setting-value">
             {t('settings.fontSize.value', { value: uiFontSizePx })}
           </span>
-          <input
-            type="range"
-            min={MIN_UI_FONT_SIZE_PX}
-            max={MAX_UI_FONT_SIZE_PX}
-            step={1}
-            value={uiFontSizePx}
-            aria-label={t('settings.fontSize.title')}
-            onChange={(event) => {
-              setSetting('uiFontSizePx', Number(event.target.value));
-              refresh();
-            }}
-          />
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            disabled={uiFontSizePx >= MAX_UI_FONT_SIZE_PX}
+            aria-label={t('settings.fontSize.increase')}
+            onClick={() => setUiFontSize(uiFontSizePx + 1)}
+          >
+            {t('settings.fontSize.increase')}
+          </button>
           <button
             type="button"
             className="btn btn-sm btn-ghost"
-            onClick={() => {
-              setSetting('uiFontSizePx', DEFAULT_UI_FONT_SIZE_PX);
-              refresh();
-            }}
+            onClick={() => setUiFontSize(DEFAULT_UI_FONT_SIZE_PX)}
           >
             {t('settings.fontSize.reset')}
           </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${uiFontBold ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setSetting('uiFontBold', !uiFontBold);
+              refresh();
+            }}
+          >
+            {uiFontBold ? t('settings.fontBold.on') : t('settings.fontBold.off')}
+          </button>
         </div>
-      </div>
-
-      <div className="setting-row">
-        <div className="setting-info">
-          <h3>{t('settings.fontBold.title')}</h3>
-          <p>{t('settings.fontBold.desc')}</p>
-        </div>
-        <button
-          className={`btn btn-sm ${uiFontBold ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => {
-            setSetting('uiFontBold', !uiFontBold);
-            refresh();
-          }}
-        >
-          {uiFontBold ? t('settings.fontBold.on') : t('settings.fontBold.off')}
-        </button>
       </div>
 
       {/* Viewing Distance */}
@@ -171,15 +183,39 @@ function GeneralTab({ refresh }: { refresh: () => void }) {
           <h3>{t('settings.sound.title')}</h3>
           <p>{t('settings.sound.desc')}</p>
         </div>
-        <button
-          className={`btn btn-sm ${getSetting('auditoryFeedbackEnabled') ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => {
-            setSetting('auditoryFeedbackEnabled', !getSetting('auditoryFeedbackEnabled'));
-            refresh();
-          }}
-        >
-          {getSetting('auditoryFeedbackEnabled') ? t('settings.sound.on') : t('settings.sound.off')}
-        </button>
+        <div className="font-setting-control sound-setting-control">
+          <button
+            type="button"
+            className={`btn btn-sm ${auditoryFeedbackEnabled ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setSetting('auditoryFeedbackEnabled', !auditoryFeedbackEnabled);
+              refresh();
+            }}
+          >
+            {auditoryFeedbackEnabled ? t('settings.sound.on') : t('settings.sound.off')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            disabled={soundVolume <= 0}
+            aria-label={t('settings.sound.volumeDecrease')}
+            onClick={() => setSoundVolume(soundVolume - 10)}
+          >
+            {t('settings.sound.volumeDecrease')}
+          </button>
+          <span className="setting-value">
+            {t('settings.sound.volumeValue', { value: soundVolume })}
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            disabled={soundVolume >= 100}
+            aria-label={t('settings.sound.volumeIncrease')}
+            onClick={() => setSoundVolume(soundVolume + 10)}
+          >
+            {t('settings.sound.volumeIncrease')}
+          </button>
+        </div>
       </div>
 
       {/* Download Prefix */}

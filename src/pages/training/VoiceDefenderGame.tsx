@@ -14,6 +14,7 @@ import type { KaldiRecognizer, Model } from 'vosk-browser';
 import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { DEFAULT_UI_FONT_SIZE_PX, getActiveUser, getSetting } from '../../utils/settings';
+import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedback } from '../../utils/soundManager';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
@@ -826,6 +827,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
   const finishGame = useCallback((gameResult: GameResult) => {
     if (phaseRef.current === 'results') return;
+    playGameEndSound(gameResult, jsPsychRef);
     void stopListening();
     enemiesRef.current.forEach((enemy) => recordEnemyOutcome(enemy, false));
     clearEnemies();
@@ -910,6 +912,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
     if (!matched) return;
     lastRecognitionRef.current = { text: recognitionKey, at: now };
+    playSuccessSound(jsPsychRef);
     recordEnemyOutcome(matched.enemy, true, matched.transcript, matched.similarity);
     matched.enemy.node.destroy({ children: true });
     enemiesRef.current = enemiesRef.current.filter((enemy) => enemy.id !== matched.enemy.id);
@@ -1131,6 +1134,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
   const startGame = useCallback(async () => {
     if (!verifySelectedTrainingUser(t)) return;
+    prepareAudioFeedback(jsPsychRef);
     if (!recognitionReady || activeWords.length === 0) return;
     if (phaseRef.current === 'editor' && !microphoneReady) return;
     const app = appRef.current;
@@ -1313,6 +1317,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           enemy.y += configRef.current.speed * dt;
           enemy.node.y = enemy.y;
           if (enemy.y <= defenseY) continue;
+          playFailureSound(jsPsychRef);
           recordEnemyOutcome(enemy, false);
           enemy.node.destroy({ children: true });
           enemiesRef.current = enemiesRef.current.filter((item) => item.id !== enemy.id);

@@ -4,6 +4,7 @@ import { initJsPsych } from 'jspsych';
 import { useT } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedback } from '../../utils/soundManager';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import {
@@ -161,6 +162,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     if (phaseRef.current === 'results') return;
     const state = stateRef.current;
     if (!state) return;
+    playGameEndSound(gameResult, jsPsychRef);
     const stats = buildResultStats(state);
     const record: SessionRecord = {
       Test_Date: formatTestDate(new Date()),
@@ -211,6 +213,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
 
   const startGame = useCallback(() => {
     if (!verifySelectedTrainingUser(t)) return;
+    prepareAudioFeedback(jsPsychRef);
 
     metricsRef.current = { elapsed: 0 };
     lastHudSecondRef.current = -1;
@@ -260,10 +263,12 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     if (phaseRef.current !== 'playing') return;
     const state = stateRef.current;
     if (!state) return;
+    const feedbackBefore = getFeedbackCounts(state);
     if (state.kind === 'memory-match') handleMemoryTap(state, index, metricsRef.current.elapsed, finishGameRef.current);
     if (state.kind === 'lights-out') handleLightsTap(state, index, finishGameRef.current);
     if (state.kind === 'whack-a-mole') handleWhackTap(state, index, metricsRef.current.elapsed);
     if (state.kind === 'sliding-puzzle') handleSlidingTap(state, index, finishGameRef.current);
+    playFeedbackForCountChange(feedbackBefore, getFeedbackCounts(state), jsPsychRef);
     syncHud();
     renderRef.current();
   }
@@ -272,7 +277,9 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
     if (phaseRef.current !== 'playing') return;
     const state = stateRef.current;
     if (!state || state.kind !== 'reaction-time') return;
+    const feedbackBefore = getFeedbackCounts(state);
     handleReactionStateTap(state, metricsRef.current.elapsed, difficulty, finishGameRef.current);
+    playFeedbackForCountChange(feedbackBefore, getFeedbackCounts(state), jsPsychRef);
     syncHud();
     renderRef.current();
   }
@@ -310,7 +317,11 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
           if (phaseRef.current !== 'playing') return;
           const dt = Math.min(ticker.deltaMS / 1000, 0.05);
           metricsRef.current.elapsed += dt;
+          const feedbackBefore = stateRef.current?.kind === 'whack-a-mole' ? getFeedbackCounts(stateRef.current) : null;
           updateTimedState(stateRef.current, metricsRef.current.elapsed, renderRef.current, finishGameRef.current);
+          if (feedbackBefore && stateRef.current?.kind === 'whack-a-mole') {
+            playFeedbackForCountChange(feedbackBefore, getFeedbackCounts(stateRef.current), jsPsychRef);
+          }
           const limit = gameId === 'whack-a-mole' ? whackDurationSec : sessionLimitSec;
           if (limit !== null && metricsRef.current.elapsed >= limit) {
             finishGameRef.current(isAutoSuccess(stateRef.current) ? 'Victory' : 'Defeat');
@@ -608,6 +619,28 @@ function buildResultStats(state: CognitiveGameState): ResultStats {
   if (state.kind === 'reaction-time') return buildReactionResultStats(state);
   if (state.kind === 'whack-a-mole') return buildWhackResultStats(state);
   return buildSlidingResultStats(state);
+}
+
+function getFeedbackCounts(state: CognitiveGameState): { success: number; errors: number } {
+  if (state.kind === 'memory-match') return { success: state.matchedPairs, errors: state.errors };
+  if (state.kind === 'lights-out') return { success: isLightsAutoSuccess(state) ? 1 : 0, errors: 0 };
+  if (state.kind === 'reaction-time') return { success: state.attempts.length, errors: state.falseStarts };
+  if (state.kind === 'whack-a-mole') return { success: state.hits, errors: state.misses };
+  return { success: state.moves, errors: state.errors };
+}
+
+function playFeedbackForCountChange(
+  before: { success: number; errors: number },
+  after: { success: number; errors: number },
+  jsPsychRef: { current: unknown },
+): void {
+  if (after.success > before.success) {
+    playSuccessSound(jsPsychRef);
+    return;
+  }
+  if (after.errors > before.errors) {
+    playFailureSound(jsPsychRef);
+  }
 }
 
 function formatLimit(value: SessionLimitSeconds, t: TFunction) {

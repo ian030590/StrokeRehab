@@ -6,10 +6,15 @@ import { useT } from '../i18n';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) => `navbar-link ${isActive ? 'active' : ''}`;
 const logoStyle = { width: 'auto', objectFit: 'contain' } as const;
+const NAVBAR_SIDEBAR_BREAKPOINT_PX = 1120;
+const NAVBAR_EXPANDED_HORIZONTAL_PADDING_PX = 96;
+const NAVBAR_INNER_MAX_WIDTH_PX = 1440;
+const NAVBAR_LAYOUT_BUFFER_PX = 12;
 
 export function Navbar() {
   const { t } = useT();
   const location = useLocation();
+  const navbarRef = useRef<HTMLElement | null>(null);
   const navbarInnerRef = useRef<HTMLDivElement | null>(null);
   const navbarMeasureRef = useRef<HTMLDivElement | null>(null);
   const [activeUserName, setActiveUserName] = useState(getActiveUser);
@@ -50,10 +55,19 @@ export function Navbar() {
     const inner = navbarInnerRef.current;
     const measure = navbarMeasureRef.current;
     if (!inner || !measure) return;
-    const isNarrowViewport = window.matchMedia('(max-width: 1120px)').matches;
-    const availableWidth = inner.clientWidth;
+    const isNarrowViewport = window.matchMedia(`(max-width: ${NAVBAR_SIDEBAR_BREAKPOINT_PX}px)`).matches;
+    if (isNarrowViewport) {
+      setUseSidebarLayout(true);
+      return;
+    }
+
+    const navbarWidth = navbarRef.current?.clientWidth ?? window.innerWidth;
+    const availableWidth = Math.min(
+      NAVBAR_INNER_MAX_WIDTH_PX,
+      Math.max(0, navbarWidth - NAVBAR_EXPANDED_HORIZONTAL_PADDING_PX)
+    );
     const requiredWidth = measure.scrollWidth;
-    setUseSidebarLayout(isNarrowViewport || requiredWidth + 12 > availableWidth);
+    setUseSidebarLayout(requiredWidth + NAVBAR_LAYOUT_BUFFER_PX > availableWidth);
   }, []);
 
   useLayoutEffect(() => {
@@ -65,6 +79,7 @@ export function Navbar() {
     scheduleMeasure();
 
     const resizeObserver = new ResizeObserver(scheduleMeasure);
+    if (navbarRef.current) resizeObserver.observe(navbarRef.current);
     if (navbarInnerRef.current) resizeObserver.observe(navbarInnerRef.current);
     window.addEventListener('resize', scheduleMeasure);
     window.addEventListener(SETTINGS_CHANGED_EVENT, scheduleMeasure);
@@ -104,7 +119,7 @@ export function Navbar() {
   };
 
   return (
-    <nav className={`navbar ${useSidebarLayout ? 'navbar-sidebar' : ''}`}>
+    <nav ref={navbarRef} className={`navbar ${useSidebarLayout ? 'navbar-sidebar' : ''}`}>
       <div className="navbar-inner" ref={navbarInnerRef}>
         <NavLink to="/" className="navbar-brand" onClick={closeMenu}>
           <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />

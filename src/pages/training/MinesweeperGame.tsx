@@ -3,6 +3,7 @@ import { initJsPsych } from 'jspsych';
 import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
 import { getActiveUser } from '../../utils/settings';
+import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedback } from '../../utils/soundManager';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
@@ -125,6 +126,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   }, []);
 
   const finishGame = useCallback((nextBoard: Cell[][], gameResult: GameResult) => {
+    playGameEndSound(gameResult, jsPsychRef);
     const duration = Math.max(0, (elapsedMillisRef.current + Date.now() - playStartedAtRef.current) / 1000);
     elapsedMillisRef.current = duration * 1000;
     const stats = getBoardStats(nextBoard);
@@ -174,6 +176,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
 
   const startGame = useCallback(() => {
     if (!verifySelectedTrainingUser(t)) return;
+    prepareAudioFeedback(jsPsychRef);
 
     const nextRows = selectedBoardConfig.rows;
     const nextCols = selectedBoardConfig.cols;
@@ -198,6 +201,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
   }, []);
 
   const restartGame = useCallback(() => {
+    prepareAudioFeedback(jsPsychRef);
     setBoard(createEmptyBoard(boardRows, boardCols));
     setMineCount(selectedBoardConfig.mines);
     setMinesGenerated(false);
@@ -249,11 +253,13 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
 
     const clicked = nextBoard[y][x];
     if (clicked.mine) {
+      playFailureSound(jsPsychRef);
       finishGame(revealAllMines(nextBoard), 'Defeat');
       return;
     }
 
     const openedBoard = revealSafeCells(nextBoard, x, y);
+    playSuccessSound(jsPsychRef);
     if (hasWon(openedBoard)) {
       finishGame(openedBoard, 'Victory');
       return;
