@@ -6,7 +6,6 @@ type TFunction = (key: TranslationKey, params?: Record<string, string | number>)
 
 interface TrainingModuleCardProps {
   module: TrainingModuleCardData;
-  expandedModule: TrainingModuleId | null;
   onSelect: (moduleId: TrainingModuleId) => void;
   t: TFunction;
 }
@@ -21,15 +20,12 @@ const moduleCardActionStyle: CSSProperties = {
   fontWeight: 600,
 };
 
-export function TrainingModuleCard({ module, expandedModule, onSelect, t }: TrainingModuleCardProps) {
-  const isExpanded = expandedModule === module.id;
-
+export function TrainingModuleCard({ module, onSelect, t }: TrainingModuleCardProps) {
   return (
     <div
-      className={`card fade-in-up ${isExpanded ? 'card-active' : ''}`}
+      className="card fade-in-up"
       role="button"
       tabIndex={0}
-      aria-expanded={isExpanded}
       onClick={() => onSelect(module.id)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -42,7 +38,7 @@ export function TrainingModuleCard({ module, expandedModule, onSelect, t }: Trai
       <div className="card-title">{t(module.titleKey)}</div>
       <div className="card-desc">{t(module.descKey)}</div>
       <div style={moduleCardActionStyle}>
-        {isExpanded ? t('btn.collapseSettings') : t('btn.selectModule')}
+        {t('btn.selectModule')}
         <svg
           width="16"
           height="16"
@@ -50,12 +46,8 @@ export function TrainingModuleCard({ module, expandedModule, onSelect, t }: Trai
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
-          style={{
-            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.3s ease',
-          }}
         >
-          <path d="M6 9l6 6 6-6" />
+          <path d="M5 12h14M12 5l7 7-7 7" />
         </svg>
       </div>
     </div>

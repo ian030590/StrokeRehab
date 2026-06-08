@@ -9,7 +9,7 @@ const bucket = getEnv('R2_BUCKET', 'stroke-trainer-vosk-models');
 const prefix = normalizePrefix(getEnv('R2_PREFIX', 'models'));
 const publicBaseUrl = trimTrailingSlash(process.env.R2_PUBLIC_BASE_URL ?? '');
 const corsFile = path.resolve(rootDir, getEnv('R2_CORS_FILE', 'config/r2-cors.json'));
-const cacheControl = getEnv('R2_CACHE_CONTROL', 'public, max-age=31536000, immutable');
+const cacheControl = getEnv('R2_CACHE_CONTROL', 'public,max-age=31536000,immutable');
 const shouldCreateBucket = process.env.R2_CREATE_BUCKET !== '0';
 const shouldApplyCors = process.env.R2_APPLY_CORS !== '0';
 const npxBin = process.platform === 'win32' ? 'npx.cmd' : 'npx';
@@ -26,7 +26,7 @@ const uploadTargets = [
     envName: 'VITE_VOSK_MODEL_ZH_VOCAB_URL',
     filePath: path.join(rootDir, 'public', 'models', 'vosk-model-small-zh-tw-0.3-vocabulary.txt'),
     key: joinKey(prefix, 'vosk-model-small-zh-tw-0.3-vocabulary.txt'),
-    contentType: 'text/plain; charset=utf-8',
+    contentType: 'text/plain;charset=utf-8',
     required: false,
   },
   {
@@ -40,7 +40,7 @@ const uploadTargets = [
     envName: 'VITE_VOSK_MODEL_EN_VOCAB_URL',
     filePath: path.join(rootDir, 'public', 'models', 'vosk-model-small-en-us-0.15-vocabulary.txt'),
     key: joinKey(prefix, 'vosk-model-small-en-us-0.15-vocabulary.txt'),
-    contentType: 'text/plain; charset=utf-8',
+    contentType: 'text/plain;charset=utf-8',
     required: false,
   },
 ];
@@ -112,6 +112,7 @@ function runWrangler(args, options = {}) {
     },
     encoding: options.capture ? 'utf8' : undefined,
     stdio: options.capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    shell: process.platform === 'win32',
   });
 
   if (options.capture) {

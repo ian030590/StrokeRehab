@@ -9,13 +9,12 @@ export const CARD_HEIGHT_MM = 53.98;
 export const DEFAULT_DISTANCE_CM = 60;
 export const DEFAULT_CAL_BAR_LENGTH_MM = 149;
 export const CAL_BAR_LENGTH_PX = 700;
-export const STORAGE_PREFIX = 'vision_trainer_';
+export const STORAGE_PREFIX = 'stroke_trainer_';
 export const DEFAULT_UI_FONT_SIZE_PX = 18;
 export const MIN_UI_FONT_SIZE_PX = 14;
 export const MAX_UI_FONT_SIZE_PX = 30;
 
-export type OculomotorPattern = string;
-export type OculomotorTargetShape = string;
+
 export const DRIVING_DURATION_MIN_SEC = 80;
 export const DRIVING_DURATION_MAX_SEC = 240;
 export type DrivingControlMode = 'arrow' | 'wasd' | 'wheel';
@@ -25,9 +24,6 @@ export interface AppSettings {
   distanceInCM: number;
   calBarLengthInMM: number;
   rulerLengthInMM: number;
-  gammaValue: number;
-  crowdingType: number;
-  crowdingDistanceType: number;
   totalRounds: number;
   optionCount: number;
   optionMoveIntervalMs: number;
@@ -38,26 +34,21 @@ export interface AppSettings {
   auditoryFeedbackEnabled: boolean;
   downloadDirectory: string;
   oculomotorMode: 'pursuit' | 'reaction-jumps' | 'multi-object' | 'lilac-chaser';
-  oculomotorPattern: OculomotorPattern;
+  oculomotorPattern: string;
   oculomotorDurationSec: number;
   oculomotorSpeedDegPerSec: number;
   oculomotorTargetSizeMm: number;
   oculomotorDistractorCount: number;
   oculomotorTargetColor: string;
   oculomotorBackgroundColor: string;
-  oculomotorTargetShape: OculomotorTargetShape;
+  oculomotorTargetShape: string;
   oculomotorCustomTargetImage: string;
   oculomotorTargetOpacity: number;
   oculomotorBackgroundImage: string;
   oculomotorAudio: string;
   oculomotorBounceJitter: number;
-  preferentialLookingInputMode: 'keyboard' | 'webgazer';
-  webGazerCalibrationAt: string;
   displayCalibrationAt: string;
-  oculomotorEnableWebgazer: boolean;
   readingWPS: number;
-  readingCrowding: number;
-  readingContrast: number;
   readingStoryId: string;
   drivingDurationSec: number;
   drivingRedFlashEnabled: boolean;
@@ -77,9 +68,6 @@ const META: { [K in keyof AppSettings]: SettingMeta<AppSettings[K]> } = {
   distanceInCM:           { dflt: DEFAULT_DISTANCE_CM,       min: 10,   max: 500 },
   calBarLengthInMM:       { dflt: DEFAULT_CAL_BAR_LENGTH_MM, min: 1,    max: 10000 },
   rulerLengthInMM:        { dflt: 0,    min: 0,    max: 10000 },
-  gammaValue:             { dflt: 2.0,  min: 0.8,  max: 4.0 },
-  crowdingType:           { dflt: 0,    min: 0,    max: 6 },
-  crowdingDistanceType:   { dflt: 0,    min: 0,    max: 3 },
   totalRounds:            { dflt: 5,    min: 1,    max: 100 },
   optionCount:            { dflt: 18,   min: 4,    max: 40 },
   optionMoveIntervalMs:   { dflt: 800,  min: 200,  max: 5000 },
@@ -103,13 +91,8 @@ const META: { [K in keyof AppSettings]: SettingMeta<AppSettings[K]> } = {
   oculomotorBackgroundImage: { dflt: '' },
   oculomotorAudio: { dflt: '' },
   oculomotorBounceJitter: { dflt: 0, min: 0, max: 100 },
-  preferentialLookingInputMode: { dflt: 'keyboard' },
-  webGazerCalibrationAt: { dflt: '' },
   displayCalibrationAt: { dflt: '' },
-  oculomotorEnableWebgazer: { dflt: false },
   readingWPS: { dflt: 4, min: 1, max: 20 },
-  readingCrowding: { dflt: 1, min: 1, max: 5 },
-  readingContrast: { dflt: 0.0, min: 0.0, max: 2.0 },
   readingStoryId: { dflt: 'en_story_01' },
   drivingDurationSec: { dflt: DRIVING_DURATION_MIN_SEC, min: DRIVING_DURATION_MIN_SEC, max: DRIVING_DURATION_MAX_SEC },
   drivingRedFlashEnabled: { dflt: true },
@@ -123,8 +106,8 @@ function storageKey(name: string): string {
   return STORAGE_PREFIX + name;
 }
 
-export const ACTIVE_USER_CHANGED_EVENT = 'vision-trainer-active-user-changed';
-export const SETTINGS_CHANGED_EVENT = 'vision-trainer-settings-changed';
+export const ACTIVE_USER_CHANGED_EVENT = 'stroke-trainer-active-user-changed';
+export const SETTINGS_CHANGED_EVENT = 'stroke-trainer-settings-changed';
 
 const settingCache: Partial<AppSettings> = {};
 

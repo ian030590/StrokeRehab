@@ -5,7 +5,7 @@ import { getSetting, STORAGE_PREFIX } from './settings';
 
 type TFunction = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
-export const TRAINING_RECORDS_CHANGED_EVENT = 'vision-trainer-training-records-changed';
+export const TRAINING_RECORDS_CHANGED_EVENT = 'stroke-trainer-training-records-changed';
 
 const TRAINING_RECORDS_KEY = `${STORAGE_PREFIX}training_records_v1`;
 const TRAINING_RECORDS_DATABASE_NAME = 'stroke-trainer-training-records';

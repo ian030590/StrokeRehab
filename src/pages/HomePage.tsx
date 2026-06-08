@@ -106,7 +106,6 @@ export function HomePage() {
           <TrainingModuleCard
             key={module.id}
             module={module}
-            expandedModule={null}
             onSelect={handleCardClick}
             t={t}
           />
