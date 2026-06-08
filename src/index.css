@@ -1897,6 +1897,18 @@ body #webgazer-calibrate-container #calibration-point {
   white-space: nowrap;
 }
 
+.drawing-defense-hud .voice-listening-indicator {
+  white-space: normal;
+}
+
+.drawing-defense-hud .voice-listening-error {
+  max-width: min(360px, calc(100vw - 48px));
+  color: var(--error);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: normal;
+}
+
 .drawing-defense-hud strong {
   color: rgba(66, 71, 82, 0.5);
   font-weight: 700;

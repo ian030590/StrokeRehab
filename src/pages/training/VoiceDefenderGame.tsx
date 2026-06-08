@@ -248,6 +248,15 @@ const ENEMY_SPAWN_Y = -ENEMY_VISUAL_HEIGHT - 8;
 const DEFAULT_BACKGROUND_COLOR = '#005EB8';
 const MICROPHONE_SIGNAL_THRESHOLD = 0.006;
 const MICROPHONE_SILENCE_DELAY_MS = 1600;
+const IOS_MICROPHONE_PERMISSION_TIMEOUT_MS = 15_000;
+const MICROPHONE_MEDIA_CONSTRAINTS: MediaStreamConstraints = {
+  video: false,
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    channelCount: 1,
+  },
+};
 const starSkyBackgroundImage = `url(${import.meta.env.BASE_URL}assets/StarSky.png)`;
 const VOSK_MODEL_DOWNLOAD_TIMEOUT_MS = getPositiveNumber(
   import.meta.env.VITE_VOSK_MODEL_TIMEOUT_MS,
@@ -695,20 +704,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     let pendingAudioContext: AudioContext | null = null;
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(t('voice.microphone.denied'));
+        throw new MicrophoneAccessError(t('voice.microphone.denied'), 'denied');
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          channelCount: 1,
-        },
-      });
+      const stream = await requestMicrophoneStream(MICROPHONE_MEDIA_CONSTRAINTS);
       pendingStream = stream;
       const track = stream.getAudioTracks()[0];
       if (!track || track.readyState !== 'live') {
-        throw new Error(t('voice.microphone.denied'));
+        throw new MicrophoneAccessError(t('voice.microphone.denied'), 'denied');
       }
 
       const audioContext = new AudioContext();
@@ -770,8 +772,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         await pendingAudioContext.close().catch(() => undefined);
       }
       await stopMicrophoneTest(false);
-      setMicrophoneStatus('denied');
-      setMicrophoneError(t('voice.microphone.denied'));
+      const accessError = getMicrophoneAccessError(error, t);
+      setMicrophoneStatus(accessError.microphoneStatus);
+      setMicrophoneError(accessError.message);
     }
   }, [addMicrophoneTrackListeners, stopListening, stopMicrophoneTest, t]);
 
@@ -940,7 +943,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         if (event.error === 'aborted' || event.error === 'no-speech') return;
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
           runtime.shouldRestart = false;
-          setMicrophoneStatus('denied');
+          const accessError = getMicrophoneAccessError(event.error, t);
+          setMicrophoneStatus(accessError.microphoneStatus);
+          setMicrophoneError(accessError.message);
+          return;
         }
         setMicrophoneError(event.message || event.error);
       };
@@ -970,20 +976,13 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const model = modelRef.current;
     if (!model || engine !== 'vosk') throw new Error(t('voice.model.notReady'));
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error(t('voice.microphone.denied'));
+      throw new MicrophoneAccessError(t('voice.microphone.denied'), 'denied');
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: false,
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        channelCount: 1,
-      },
-    });
+    const stream = await requestMicrophoneStream(MICROPHONE_MEDIA_CONSTRAINTS);
     const track = stream.getAudioTracks()[0];
     if (!track || track.readyState !== 'live') {
       stream.getTracks().forEach((streamTrack) => streamTrack.stop());
-      throw new Error(t('voice.microphone.denied'));
+      throw new MicrophoneAccessError(t('voice.microphone.denied'), 'denied');
     }
     const audioContext = new AudioContext();
     await audioContext.resume();
@@ -1123,8 +1122,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       await startListening();
     } catch (error) {
       console.error('Unable to start voice recognition.', error);
-      setMicrophoneError(error instanceof Error ? error.message : t('voice.microphone.denied'));
-      setMicrophoneStatus('disconnected');
+      const accessError = getMicrophoneAccessError(error, t);
+      setMicrophoneError(accessError.message);
+      setMicrophoneStatus(accessError.microphoneStatus);
       setShowStartValidation(true);
       window.requestAnimationFrame(() => scrollToStartRequirement('microphone'));
       return;
@@ -1204,7 +1204,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       setPhase('playing');
     } catch (error) {
       console.error('Unable to resume voice recognition.', error);
-      setMicrophoneError(error instanceof Error ? error.message : t('voice.microphone.denied'));
+      const accessError = getMicrophoneAccessError(error, t);
+      setMicrophoneError(accessError.message);
+      setMicrophoneStatus(accessError.microphoneStatus);
       returnToEditor();
     }
   }, [returnToEditor, setPhase, startListening, t]);
@@ -1699,7 +1701,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <div className="training-setting-header">
                   <div>
                     <h2>{t('voice.microphone.title')}</h2>
-                    <p>{microphoneError || t('voice.microphone.desc')}</p>
+                    <p role={microphoneError ? 'alert' : undefined}>
+                      {microphoneError || t('voice.microphone.desc')}
+                    </p>
                   </div>
                   <span>{getMicrophoneStatusText(microphoneStatus, t)}</span>
                 </div>
@@ -1850,6 +1854,11 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             <div className={`voice-listening-indicator voice-listening-${microphoneStatus}`}>
               <span aria-hidden="true" />
               <strong>{getMicrophoneStatusText(microphoneStatus, t)}</strong>
+              {microphoneStatus === 'denied' && microphoneError && (
+                <small className="voice-listening-error" role="alert">
+                  {microphoneError}
+                </small>
+              )}
             </div>
           )}
           <div><strong>{t('voice.hud.heard')}</strong> {recognizedText || '-'}</div>
@@ -1947,6 +1956,118 @@ function getModelStatusText(
 export function isLineOrFacebookInAppBrowser(userAgent: string): boolean {
   return /\bLine\/[\d.]+/i.test(userAgent)
     || /(FBAN|FBAV|FB_IAB|FBIOS|FB4A|MESSENGER)/i.test(userAgent);
+}
+
+class MicrophoneAccessError extends Error {
+  readonly microphoneStatus: MicrophoneStatus;
+
+  constructor(message: string, microphoneStatus: MicrophoneStatus) {
+    super(message);
+    this.name = 'MicrophoneAccessError';
+    this.microphoneStatus = microphoneStatus;
+    Object.setPrototypeOf(this, MicrophoneAccessError.prototype);
+  }
+}
+
+class MicrophonePermissionTimeoutError extends Error {
+  constructor() {
+    super('Microphone permission request did not respond.');
+    this.name = 'MicrophonePermissionTimeoutError';
+    Object.setPrototypeOf(this, MicrophonePermissionTimeoutError.prototype);
+  }
+}
+
+function requestMicrophoneStream(constraints: MediaStreamConstraints): Promise<MediaStream> {
+  const request = navigator.mediaDevices.getUserMedia(constraints);
+  if (!isLikelyIosDevice()) return request;
+
+  let isSettled = false;
+  let timeoutId = 0;
+  return new Promise((resolve, reject) => {
+    timeoutId = window.setTimeout(() => {
+      if (isSettled) return;
+      isSettled = true;
+      reject(new MicrophonePermissionTimeoutError());
+    }, IOS_MICROPHONE_PERMISSION_TIMEOUT_MS);
+
+    request.then(
+      (stream) => {
+        if (isSettled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        isSettled = true;
+        window.clearTimeout(timeoutId);
+        resolve(stream);
+      },
+      (error: unknown) => {
+        if (isSettled) return;
+        isSettled = true;
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
+
+function getMicrophoneAccessError(error: unknown, t: TFunction): MicrophoneAccessError {
+  if (error instanceof MicrophoneAccessError) return error;
+
+  const isDenied = isMicrophonePermissionDeniedError(error) || error instanceof MicrophonePermissionTimeoutError;
+  if (isDenied) {
+    const message = isLikelyIosDevice()
+      ? t('voice.microphone.iosSettings', { browser: getCurrentBrowserDisplayName(t) })
+      : t('voice.microphone.denied');
+    return new MicrophoneAccessError(message, 'denied');
+  }
+
+  return new MicrophoneAccessError(getErrorMessage(error) || t('voice.microphone.denied'), 'disconnected');
+}
+
+function isLikelyIosDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function getCurrentBrowserDisplayName(t: TFunction): string {
+  if (typeof navigator === 'undefined') return t('voice.microphone.browserFallback');
+  const userAgent = navigator.userAgent;
+  if (/\bLine\/[\d.]+/i.test(userAgent)) return 'LINE';
+  if (/(FBAN|FBAV|FB_IAB|FBIOS|FB4A)/i.test(userAgent)) return 'Facebook';
+  if (/MESSENGER/i.test(userAgent)) return 'Messenger';
+  if (/EdgiOS/i.test(userAgent)) return 'Edge';
+  if (/CriOS/i.test(userAgent)) return 'Chrome';
+  if (/FxiOS/i.test(userAgent)) return 'Firefox';
+  if (/OPiOS/i.test(userAgent)) return 'Opera';
+  if (/DuckDuckGo/i.test(userAgent)) return 'DuckDuckGo';
+  if (/Safari/i.test(userAgent)) return 'Safari';
+  return t('voice.microphone.browserFallback');
+}
+
+function isMicrophonePermissionDeniedError(error: unknown): boolean {
+  const errorName = getErrorName(error);
+  const normalizedError = `${errorName} ${getErrorMessage(error)}`.toLowerCase();
+  return errorName === 'NotAllowedError'
+    || errorName === 'SecurityError'
+    || errorName === 'PermissionDeniedError'
+    || normalizedError.includes('not-allowed')
+    || normalizedError.includes('service-not-allowed')
+    || normalizedError.includes('permission denied');
+}
+
+function getErrorName(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('name' in error)) return '';
+  const value = (error as { name?: unknown }).name;
+  return typeof value === 'string' ? value : '';
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (!error || typeof error !== 'object' || !('message' in error)) return '';
+  const value = (error as { message?: unknown }).message;
+  return typeof value === 'string' ? value : '';
 }
 
 function getMicrophoneStatusText(status: MicrophoneStatus, t: TFunction): string {

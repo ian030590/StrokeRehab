@@ -491,6 +491,8 @@ export const zh = {
   'voice.microphone.level': '輸入音量',
   'voice.microphone.pending': '尚未測試',
   'voice.microphone.denied': '麥克風權限遭拒或找不到可用的麥克風。',
+  'voice.microphone.iosSettings': '請確認已在手機設定中允許{browser}存取麥克風',
+  'voice.microphone.browserFallback': '瀏覽器',
   'voice.config.backgroundColorAria': '選擇遊戲背景顏色',
   'voice.config.backgroundColorHint': '點選色塊自訂背景顏色。',
   'voice.vocabulary.title': '詞彙庫',

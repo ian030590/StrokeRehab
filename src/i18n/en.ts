@@ -492,6 +492,8 @@ export const en: Record<TranslationKey, string> = {
   'voice.microphone.level': 'Input volume',
   'voice.microphone.pending': 'Not tested',
   'voice.microphone.denied': 'Microphone permission was denied or no microphone is available.',
+  'voice.microphone.iosSettings': 'Confirm that {browser} is allowed to access the microphone in your phone settings.',
+  'voice.microphone.browserFallback': 'this browser',
   'voice.config.backgroundColorAria': 'Choose the game background color',
   'voice.config.backgroundColorHint': 'Select the color swatch to customize the background.',
   'voice.vocabulary.title': 'Vocabulary',
