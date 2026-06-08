@@ -1,7 +1,12 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useLayoutEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { useT } from './i18n';
+import {
+  DEFAULT_UI_FONT_SIZE_PX,
+  SETTINGS_CHANGED_EVENT,
+  getSetting,
+} from './utils/settings';
 
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const TrainingPage = lazy(() => import('./pages/training/TrainingPage').then((module) => ({ default: module.TrainingPage })));
@@ -34,6 +39,29 @@ export function App() {
 
 function AppLayout() {
   const { t } = useT();
+
+  useLayoutEffect(() => {
+    const applyFontSettings = () => {
+      const fontSizePx = getSetting('uiFontSizePx');
+      const fontScale = fontSizePx / DEFAULT_UI_FONT_SIZE_PX;
+      const isBold = getSetting('uiFontBold');
+      document.documentElement.style.setProperty('--ui-font-size', `${fontSizePx}px`);
+      document.documentElement.style.setProperty('--ui-font-scale', String(fontScale));
+      document.documentElement.style.setProperty('--ui-font-weight', isBold ? '700' : '400');
+      document.documentElement.style.setProperty('--ui-font-medium-weight', isBold ? '800' : '600');
+      document.documentElement.style.setProperty('--ui-font-heading-weight', isBold ? '900' : '700');
+      document.body.dataset.uiFontBold = isBold ? 'true' : 'false';
+      document.body.dataset.uiFontSize = String(fontSizePx);
+    };
+
+    applyFontSettings();
+    window.addEventListener(SETTINGS_CHANGED_EVENT, applyFontSettings);
+    window.addEventListener('storage', applyFontSettings);
+    return () => {
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, applyFontSettings);
+      window.removeEventListener('storage', applyFontSettings);
+    };
+  }, []);
 
   return (
     <div className="app-layout">

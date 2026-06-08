@@ -144,6 +144,14 @@ export const zh = {
   'settings.language.desc': '切換介面顯示語言',
   'settings.language.zh': '中文',
   'settings.language.en': '英文',
+  'settings.fontSize.title': '介面字體大小',
+  'settings.fontSize.desc': '調整各類 UI 顯示文字與語音防線字卡的字體大小',
+  'settings.fontSize.value': '{value}px',
+  'settings.fontSize.reset': '重設',
+  'settings.fontBold.title': '介面粗體',
+  'settings.fontBold.desc': '將各類 UI 顯示文字與語音防線字卡改為粗體',
+  'settings.fontBold.on': '✓ 已開啟',
+  'settings.fontBold.off': '✗ 已關閉',
 
   // Calibration
   'settings.cal.rulerMode': '尺規校正',

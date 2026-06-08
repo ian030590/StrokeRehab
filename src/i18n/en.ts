@@ -145,6 +145,14 @@ export const en: Record<TranslationKey, string> = {
   'settings.language.desc': 'Switch interface language',
   'settings.language.zh': 'Chinese',
   'settings.language.en': 'English',
+  'settings.fontSize.title': 'Interface Font Size',
+  'settings.fontSize.desc': 'Adjust UI display text and Voice Defender word-card font size',
+  'settings.fontSize.value': '{value}px',
+  'settings.fontSize.reset': 'Reset',
+  'settings.fontBold.title': 'Interface Bold Text',
+  'settings.fontBold.desc': 'Use bold text for UI display text and Voice Defender word cards',
+  'settings.fontBold.on': '✓ Enabled',
+  'settings.fontBold.off': '✗ Disabled',
 
   // Calibration
   'settings.cal.rulerMode': 'Ruler Calibration',

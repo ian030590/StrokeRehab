@@ -15,6 +15,9 @@ import {
   CAL_BAR_LENGTH_PX,
   CARD_WIDTH_MM,
   CARD_HEIGHT_MM,
+  DEFAULT_UI_FONT_SIZE_PX,
+  MAX_UI_FONT_SIZE_PX,
+  MIN_UI_FONT_SIZE_PX,
 } from '../../utils/settings';
 import { pixelFromMillimeter } from '../../utils/spatialUtils';
 
@@ -70,6 +73,8 @@ export function SettingsPage() {
 /* ── General Tab ── */
 function GeneralTab({ refresh }: { refresh: () => void }) {
   const { t, lang, setLang } = useT();
+  const uiFontSizePx = getSetting('uiFontSizePx');
+  const uiFontBold = getSetting('uiFontBold');
 
   return (
     <div className="fade-in">
@@ -93,6 +98,57 @@ function GeneralTab({ refresh }: { refresh: () => void }) {
             {t('settings.language.en')}
           </button>
         </div>
+      </div>
+
+      {/* UI Typography */}
+      <div className="setting-row">
+        <div className="setting-info">
+          <h3>{t('settings.fontSize.title')}</h3>
+          <p>{t('settings.fontSize.desc')}</p>
+        </div>
+        <div className="font-setting-control">
+          <span className="setting-value">
+            {t('settings.fontSize.value', { value: uiFontSizePx })}
+          </span>
+          <input
+            type="range"
+            min={MIN_UI_FONT_SIZE_PX}
+            max={MAX_UI_FONT_SIZE_PX}
+            step={1}
+            value={uiFontSizePx}
+            aria-label={t('settings.fontSize.title')}
+            onChange={(event) => {
+              setSetting('uiFontSizePx', Number(event.target.value));
+              refresh();
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={() => {
+              setSetting('uiFontSizePx', DEFAULT_UI_FONT_SIZE_PX);
+              refresh();
+            }}
+          >
+            {t('settings.fontSize.reset')}
+          </button>
+        </div>
+      </div>
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <h3>{t('settings.fontBold.title')}</h3>
+          <p>{t('settings.fontBold.desc')}</p>
+        </div>
+        <button
+          className={`btn btn-sm ${uiFontBold ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => {
+            setSetting('uiFontBold', !uiFontBold);
+            refresh();
+          }}
+        >
+          {uiFontBold ? t('settings.fontBold.on') : t('settings.fontBold.off')}
+        </button>
       </div>
 
       {/* Viewing Distance */}

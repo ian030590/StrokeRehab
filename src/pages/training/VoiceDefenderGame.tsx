@@ -13,7 +13,7 @@ import { initJsPsych } from 'jspsych';
 import type { KaldiRecognizer, Model } from 'vosk-browser';
 import { useT, type TranslationKey } from '../../i18n';
 import { downloadCsvFile } from '../../utils/downloadFile';
-import { getActiveUser } from '../../utils/settings';
+import { DEFAULT_UI_FONT_SIZE_PX, getActiveUser, getSetting } from '../../utils/settings';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
@@ -1059,8 +1059,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const word = words[Math.floor(Math.random() * words.length)];
     const enemyNumber = metricsRef.current.spawned + 1;
     const resultIndex = enemyResultsRef.current.length;
-    const wordLength = [...word].length;
-    const boardWidth = clamp(68 + Math.max(0, wordLength - 2) * 11, 88, 172);
+    const cardTypography = getVoiceCardTypography(word);
+    const boardWidth = clamp(cardTypography.estimatedWidth + 32, 88, Math.min(280, app.renderer.width - 24));
+    const boardHeight = clamp(cardTypography.fontSize + 28, 50, 74);
+    const boardY = 48;
     const x = boardWidth / 2 + 12 + Math.random() * Math.max(1, app.renderer.width - boardWidth - 24);
     const node = new Container();
     const monster = new Text({ text: '👾', style: { fontSize: 42 } });
@@ -1068,21 +1070,21 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     monster.x = 0;
     monster.y = 24;
     const board = new Graphics();
-    board.roundRect(-boardWidth / 2, 48, boardWidth, 50, 6)
+    board.roundRect(-boardWidth / 2, boardY, boardWidth, boardHeight, 6)
       .fill(0xffffff)
       .stroke({ color: 0xc2c6d4, width: 2 });
     const label = new Text({
       text: word,
       style: {
         fill: 0x1a1c1e,
-        fontFamily: 'Arial, sans-serif',
-        fontSize: wordLength > 10 ? 15 : wordLength > 6 ? 18 : 22,
-        fontWeight: '700',
+        fontFamily: 'Inter, Noto Sans TC, Arial, sans-serif',
+        fontSize: cardTypography.fontSize,
+        fontWeight: cardTypography.fontWeight,
         align: 'center',
       },
     });
     label.anchor.set(0.5);
-    label.y = 73;
+    label.y = boardY + boardHeight / 2;
     node.addChild(monster, board, label);
     node.x = x;
     node.y = ENEMY_SPAWN_Y;
@@ -1931,6 +1933,31 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       )}
     </div>
   );
+}
+
+function getVoiceCardTypography(word: string): {
+  estimatedWidth: number;
+  fontSize: number;
+  fontWeight: '700' | '900';
+} {
+  const characters = [...word];
+  const baseFontSize = characters.length > 10 ? 15 : characters.length > 6 ? 18 : 22;
+  const fontScale = getSetting('uiFontSizePx') / DEFAULT_UI_FONT_SIZE_PX;
+  const fontSize = Math.round(clamp(baseFontSize * fontScale, 12, 38));
+  const estimatedWidth = Math.ceil(characters.reduce((totalWidth, character) => (
+    totalWidth + fontSize * getVoiceCardCharacterWidthFactor(character)
+  ), 0));
+
+  return {
+    estimatedWidth,
+    fontSize,
+    fontWeight: getSetting('uiFontBold') ? '900' : '700',
+  };
+}
+
+function getVoiceCardCharacterWidthFactor(character: string): number {
+  if (/[\u0000-\u007f]/.test(character)) return 0.62;
+  return 1;
 }
 
 function getModelStatusText(
