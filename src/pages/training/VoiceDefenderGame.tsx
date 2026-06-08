@@ -426,6 +426,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     }
     return { backgroundImage: 'none', backgroundColor };
   }, [backgroundColor, backgroundMode, uploadedBackgroundUrl]);
+  const modelStatusText = getModelStatusText(modelStatus, modelLoadStage, modelProgress, t);
 
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
@@ -1412,6 +1413,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <span className="training-config-label">{t('voice.configLabel')}</span>
                 <h1>{t('voice.title')}</h1>
               </div>
+              <div className={`voice-model-status voice-model-status-${modelStatus}`} aria-live="polite">
+                <span>{modelStatusText}</span>
+                <progress max="100" value={modelProgress} aria-label={modelStatusText} />
+              </div>
             </header>
 
             <div className="training-config-body">
@@ -1619,10 +1624,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                     <span className="training-option-title">{t('voice.model.reload')}</span>
                     <span className="training-option-meta">{modelError || t('voice.model.cacheHint')}</span>
                   </button>
-                </div>
-                <div className={`voice-model-status voice-model-status-${modelStatus}`}>
-                  <span>{getModelStatusText(modelStatus, modelLoadStage, modelProgress, t)}</span>
-                  <progress max="100" value={modelProgress} />
                 </div>
               </section>
 

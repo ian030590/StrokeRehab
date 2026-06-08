@@ -2927,10 +2927,15 @@ body #webgazer-calibrate-container #calibration-point {
   min-width: 230px;
   display: grid;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 700;
+}
+
+.training-config-header .voice-model-status {
+  flex: 0 1 320px;
+  align-self: center;
 }
 
 .voice-model-status progress {
@@ -3370,6 +3375,7 @@ body #webgazer-calibrate-container #calibration-point {
 
   .voice-model-status {
     min-width: 0;
+    width: 100%;
   }
 
   .voice-vocabulary-list {

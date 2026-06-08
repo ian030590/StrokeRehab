@@ -1,0 +1,25 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://visiontrainer.pages.dev",
+          "https://stroke-trainer.pages.dev",
+          "https://ian030590.github.io",
+          "http://localhost:5173",
+          "http://127.0.0.1:5173"
+        ],
+        "methods": [
+          "GET",
+          "HEAD"
+        ]
+      },
+      "exposeHeaders": [
+        "Content-Length",
+        "Content-Type",
+        "ETag"
+      ],
+      "maxAgeSeconds": 86400
+    }
+  ]
+}

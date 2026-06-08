@@ -5,11 +5,12 @@ import { fileURLToPath } from 'node:url';
 const CLOUDFLARE_PAGES_ASSET_LIMIT_BYTES = 25 * 1024 * 1024;
 const force = process.argv.includes('--force');
 const isCloudflarePagesBuild = process.env.CF_PAGES === '1';
+const hasExternalZhModelUrl = Boolean(process.env.VITE_VOSK_MODEL_ZH_URL?.trim());
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(rootDir, 'dist');
 const bundledZhModelPath = path.join(distDir, 'models', 'vosk-model-small-zh-tw-0.3.tar.gz');
 
-if (!force && !isCloudflarePagesBuild) {
+if (!force && !isCloudflarePagesBuild && !hasExternalZhModelUrl) {
   process.exit(0);
 }
 

@@ -89,10 +89,32 @@ npm run build
 
 Cloudflare Pages has a 25 MiB limit per uploaded asset. The default build detects Cloudflare Pages through `CF_PAGES=1` and removes the bundled Chinese Vosk archive from `dist`; Voice Defender will use Web Speech fallback unless an external model URL is configured.
 
-To keep offline Chinese recognition on Cloudflare Pages, upload `public/models/vosk-model-small-zh-tw-0.3.tar.gz` to R2 or another static file host and set:
+To keep offline Chinese recognition on Cloudflare Pages and GitHub Pages, upload the local Vosk files to a public Cloudflare R2 bucket and set the model URLs at build time. The helper script uploads:
+
+- `public/models/vosk-model-small-zh-tw-0.3.tar.gz`
+- `public/models/vosk-model-small-zh-tw-0.3-vocabulary.txt`
+- `public/models/vosk-model-small-en-us-0.15-vocabulary.txt`
+- `public/models/vosk-model-small-en-us-0.15.tar.gz`, if you add it locally later
+
+First authenticate Wrangler with `npx wrangler login`, or set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Then expose the bucket through a custom R2 domain, or enable the `r2.dev` public development URL for testing.
+
+PowerShell example:
 
 ```text
-VITE_VOSK_MODEL_ZH_URL=https://static.example.com/vosk-model-small-zh-tw-0.3.tar.gz
+$env:R2_BUCKET='stroke-trainer-vosk-models'
+$env:R2_PREFIX='models'
+$env:R2_PUBLIC_BASE_URL='https://vosk-models.example.com'
+npm run r2:upload-vosk
+```
+
+The script also applies `config/r2-cors.json`. Update that file if your Cloudflare Pages or GitHub Pages origin is different.
+
+Set the printed frontend variables in Cloudflare Pages environment variables and GitHub repository variables:
+
+```text
+VITE_VOSK_MODEL_ZH_URL=https://vosk-models.example.com/models/vosk-model-small-zh-tw-0.3.tar.gz
+VITE_VOSK_MODEL_ZH_VOCAB_URL=https://vosk-models.example.com/models/vosk-model-small-zh-tw-0.3-vocabulary.txt
+VITE_VOSK_MODEL_EN_VOCAB_URL=https://vosk-models.example.com/models/vosk-model-small-en-us-0.15-vocabulary.txt
 ```
 
 Set in Cloudflare Pages environment variables:
@@ -123,6 +145,8 @@ VITE_VOSK_MODEL_TIMEOUT_MS=90000
 VITE_VOSK_MODEL_RETRY_MS=10000
 VITE_VOSK_MODEL_MIN_BYTES=1048576
 ```
+
+When `VITE_VOSK_MODEL_ZH_URL` is set during `npm run build`, `scripts/prune-cloudflare-pages-assets.mjs` removes the bundled Chinese model from `dist` so GitHub Pages and Cloudflare Pages both use the external R2 copy. The GitHub Pages workflow reads these values from repository variables with the same names.
 
 The model host must allow cross-origin requests. Downloads begin only after Voice Defender is opened. If a download fails, the page keeps retrying in the background until a complete model is cached or the browser tab closes, including while Web Speech gameplay continues or the user navigates elsewhere in the app. Cached archives must include completion metadata, match their recorded byte length, meet the configured minimum size, and have a gzip signature; incomplete or legacy cache entries are deleted and downloaded again. The default Chinese and English archives are also checked against their exact published byte sizes.
 

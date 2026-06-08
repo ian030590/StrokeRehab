@@ -35,6 +35,11 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_VOSK_MODEL_ZH_URL: ${{ vars.VITE_VOSK_MODEL_ZH_URL }}
+          VITE_VOSK_MODEL_EN_URL: ${{ vars.VITE_VOSK_MODEL_EN_URL }}
+          VITE_VOSK_MODEL_ZH_VOCAB_URL: ${{ vars.VITE_VOSK_MODEL_ZH_VOCAB_URL }}
+          VITE_VOSK_MODEL_EN_VOCAB_URL: ${{ vars.VITE_VOSK_MODEL_EN_VOCAB_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
