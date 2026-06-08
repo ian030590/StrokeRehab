@@ -40,7 +40,7 @@ jobs:
           VITE_VOSK_MODEL_EN_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-en-us-0.15.tar.gz"
           VITE_VOSK_MODEL_ZH_VOCAB_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-zh-tw-0.3-vocabulary.txt"
           VITE_VOSK_MODEL_EN_VOCAB_URL: "https://pub-83410295f846445a8f000b35f0cec50a.r2.dev/vosk-model-small-en-us-0.15-vocabulary.txt"
-          VITE_VOSK_MODEL_MIN_BYTES: "34603008"
+          VITE_VOSK_MODEL_MIN_BYTES: "31457280"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

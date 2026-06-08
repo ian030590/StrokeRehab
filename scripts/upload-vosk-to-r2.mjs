@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bucket = getEnv('R2_BUCKET', 'stroke-trainer-vosk-models');
-const prefix = normalizePrefix(getEnv('R2_PREFIX', 'models'));
+const prefix = normalizePrefix(getEnv('R2_PREFIX', ''));
 const publicBaseUrl = trimTrailingSlash(process.env.R2_PUBLIC_BASE_URL ?? '');
 const corsFile = path.resolve(rootDir, getEnv('R2_CORS_FILE', 'config/r2-cors.json'));
 const cacheControl = getEnv('R2_CACHE_CONTROL', 'public,max-age=31536000,immutable');
