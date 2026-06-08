@@ -1,4 +1,5 @@
 const MAX_IMAGE_BYTES = 1024 * 1024;
+const MAX_REQUEST_BYTES = MAX_IMAGE_BYTES + 128 * 1024;
 const SHAPES = new Set(['circle', 'cross', 'square', 'triangle', 'vertical-line', 'horizontal-line']);
 
 export async function onRequestOptions(context) {
@@ -26,7 +27,17 @@ export async function onRequestPost(context) {
     return json({ error: 'Expected multipart/form-data.' }, 415, headers);
   }
 
-  const form = await request.formData();
+  const contentLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    return json({ error: 'Upload request is too large.' }, 413, headers);
+  }
+
+  let form;
+  try {
+    form = await request.formData();
+  } catch {
+    return json({ error: 'Invalid multipart form data.' }, 400, headers);
+  }
   const image = form.get('image');
   const metadataText = form.get('metadata');
 
@@ -48,21 +59,38 @@ export async function onRequestPost(context) {
   discordForm.append('payload_json', JSON.stringify(createDiscordPayload(metadata, filename)));
   discordForm.append('files[0]', image, filename);
 
-  const discordResponse = await fetch(`${webhookUrl}?wait=true`, {
-    method: 'POST',
-    body: discordForm,
-  });
+  let discordWebhookUrl;
+  try {
+    discordWebhookUrl = createDiscordWebhookUrl(webhookUrl);
+  } catch {
+    return json({ error: 'Discord webhook URL is invalid.' }, 500, headers);
+  }
+
+  let discordResponse;
+  try {
+    discordResponse = await fetch(discordWebhookUrl, {
+      method: 'POST',
+      body: discordForm,
+    });
+  } catch {
+    return json({ error: 'Discord upload request failed.' }, 502, headers);
+  }
 
   if (!discordResponse.ok) {
-    const text = await discordResponse.text().catch(() => '');
     return json(
-      { error: 'Discord upload failed.', discordStatus: discordResponse.status, detail: text.slice(0, 500) },
+      { error: 'Discord upload failed.', discordStatus: discordResponse.status },
       502,
       headers,
     );
   }
 
   return json({ ok: true, filename }, 201, headers);
+}
+
+function createDiscordWebhookUrl(webhookUrl) {
+  const url = new URL(webhookUrl);
+  url.searchParams.set('wait', 'true');
+  return url.toString();
 }
 
 function parseMetadata(value) {

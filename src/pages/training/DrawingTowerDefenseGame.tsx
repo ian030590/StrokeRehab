@@ -16,7 +16,6 @@ type GamePhase = 'menu' | 'playing' | 'paused' | 'results';
 type GameResult = 'Victory' | 'Defeat';
 type BackgroundMode = 'stars' | 'color' | 'image';
 type GameDurationSeconds = number | null;
-type DrawingSampleUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 interface DrawingTowerDefenseGameProps {
   onExit: () => void;
@@ -49,14 +48,6 @@ interface EnemyResult {
   Shape: ShapeId;
   Reaction_Time_Seconds: number | null;
   Defeated: boolean;
-}
-
-interface DrawingSampleUploadState {
-  status: DrawingSampleUploadStatus;
-  pending: number;
-  uploaded: number;
-  failed: number;
-  message: string;
 }
 
 interface DrawingSampleMetadata {
@@ -158,6 +149,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const strokesRef = useRef<Point[][]>([]);
   const enemyResultsRef = useRef<EnemyResult[]>([]);
   const recognitionTimerRef = useRef<number | null>(null);
+  const drawingClearTimerRef = useRef<number | null>(null);
   const uploadedBackgroundUrlRef = useRef<string | null>(null);
   const isDrawingRef = useRef(false);
   const metricsRef = useRef({ defeated: 0, hp: DEFAULT_HP, spawned: 0, elapsed: 0, spawnTimer: 0, nextId: 1 });
@@ -192,13 +184,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recognized, setRecognized] = useState<string>(() => t('drawing.recognition.idle'));
   const [result, setResult] = useState<SessionRecord | null>(null);
-  const [sampleUpload, setSampleUpload] = useState<DrawingSampleUploadState>({
-    status: 'idle',
-    pending: 0,
-    uploaded: 0,
-    failed: 0,
-    message: t('drawing.upload.idle'),
-  });
 
   const activeConfig = DIFFICULTIES[difficulty];
   const activeDifficultyLabel = t(activeConfig.labelKey);
@@ -218,13 +203,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     }
     return { backgroundImage: 'none', backgroundColor };
   }, [backgroundColor, backgroundMode, uploadedBackgroundUrl]);
-  const sampleUploadLabel = useMemo(() => {
-    if (sampleUpload.pending > 0) return t('drawing.upload.uploadingCount', { count: sampleUpload.pending });
-    if (sampleUpload.failed > 0) return t('drawing.upload.summaryFailed', { uploaded: sampleUpload.uploaded, failed: sampleUpload.failed });
-    if (sampleUpload.uploaded > 0) return t('drawing.upload.summary', { uploaded: sampleUpload.uploaded });
-    return sampleUpload.message;
-  }, [sampleUpload, t]);
-
   const setPhase = useCallback((next: GamePhase) => {
     phaseRef.current = next;
     setPhaseState(next);
@@ -238,21 +216,31 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     jsPsychRef.current = initJsPsych();
   }, []);
 
-  useEffect(() => () => {
-    if (uploadedBackgroundUrlRef.current) URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
-  }, []);
-
-  const clearPixiState = useCallback(() => {
+  const clearDrawingInput = useCallback(() => {
     if (recognitionTimerRef.current !== null) {
       window.clearTimeout(recognitionTimerRef.current);
       recognitionTimerRef.current = null;
     }
+    if (drawingClearTimerRef.current !== null) {
+      window.clearTimeout(drawingClearTimerRef.current);
+      drawingClearTimerRef.current = null;
+    }
+    isDrawingRef.current = false;
     pathRef.current = [];
     strokesRef.current = [];
-    enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
-    enemiesRef.current = [];
     drawingLayerRef.current?.clear();
   }, []);
+
+  useEffect(() => () => {
+    if (uploadedBackgroundUrlRef.current) URL.revokeObjectURL(uploadedBackgroundUrlRef.current);
+    clearDrawingInput();
+  }, [clearDrawingInput]);
+
+  const clearPixiState = useCallback(() => {
+    clearDrawingInput();
+    enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
+    enemiesRef.current = [];
+  }, [clearDrawingInput]);
 
   const recordEnemyOutcome = useCallback((enemy: Enemy, defeatedEnemy: boolean) => {
     const result = enemyResultsRef.current[enemy.resultIndex];
@@ -265,14 +253,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   const finishGame = useCallback((gameResult: GameResult) => {
     if (phaseRef.current === 'results') return;
     playGameEndSound(gameResult, jsPsychRef);
-    if (recognitionTimerRef.current !== null) {
-      window.clearTimeout(recognitionTimerRef.current);
-      recognitionTimerRef.current = null;
-    }
-    isDrawingRef.current = false;
-    pathRef.current = [];
-    strokesRef.current = [];
-    drawingLayerRef.current?.clear();
+    clearDrawingInput();
     enemiesRef.current.forEach((enemy) => recordEnemyOutcome(enemy, false));
     enemiesRef.current.forEach((enemy) => enemy.node.destroy({ children: true }));
     enemiesRef.current = [];
@@ -325,7 +306,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       })),
     });
     writeJsPsychData(jsPsychRef, record as unknown as Record<string, unknown>, 'Unable to write drawing tower defense result to jsPsych data.');
-  }, [recordEnemyOutcome, setPhase, t]);
+  }, [clearDrawingInput, recordEnemyOutcome, setPhase, t]);
 
   const drawLayout = useCallback((app: Application) => {
     const w = app.renderer.width;
@@ -450,39 +431,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       imageSize: DRAWING_SAMPLE_IMAGE_SIZE,
     };
 
-    setSampleUpload((current) => ({
-      ...current,
-      status: 'uploading',
-      pending: current.pending + 1,
-      message: t('drawing.upload.uploading'),
-    }));
-
     void createDrawingSampleBlob(sampleStrokes)
       .then((blob) => uploadDrawingSample(blob, metadata))
-      .then(() => {
-        setSampleUpload((current) => {
-          const pending = Math.max(0, current.pending - 1);
-          return {
-            status: pending > 0 ? 'uploading' : 'success',
-            pending,
-            uploaded: current.uploaded + 1,
-            failed: current.failed,
-            message: t('drawing.upload.done'),
-          };
-        });
-      })
       .catch((error) => {
         console.warn('Unable to upload drawing sample to Discord.', error);
-        setSampleUpload((current) => {
-          const pending = Math.max(0, current.pending - 1);
-          return {
-            status: pending > 0 ? 'uploading' : 'error',
-            pending,
-            uploaded: current.uploaded,
-            failed: current.failed + 1,
-            message: t('drawing.upload.failed'),
-          };
-        });
       });
   }, [t]);
 
@@ -512,7 +464,11 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         metricsRef.current.defeated += 1;
         setDefeated(metricsRef.current.defeated);
       }
-      window.setTimeout(() => {
+      if (drawingClearTimerRef.current !== null) {
+        window.clearTimeout(drawingClearTimerRef.current);
+      }
+      drawingClearTimerRef.current = window.setTimeout(() => {
+        drawingClearTimerRef.current = null;
         strokesRef.current = [];
         drawingLayerRef.current?.clear();
       }, 650);
@@ -536,13 +492,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
     setElapsedSeconds(0);
     setResult(null);
     setRecognized(t('drawing.recognition.idle'));
-    setSampleUpload({
-      status: 'idle',
-      pending: 0,
-      uploaded: 0,
-      failed: 0,
-      message: t('drawing.upload.idle'),
-    });
     setPhase('playing');
   }, [clearPixiState, drawLayout, setPhase, t]);
 
@@ -561,8 +510,10 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
   }, [clearPixiState, drawLayout, setPhase]);
 
   const pauseGame = useCallback(() => {
-    if (phaseRef.current === 'playing') setPhase('paused');
-  }, [setPhase]);
+    if (phaseRef.current !== 'playing') return;
+    clearDrawingInput();
+    setPhase('paused');
+  }, [clearDrawingInput, setPhase]);
 
   const resumeGame = useCallback(() => {
     if (phaseRef.current === 'paused') setPhase('playing');
@@ -691,6 +642,12 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         window.clearTimeout(recognitionTimerRef.current);
         recognitionTimerRef.current = null;
       }
+      if (drawingClearTimerRef.current !== null) {
+        window.clearTimeout(drawingClearTimerRef.current);
+        drawingClearTimerRef.current = null;
+        strokesRef.current = [];
+        drawingLayerRef.current?.clear();
+      }
       overlay.setPointerCapture(event.pointerId);
       isDrawingRef.current = true;
       pathRef.current = [toPoint(event)];
@@ -733,7 +690,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
         <div><strong>{t('drawing.hud.defeated')}</strong> {defeated}</div>
         <div><strong>{t('drawing.hud.time')}</strong> {timeProgressText}</div>
         <div><strong>{t('drawing.hud.recognition')}</strong> {recognized}</div>
-        <div><strong>{t('drawing.hud.image')}</strong> {sampleUploadLabel}</div>
         {phase === 'playing' && <button className="btn btn-sm btn-secondary" onClick={pauseGame}>{t('training.pause')}</button>}
       </div>}
 
@@ -1070,10 +1026,6 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
               <span>
                 <small>{t('drawing.results.duration')}</small>
                 <strong>{formatSeconds(result.Total_Duration_Seconds, t)}</strong>
-              </span>
-              <span>
-                <small>{t('drawing.results.discordUpload')}</small>
-                <strong>{sampleUpload.pending > 0 ? sampleUploadLabel : `${sampleUpload.uploaded}/${sampleUpload.uploaded + sampleUpload.failed}`}</strong>
               </span>
             </div>
 

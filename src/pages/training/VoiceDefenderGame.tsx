@@ -198,7 +198,7 @@ const DEFAULT_MODEL_URLS: Record<VoiceLanguage, string> = {
 };
 
 const DEFAULT_MODEL_BYTES: Record<VoiceLanguage, number> = {
-  zh: 33_179_559,
+  zh: 33_368_542,
   en: 41_184_862,
 };
 
@@ -570,7 +570,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         });
     }
     const cacheKey = targetLanguage === 'zh'
-      ? 'voice-defender-zh-tw-v1'
+      ? 'voice-defender-zh-tw-v2'
       : `voice-defender-${targetLanguage}`;
     const modelUrl = MODEL_URLS[targetLanguage];
     if (!modelUrl) {

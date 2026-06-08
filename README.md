@@ -79,7 +79,7 @@ npm run preview   # Preview production version
 
 ## Discord Image Upload
 
-Drawing Tower Defense will output the user's strokes as a 256x256 transparent PNG after each recognition is completed, and send it to `/api/drawing-samples` as `multipart/form-data`. The frontend does not store the Discord webhook; the actual webhook needs to be provided by backend environment variables.
+Drawing Tower Defense outputs missed recognition samples as 256x256 transparent PNG files and sends them to `/api/drawing-samples` as `multipart/form-data`. Upload progress and counts are intentionally not shown in the game UI. The frontend does not store the Discord webhook; the actual webhook needs to be provided by backend environment variables.
 
 Cloudflare Pages Deployment Settings:
 
@@ -150,7 +150,7 @@ When `VITE_VOSK_MODEL_ZH_URL` is set during `npm run build`, `scripts/prune-clou
 
 The model host must allow cross-origin requests. Downloads begin only after Voice Defender is opened. If a download fails, the page keeps retrying in the background until a complete model is cached or the browser tab closes, including while Web Speech gameplay continues or the user navigates elsewhere in the app. Cached archives must include completion metadata, match their recorded byte length, meet the configured minimum size, and have a gzip signature; incomplete or legacy cache entries are deleted and downloaded again. The default Chinese and English archives are also checked against their exact published byte sizes.
 
-The bundled Chinese model uses a Traditional Chinese output vocabulary, so the frontend does not perform Simplified/Traditional conversion. Its compact vocabulary index is loaded only after Voice Defender is opened. Custom words are added only when they exist in the model vocabulary; unsupported words produce a visible warning.
+The bundled Chinese model uses matching Traditional Chinese input and output symbol tables, so Vosk grammar entries and recognition results use the same words shown on screen. The frontend does not perform Simplified/Traditional conversion. Its compact vocabulary index is loaded only after Voice Defender is opened. Custom words are added only when they exist in the model vocabulary; unsupported words produce a visible warning.
 
 If the model download or initialization fails, Voice Defender automatically falls back to the browser Web Speech API and compares transcripts with visible word cards using Levenshtein similarity. Vosk audio is processed locally; Web Speech processing depends on the browser and may use its online speech service.
 

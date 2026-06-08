@@ -9,6 +9,7 @@
     "build:full": "tsc -b && vite build",
     "build:cloudflare": "tsc -b && vite build --mode cloudflare && node scripts/prune-cloudflare-pages-assets.mjs --force",
     "r2:upload-vosk": "node scripts/upload-vosk-to-r2.mjs",
+    "vosk:repair-zh-symbols": "node scripts/repair-zh-vosk-symbols.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
