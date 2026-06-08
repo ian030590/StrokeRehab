@@ -3,11 +3,8 @@
     {
       "allowed": {
         "origins": [
-          "https://visiontrainer.pages.dev",
-          "https://stroke-trainer.pages.dev",
-          "https://ian030590.github.io",
-          "http://localhost:5173",
-          "http://127.0.0.1:5173"
+          "https://stroketrainer.pages.dev",
+          "https://ian030590.github.io"
         ],
         "methods": [
           "GET",
