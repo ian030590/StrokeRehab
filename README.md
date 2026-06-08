@@ -68,7 +68,7 @@ src/
     └── pixiPool.ts                   # PixiJS Application management
 ```
 
-## Development
+## Development 
 
 ```bash
 npm install       # Install dependencies
