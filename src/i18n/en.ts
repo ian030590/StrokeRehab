@@ -473,6 +473,7 @@ export const en: Record<TranslationKey, string> = {
   'voice.model.notReady': 'The speech recognition engine is not ready.',
   'voice.model.reload': 'Reload Model',
   'voice.model.cacheHint': 'The downloaded model is cached in this browser.',
+  'voice.model.externalModelRequired': 'The Cloudflare Pages build does not bundle the offline Chinese model. To use offline Chinese recognition, set VITE_VOSK_MODEL_ZH_URL to an R2 or other external model file.',
   'voice.startBlocked.title': 'Unable to Start',
   'voice.startBlocked.desc': 'Complete the following items. The affected settings are outlined in red.',
   'voice.startBlocked.modelLoading': 'The speech model is still loading. If the download fails, Web Speech will be used automatically.',

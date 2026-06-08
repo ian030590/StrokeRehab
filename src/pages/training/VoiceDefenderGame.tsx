@@ -45,6 +45,8 @@ import {
   type VoskVocabularyIndex,
 } from './voskVocabularyIndex';
 
+declare const __BUNDLED_ZH_VOSK_MODEL_ENABLED__: boolean;
+
 export { calculateSimilarity, levenshteinDistance } from './voiceDefenderSpeechMatching';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -188,7 +190,9 @@ interface StartIssue {
 }
 
 const DEFAULT_MODEL_URLS: Record<VoiceLanguage, string> = {
-  zh: `${import.meta.env.BASE_URL}models/vosk-model-small-zh-tw-0.3.tar.gz`,
+  zh: __BUNDLED_ZH_VOSK_MODEL_ENABLED__
+    ? `${import.meta.env.BASE_URL}models/vosk-model-small-zh-tw-0.3.tar.gz`
+    : '',
   en: 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz',
 };
 
@@ -566,6 +570,20 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const cacheKey = targetLanguage === 'zh'
       ? 'voice-defender-zh-tw-v1'
       : `voice-defender-${targetLanguage}`;
+    const modelUrl = MODEL_URLS[targetLanguage];
+    if (!modelUrl) {
+      if (getWebSpeechRecognitionConstructor()) {
+        recognitionEngineRef.current = 'web-speech';
+        setRecognitionEngine('web-speech');
+        setModelProgress(100);
+        setModelStatus('fallback');
+        setModelError(`${t('voice.model.externalModelRequired')} ${t('voice.model.fallbackHint')}`);
+      } else {
+        setModelStatus('error');
+        setModelError(`${t('voice.model.externalModelRequired')} ${t('voice.model.webSpeechUnavailable')}`);
+      }
+      return;
+    }
     const expectedModelBytes = MODEL_URLS[targetLanguage] === DEFAULT_MODEL_URLS[targetLanguage]
       ? DEFAULT_MODEL_BYTES[targetLanguage]
       : 0;

@@ -472,6 +472,7 @@ export const zh = {
   'voice.model.notReady': '語音辨識引擎尚未就緒。',
   'voice.model.reload': '重新載入模型',
   'voice.model.cacheHint': '下載完成後會快取在此瀏覽器。',
+  'voice.model.externalModelRequired': 'Cloudflare Pages 版本未內建中文離線模型；如需離線中文辨識，請設定 VITE_VOSK_MODEL_ZH_URL 指向 R2 或其他外部模型檔。',
   'voice.startBlocked.title': '尚無法開始遊戲',
   'voice.startBlocked.desc': '請先完成下列項目；對應欄位已用紅框標示。',
   'voice.startBlocked.modelLoading': '語音辨識模型仍在載入中，請稍候；若下載失敗會自動改用 Web Speech。',

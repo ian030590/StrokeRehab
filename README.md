@@ -87,6 +87,14 @@ Cloudflare Pages Deployment Settings:
 npm run build
 ```
 
+Cloudflare Pages has a 25 MiB limit per uploaded asset. The default build detects Cloudflare Pages through `CF_PAGES=1` and removes the bundled Chinese Vosk archive from `dist`; Voice Defender will use Web Speech fallback unless an external model URL is configured.
+
+To keep offline Chinese recognition on Cloudflare Pages, upload `public/models/vosk-model-small-zh-tw-0.3.tar.gz` to R2 or another static file host and set:
+
+```text
+VITE_VOSK_MODEL_ZH_URL=https://static.example.com/vosk-model-small-zh-tw-0.3.tar.gz
+```
+
 Set in Cloudflare Pages environment variables:
 
 ```text
