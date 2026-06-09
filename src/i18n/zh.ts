@@ -435,7 +435,7 @@ export const zh = {
   'training.drawing.desc': '以滑鼠或觸控繪製圓形、叉叉、方形、三角形與直橫線，訓練上肢精細動作與手眼協調。',
   'training.minesweeper.title': '踩地雷',
   'training.minesweeper.desc': '透過開格、推理與標記地雷位置，訓練注意力、視覺掃描與策略判斷。',
-  'training.brunnstrom.title': 'Brunnstrom 肢體復健',
+  'training.brunnstrom.title': 'Brunnstrom 肢體復健（開發中）',
   'training.brunnstrom.desc': '基於電腦視覺的互動復健，針對中風不同階段提供適配動作訓練。（開發中）',
   'training.brunnstrom.autoCalTitle': '自動動作校正',
   'training.brunnstrom.manualCalTitle': '手動校正與參數設定',
