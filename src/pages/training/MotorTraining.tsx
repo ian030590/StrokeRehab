@@ -1,16 +1,19 @@
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { DrawingTowerDefenseGame } from './DrawingTowerDefenseGame';
+import { BrunnstromGame } from './brunnstrom/BrunnstromGame';
 import { TrainingUserSelector } from './TrainingUserSelector';
 import { useGameModuleGuard } from './useGameModuleGuard';
 
-type MotorModuleId = 'drawing-defense';
+type MotorModuleId = 'drawing-defense' | 'brunnstrom';
 
 export function MotorTraining() {
   const { t } = useT();
   const [searchParams] = useSearchParams();
   const requestedGameId = searchParams.get('game');
-  const requestedModule = requestedGameId === 'drawing-defense' ? 'drawing-defense' : null;
+  const requestedModule = requestedGameId === 'drawing-defense' ? 'drawing-defense' 
+                        : requestedGameId === 'brunnstrom' ? 'brunnstrom' 
+                        : null;
   const { activeModule, openModule, closeModule } = useGameModuleGuard<MotorModuleId>({
     requestedGameId,
     requestedModule,
@@ -20,6 +23,9 @@ export function MotorTraining() {
 
   if (activeModule === 'drawing-defense') {
     return <DrawingTowerDefenseGame onExit={closeModule} />;
+  }
+  if (activeModule === 'brunnstrom') {
+    return <BrunnstromGame onExit={closeModule} />;
   }
 
   return (
@@ -41,6 +47,17 @@ export function MotorTraining() {
           </div>
           <h2 className="card-title">{t('training.drawing.title')}</h2>
           <p className="card-desc">{t('training.drawing.desc')}</p>
+          <div className="card-expand-hint">{t('training.startGame')}</div>
+        </button>
+
+        <button className="card fade-in-up training-module-button" onClick={() => openModule('brunnstrom')} style={{ animationDelay: '0.1s' }}>
+          <div className="card-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </div>
+          <h2 className="card-title">{t('training.brunnstrom.title')}</h2>
+          <p className="card-desc">{t('training.brunnstrom.desc')}</p>
           <div className="card-expand-hint">{t('training.startGame')}</div>
         </button>
       </div>
