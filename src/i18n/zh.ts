@@ -436,7 +436,7 @@ export const zh = {
   'training.minesweeper.title': '踩地雷',
   'training.minesweeper.desc': '透過開格、推理與標記地雷位置，訓練注意力、視覺掃描與策略判斷。',
   'training.brunnstrom.title': 'Brunnstrom 肢體復健',
-  'training.brunnstrom.desc': '基於電腦視覺的互動復健，針對中風不同階段提供適配動作訓練。',
+  'training.brunnstrom.desc': '基於電腦視覺的互動復健，針對中風不同階段提供適配動作訓練。（開發中）',
   'training.brunnstrom.autoCalTitle': '自動動作校正',
   'training.brunnstrom.manualCalTitle': '手動校正與參數設定',
   'training.brunnstrom.stage': 'Brunnstrom 分級',
