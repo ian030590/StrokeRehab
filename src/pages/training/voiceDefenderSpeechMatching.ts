@@ -1,4 +1,6 @@
-export const VOICE_MATCH_SIMILARITY_THRESHOLD = 0.7;
+import { pinyin } from 'pinyin-pro';
+
+export const VOICE_MATCH_SIMILARITY_THRESHOLD = 0.3;
 
 export function normalizeSpeechText(value: string): string {
   return value
@@ -19,19 +21,63 @@ export function buildVoskGrammar(
 }
 
 export function calculateBestSpeechSimilarity(transcript: string, target: string): number {
-  const normalizedTarget = normalizeSpeechText(target);
-  const candidates = new Set([
-    normalizeSpeechText(transcript),
-    ...transcript
-      .split(/[\s,.;:!?，。！？、；：]+/u)
-      .map(normalizeSpeechText),
-  ]);
+  const usePinyin = containsHanCharacter(target);
+  const normalizedTarget = usePinyin
+    ? normalizeSpeechPronunciation(target)
+    : normalizeSpeechText(target);
+  const candidates = usePinyin
+    ? buildPinyinCandidates(transcript, getPinyinSyllables(target).length)
+    : new Set([
+        normalizeSpeechText(transcript),
+        ...transcript
+          .split(/[\s,.;:!?，。！？、；：]+/u)
+          .map(normalizeSpeechText),
+      ]);
   return Math.max(
     0,
     ...[...candidates]
       .filter(Boolean)
       .map((candidate) => calculateSimilarity(candidate, normalizedTarget)),
   );
+}
+
+export function normalizeSpeechPronunciation(value: string): string {
+  return normalizeSpeechText(pinyin(value.normalize('NFKC'), {
+    toneType: 'none',
+    traditional: true,
+    nonZh: 'consecutive',
+    separator: '',
+    v: true,
+  }));
+}
+
+function buildPinyinCandidates(transcript: string, targetSyllableCount: number): Set<string> {
+  const syllables = getPinyinSyllables(transcript);
+  const candidates = new Set<string>([
+    normalizeSpeechPronunciation(transcript),
+    ...syllables,
+  ]);
+  const windowSize = Math.max(1, targetSyllableCount);
+  for (let index = 0; index <= syllables.length - windowSize; index += 1) {
+    candidates.add(syllables.slice(index, index + windowSize).join(''));
+  }
+  return candidates;
+}
+
+function getPinyinSyllables(value: string): string[] {
+  return pinyin(value.normalize('NFKC'), {
+    toneType: 'none',
+    type: 'array',
+    traditional: true,
+    nonZh: 'consecutive',
+    v: true,
+  }).flatMap((part) => part.split(/[^\p{L}\p{N}]+/u))
+    .map(normalizeSpeechText)
+    .filter(Boolean);
+}
+
+function containsHanCharacter(value: string): boolean {
+  return /\p{Script=Han}/u.test(value);
 }
 
 export function levenshteinDistance(a: string, b: string): number {

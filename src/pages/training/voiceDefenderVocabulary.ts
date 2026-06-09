@@ -9,14 +9,19 @@ export interface VoiceVocabularyItem {
   isActive: boolean;
 }
 
-const STORAGE_KEY = `${STORAGE_PREFIX}voice_defender_vocabulary_v1`;
+const STORAGE_KEY = `${STORAGE_PREFIX}voice_defender_vocabulary_v2`;
+const LEGACY_STORAGE_KEY = `${STORAGE_PREFIX}voice_defender_vocabulary_v1`;
 
-const DEFAULT_CHINESE_WORDS = [
-  '蘋果', '香蕉', '葡萄', '橘子', '草莓', '西瓜', '桃子', '梨子', '芒果', '檸檬',
-  '天空', '海洋', '河流', '山谷', '森林', '花朵', '雨水', '雪花', '太陽', '月亮',
-  '紅色', '藍色', '綠色', '黃色', '白色', '黑色', '紫色', '橙色', '桌子', '椅子',
-  '杯子', '書本', '鉛筆', '眼鏡', '電話', '電腦', '鑰匙', '雨傘', '走路', '跑步',
-  '跳躍', '微笑', '呼吸', '說話', '聆聽', '閱讀', '寫字', '畫畫', '朋友', '老師',
+const DEFAULT_CHINESE_CHARACTERS = [
+  '蘋', '果', '香', '人', '葡', '大', '小', '子', '草', '莓',
+  '西', '瓜', '桃', '梨', '芒', '上', '下', '天', '空', '海',
+  '洋', '河', '流', '山', '谷', '森', '林', '花', '朵', '雨',
+  '水', '雪', '太', '陽', '月', '亮', '紅', '色', '藍', '綠',
+  '黃', '白', '黑', '紫', '橙', '桌', '椅', '杯', '書', '本',
+  '鉛', '筆', '眼', '鏡', '電', '話', '腦', '鑰', '匙', '傘',
+  '走', '路', '跑', '步', '跳', '躍', '微', '笑', '呼', '吸',
+  '說', '左', '聽', '閱', '讀', '寫', '字', '畫', '朋', '友',
+  '老', '師',
 ] as const;
 
 const DEFAULT_ENGLISH_WORDS = [
@@ -29,7 +34,7 @@ const DEFAULT_ENGLISH_WORDS = [
 
 export function createDefaultVoiceVocabulary(): VoiceVocabularyItem[] {
   return [
-    ...DEFAULT_CHINESE_WORDS.map((word, index) => ({
+    ...DEFAULT_CHINESE_CHARACTERS.map((word, index) => ({
       id: `zh-${index + 1}`,
       word,
       language: 'zh' as const,
@@ -47,18 +52,25 @@ export function createDefaultVoiceVocabulary(): VoiceVocabularyItem[] {
 export function loadVoiceVocabulary(): VoiceVocabularyItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      const defaults = createDefaultVoiceVocabulary();
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return createDefaultVoiceVocabulary();
+      return deduplicateVocabulary(parsed.flatMap(toVocabularyItems));
+    }
+
+    const defaults = createDefaultVoiceVocabulary();
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyRaw) {
       saveVoiceVocabulary(defaults);
       return defaults;
     }
-
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return createDefaultVoiceVocabulary();
-
-    return parsed
-      .map(toVocabularyItem)
-      .filter((item): item is VoiceVocabularyItem => item !== null);
+    const legacyParsed: unknown = JSON.parse(legacyRaw);
+    const customItems = Array.isArray(legacyParsed)
+      ? legacyParsed.filter((item) => !isLegacyDefaultItem(item)).flatMap(toVocabularyItems)
+      : [];
+    const migrated = deduplicateVocabulary([...defaults, ...customItems]);
+    saveVoiceVocabulary(migrated);
+    return migrated;
   } catch (error) {
     console.warn('Unable to read voice defender vocabulary.', error);
     return createDefaultVoiceVocabulary();
@@ -73,17 +85,27 @@ export function saveVoiceVocabulary(items: VoiceVocabularyItem[]): void {
   }
 }
 
-export function createVoiceVocabularyItem(word: string, language: VoiceLanguage): VoiceVocabularyItem {
-  return {
+export function createVoiceVocabularyItems(input: string, language: VoiceLanguage): VoiceVocabularyItem[] {
+  return splitVoiceVocabularyInput(input, language).map((word) => ({
     id: `${language}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    word: word.trim(),
+    word,
     language,
     isActive: true,
-  };
+  }));
 }
 
-function toVocabularyItem(value: unknown): VoiceVocabularyItem | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+export function splitVoiceVocabularyInput(input: string, language: VoiceLanguage): string[] {
+  const normalized = input.normalize('NFKC').trim();
+  if (!normalized) return [];
+  if (language === 'en') return [normalized.replace(/\s+/g, ' ')];
+
+  return [...new Set(
+    [...normalized].filter((character) => /[\p{L}\p{N}]/u.test(character)),
+  )];
+}
+
+function toVocabularyItems(value: unknown): VoiceVocabularyItem[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   const item = value as Record<string, unknown>;
   if (
     typeof item.id !== 'string' ||
@@ -91,9 +113,38 @@ function toVocabularyItem(value: unknown): VoiceVocabularyItem | null {
     (item.language !== 'zh' && item.language !== 'en') ||
     typeof item.isActive !== 'boolean'
   ) {
-    return null;
+    return [];
   }
 
-  const word = item.word.trim();
-  return word ? { id: item.id, word, language: item.language, isActive: item.isActive } : null;
+  const id = item.id;
+  const language = item.language;
+  const isActive = item.isActive;
+  return splitVoiceVocabularyInput(item.word, language).map((word, index, entries) => ({
+    id: entries.length === 1 ? id : `${id}-${index + 1}`,
+    word,
+    language,
+    isActive,
+  }));
+}
+
+function deduplicateVocabulary(items: VoiceVocabularyItem[]): VoiceVocabularyItem[] {
+  const deduplicated = new Map<string, VoiceVocabularyItem>();
+  items.forEach((item) => {
+    const key = `${item.language}:${item.word.toLocaleLowerCase()}`;
+    const existing = deduplicated.get(key);
+    if (!existing) {
+      deduplicated.set(key, item);
+      return;
+    }
+    if (!existing.isActive && item.isActive) {
+      deduplicated.set(key, { ...existing, isActive: true });
+    }
+  });
+  return [...deduplicated.values()];
+}
+
+function isLegacyDefaultItem(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const id = (value as Record<string, unknown>).id;
+  return typeof id === 'string' && /^(?:zh|en)-\d+$/.test(id);
 }

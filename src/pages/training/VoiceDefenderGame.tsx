@@ -21,9 +21,10 @@ import { verifySelectedTrainingUser } from './selectedUserGuard';
 import type { TFunction } from './types';
 import {
   createDefaultVoiceVocabulary,
-  createVoiceVocabularyItem,
+  createVoiceVocabularyItems,
   loadVoiceVocabulary,
   saveVoiceVocabulary,
+  splitVoiceVocabularyInput,
   type VoiceLanguage,
   type VoiceVocabularyItem,
 } from './voiceDefenderVocabulary';
@@ -1354,8 +1355,14 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const word = newWord.trim();
     if (!word) return;
     setVocabularyWarning('');
-    const normalized = normalizeSpeechText(word);
-    if (vocabulary.some((item) => item.language === language && normalizeSpeechText(item.word) === normalized)) {
+    const entries = splitVoiceVocabularyInput(word, language);
+    const newEntries = entries.filter((entry) => (
+      !vocabulary.some((item) => (
+        item.language === language
+        && normalizeSpeechText(item.word) === normalizeSpeechText(entry)
+      ))
+    ));
+    if (newEntries.length === 0) {
       setNewWord('');
       return;
     }
@@ -1368,11 +1375,17 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       ));
       return;
     }
-    if (!hasVoskVocabularyWord(vocabularyIndex, word, language)) {
-      setVocabularyWarning(t('voice.vocabulary.unsupportedWord', { word }));
+    const unsupportedEntry = newEntries.find((entry) => (
+      !hasVoskVocabularyWord(vocabularyIndex, entry, language)
+    ));
+    if (unsupportedEntry) {
+      setVocabularyWarning(t('voice.vocabulary.unsupportedWord', { word: unsupportedEntry }));
       return;
     }
-    updateVocabulary((items) => [...items, createVoiceVocabularyItem(word, language)]);
+    updateVocabulary((items) => [
+      ...items,
+      ...newEntries.flatMap((entry) => createVoiceVocabularyItems(entry, language)),
+    ]);
     setNewWord('');
   }, [language, newWord, t, updateVocabulary, vocabulary, vocabularyIndexStatus]);
 
@@ -1709,7 +1722,10 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                     <button
                       type="button"
                       className="btn btn-ghost"
-                      onClick={() => setVocabulary(createDefaultVoiceVocabulary())}
+                      onClick={() => updateVocabulary((items) => [
+                        ...items.filter((item) => item.language !== language),
+                        ...createDefaultVoiceVocabulary().filter((item) => item.language === language),
+                      ])}
                     >
                       {t('voice.vocabulary.reset')}
                     </button>
