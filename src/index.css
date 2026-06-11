@@ -3271,6 +3271,499 @@ body #webgazer-calibrate-container #calibration-point {
   }
 }
 
+/* Gesture Battler */
+.training-option-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gesture-battler {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #dce9c8;
+  color: #17201a;
+  font-family: var(--font-family);
+}
+
+.gesture-battler-stage {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+.gesture-battler-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  image-rendering: pixelated;
+}
+
+.gesture-menu-panel {
+  background:
+    linear-gradient(rgba(242, 244, 243, 0.86), rgba(242, 244, 243, 0.86)),
+    repeating-linear-gradient(0deg, transparent 0 7px, rgba(23, 32, 26, 0.08) 7px 8px);
+}
+
+.gesture-config-badge {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border: 1px solid #9ab278;
+  border-radius: var(--radius-m);
+  background: #edf6df;
+  color: #3f6212;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.gesture-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #b8c99e;
+  border-radius: var(--radius-m);
+  background: #f4f9ec;
+}
+
+.gesture-privacy-note strong {
+  flex: 0 0 auto;
+  color: #365314;
+  font-size: 14px;
+}
+
+.gesture-privacy-note span {
+  color: #52634b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.gesture-error {
+  margin: 14px 28px 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(220, 38, 38, 0.32);
+  border-radius: var(--radius-m);
+  background: rgba(254, 226, 226, 0.88);
+  color: #991b1b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.gesture-camera {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 8;
+  width: min(260px, 24vw);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 4px solid #f8faf0;
+  border-radius: 4px;
+  background: #17201a;
+  box-shadow:
+    0 0 0 3px #273329,
+    8px 8px 0 rgba(23, 32, 26, 0.2);
+}
+
+.gesture-camera-hidden {
+  display: none;
+}
+
+.gesture-camera video,
+.gesture-camera canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.gesture-camera canvas {
+  pointer-events: none;
+}
+
+.gesture-camera > span {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  padding: 5px 7px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #f8fafc;
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.gesture-calibration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    linear-gradient(rgba(226, 237, 207, 0.9), rgba(226, 237, 207, 0.9)),
+    repeating-linear-gradient(0deg, transparent 0 7px, rgba(23, 32, 26, 0.1) 7px 8px);
+}
+
+.gesture-loading-card,
+.gesture-calibration-card {
+  width: min(760px, calc(100vw - 48px));
+  padding: 30px;
+  border: 4px solid #f8faf0;
+  border-radius: 5px;
+  background: #f8faf0;
+  box-shadow:
+    0 0 0 4px #273329,
+    12px 12px 0 rgba(39, 51, 41, 0.2);
+}
+
+.gesture-loading-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.gesture-loading-card h1,
+.gesture-calibration-card h1 {
+  margin: 0;
+  color: #17201a;
+  font-family: "Courier New", monospace;
+  font-size: clamp(26px, 4vw, 42px);
+  letter-spacing: -1px;
+}
+
+.gesture-loading-card p,
+.gesture-calibration-card p {
+  margin: 0;
+  color: #52634b;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.gesture-loader {
+  width: 54px;
+  height: 54px;
+  border: 8px solid #cbd9b5;
+  border-top-color: #4d7c0f;
+  border-radius: 50%;
+  animation: gesture-spin 0.8s steps(8) infinite;
+}
+
+@keyframes gesture-spin {
+  to { transform: rotate(360deg); }
+}
+
+.gesture-calibration-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: center;
+  gap: 28px;
+}
+
+.gesture-calibration-card > .btn {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+.gesture-calibration-copy {
+  display: grid;
+  gap: 15px;
+}
+
+.gesture-step-count {
+  width: fit-content;
+  padding: 6px 9px;
+  border: 2px solid #273329;
+  background: #e7f2d5;
+  color: #365314;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.gesture-calibration-progress {
+  height: 22px;
+  overflow: hidden;
+  border: 3px solid #273329;
+  background: #d7dfcb;
+}
+
+.gesture-calibration-progress span {
+  display: block;
+  height: 100%;
+  background:
+    repeating-linear-gradient(90deg, #65a30d 0 12px, #84cc16 12px 24px);
+  transition: width 80ms linear;
+}
+
+.gesture-calibration-copy > strong {
+  color: #365314;
+  font-size: 15px;
+}
+
+.gesture-cue {
+  position: relative;
+  width: 200px;
+  height: 230px;
+  display: grid;
+  place-items: center;
+}
+
+.gesture-cue svg {
+  width: 180px;
+  height: 220px;
+  overflow: visible;
+  fill: #8fa79a;
+  stroke: #273329;
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+.gesture-cue svg .extended {
+  fill: #f3c98b;
+}
+
+.gesture-cue > strong {
+  position: absolute;
+  right: 3px;
+  bottom: 4px;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 4px solid #273329;
+  background: #fef08a;
+  color: #17201a;
+  font-family: "Courier New", monospace;
+  font-size: 34px;
+}
+
+.gesture-combat-controls {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 7px 12px;
+  border: 3px solid #273329;
+  background: rgba(248, 250, 240, 0.94);
+  color: #365314;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 800;
+  transform: translateX(-50%);
+}
+
+.gesture-combat-controls button {
+  padding: 4px 8px;
+  border: 2px solid #273329;
+  background: #d9e8c5;
+  color: #17201a;
+  cursor: pointer;
+  font: inherit;
+}
+
+.gesture-enemy-status {
+  position: fixed;
+  top: 8%;
+  right: 5%;
+  z-index: 4;
+  width: min(360px, 34vw);
+  padding: 12px 16px;
+  border: 4px solid #f8faf0;
+  background: rgba(248, 250, 240, 0.94);
+  box-shadow: 0 0 0 3px #273329;
+  font-family: "Courier New", monospace;
+}
+
+.gesture-enemy-status > div:first-child,
+.gesture-hp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gesture-enemy-status > div:first-child strong {
+  font-size: clamp(16px, 2vw, 23px);
+}
+
+.gesture-enemy-status > div:first-child span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.gesture-hp-row {
+  margin-top: 8px;
+}
+
+.gesture-hp-row > span {
+  color: #a16207;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.gesture-hp-row > div {
+  flex: 1;
+  height: 16px;
+  padding: 2px;
+  border: 2px solid #273329;
+  background: #314038;
+}
+
+.gesture-hp-row i {
+  display: block;
+  height: 100%;
+  background: #65a30d;
+  transition: width 260ms steps(6);
+}
+
+.gesture-hp-row > strong {
+  min-width: 52px;
+  font-size: 12px;
+  text-align: right;
+}
+
+.gesture-battle-dialogue,
+.gesture-move-menu {
+  position: fixed;
+  z-index: 4;
+  bottom: 4.5%;
+  min-height: 190px;
+  border: 5px solid #f8faf0;
+  background: rgba(248, 250, 240, 0.97);
+  box-shadow: 0 0 0 4px #273329;
+  font-family: "Courier New", monospace;
+}
+
+.gesture-battle-dialogue {
+  left: 4%;
+  width: 42%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 26px;
+}
+
+.gesture-battle-dialogue strong {
+  font-size: clamp(18px, 2.2vw, 30px);
+  line-height: 1.35;
+}
+
+.gesture-battle-dialogue span {
+  color: #52634b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.gesture-move-menu {
+  right: 4%;
+  width: 44%;
+  padding: 14px 16px;
+}
+
+.gesture-move-menu header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 9px;
+  border-bottom: 3px solid #273329;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.gesture-move-menu header strong {
+  color: #9a3412;
+}
+
+.gesture-move-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 12px;
+  padding-top: 9px;
+}
+
+.gesture-move {
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 18px 24px minmax(0, 1fr) 25px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  color: #273329;
+  font-size: clamp(12px, 1.35vw, 17px);
+  font-weight: 800;
+}
+
+.gesture-move.selected {
+  background: #e7f2d5;
+  color: #17201a;
+}
+
+.gesture-move.disabled {
+  color: #8a9587;
+}
+
+.gesture-pointer {
+  color: #9a3412;
+  font-size: 16px;
+}
+
+.gesture-move b {
+  color: #365314;
+}
+
+.gesture-cast-ring {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #273329;
+  border-radius: 50%;
+  background: conic-gradient(#65a30d var(--gesture-progress), #d7dfcb 0);
+}
+
+.gesture-pause-panel {
+  z-index: 12;
+  background: rgba(226, 237, 207, 0.9);
+}
+
+.gesture-results-container {
+  z-index: 12;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)),
+    repeating-linear-gradient(0deg, transparent 0 7px, rgba(23, 32, 26, 0.08) 7px 8px);
+}
+
+.gesture-victory-label {
+  display: inline-flex;
+  padding: 7px 12px;
+  border: 3px solid #273329;
+  background: #fef08a;
+  color: #713f12;
+  font-family: "Courier New", monospace;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.gesture-result-summary {
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+}
+
 @media (max-width: 720px) {
   .voice-start-validation {
     margin: 12px 18px 0;
@@ -3315,6 +3808,7 @@ body #webgazer-calibrate-container #calibration-point {
 
   .training-option-grid-three,
   .training-option-grid-four,
+  .training-option-grid-two,
   .training-speed-grid,
   .training-duration-grid,
   .training-wait-grid {
@@ -3391,6 +3885,89 @@ body #webgazer-calibrate-container #calibration-point {
   }
 
   .voice-defender-results-container .training-result-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .gesture-privacy-note {
+    flex-direction: column;
+  }
+
+  .gesture-calibration-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 22px;
+  }
+
+  .gesture-cue {
+    width: 150px;
+    height: 170px;
+    justify-self: center;
+  }
+
+  .gesture-cue svg {
+    width: 130px;
+    height: 160px;
+  }
+
+  .gesture-cue > strong {
+    width: 44px;
+    height: 44px;
+    font-size: 25px;
+  }
+
+  .gesture-camera {
+    top: 9px;
+    left: 9px;
+    width: 120px;
+    border-width: 2px;
+  }
+
+  .gesture-camera > span {
+    padding: 3px;
+    font-size: 8px;
+  }
+
+  .gesture-combat-controls {
+    top: 9px;
+    right: 9px;
+    left: auto;
+    max-width: calc(100vw - 150px);
+    transform: none;
+  }
+
+  .gesture-enemy-status {
+    top: 20%;
+    right: 12px;
+    width: min(270px, calc(100vw - 150px));
+  }
+
+  .gesture-battle-dialogue,
+  .gesture-move-menu {
+    min-height: 0;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .gesture-battle-dialogue {
+    bottom: 238px;
+    padding: 13px 16px;
+  }
+
+  .gesture-battle-dialogue strong {
+    font-size: 16px;
+  }
+
+  .gesture-move-menu {
+    bottom: 12px;
+    padding: 9px 10px;
+  }
+
+  .gesture-move {
+    font-size: 12px;
+  }
+
+  .gesture-result-summary {
     grid-template-columns: 1fr;
   }
 }
