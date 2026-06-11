@@ -3308,20 +3308,6 @@ body #webgazer-calibrate-container #calibration-point {
     repeating-linear-gradient(0deg, transparent 0 7px, rgba(23, 32, 26, 0.08) 7px 8px);
 }
 
-.gesture-config-badge {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  padding: 7px 12px;
-  border: 1px solid #9ab278;
-  border-radius: var(--radius-m);
-  background: #edf6df;
-  color: #3f6212;
-  font-size: 13px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
 .gesture-privacy-note {
   display: flex;
   align-items: flex-start;
@@ -3471,9 +3457,12 @@ body #webgazer-calibrate-container #calibration-point {
   gap: 28px;
 }
 
-.gesture-calibration-card > .btn {
+.gesture-calibration-actions {
   grid-column: 1 / -1;
-  justify-self: center;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .gesture-calibration-copy {
@@ -3510,6 +3499,16 @@ body #webgazer-calibrate-container #calibration-point {
 .gesture-calibration-copy > strong {
   color: #365314;
   font-size: 15px;
+}
+
+.gesture-calibration-notice {
+  padding: 9px 11px;
+  border: 2px solid #a16207;
+  background: #fef3c7;
+  color: #713f12;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .gesture-cue {

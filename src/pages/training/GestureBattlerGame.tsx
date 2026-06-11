@@ -86,6 +86,8 @@ interface BattleScene {
   effects: Container;
   width: number;
   height: number;
+  enemyBaseY: number;
+  playerBaseY: number;
 }
 
 interface RecognitionState {
@@ -105,12 +107,17 @@ interface HoldState {
 const MEDIAPIPE_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
 const HAND_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const CALIBRATION_HOLD_MS = 2200;
-const CALIBRATION_PREP_MS = 700;
+const CALIBRATION_CHANGE_THRESHOLD = 0.22;
+const CALIBRATION_MIN_STABLE_SAMPLES = 5;
 const TRACKING_GRACE_MS = 180;
 const DETECTION_INTERVAL_MS = 66;
 const DEFAULT_ENEMY_HP = 10;
 const DEFAULT_HOLD_DURATION = 2;
 const DEFAULT_STRICTNESS = 0.7;
+const ENEMY_HP_OPTIONS = [5, 10, 15] as const;
+const HOLD_DURATION_OPTIONS = [1.5, 2, 3] as const;
+const DEFAULT_CUSTOM_ENEMY_HP = 8;
+const DEFAULT_CUSTOM_HOLD_DURATION = 2.5;
 const GESTURES: readonly GestureId[] = [1, 2, 3, 4, 5];
 const MOVE_COLORS = [0x38bdf8, 0xf8fafc, 0x4ade80, 0xfb923c, 0xfacc15] as const;
 const MOVE_KEYS: Record<GestureId, TranslationKey> = {
@@ -165,8 +172,8 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
   const lastVideoTimeRef = useRef(-1);
   const phaseRef = useRef<GamePhase>('menu');
   const calibrationIndexRef = useRef(0);
+  const calibrationCapturingRef = useRef(false);
   const calibrationHoldStartRef = useRef<number | null>(null);
-  const calibrationReadyAtRef = useRef(0);
   const calibrationSamplesRef = useRef<number[][]>([]);
   const lastHandSeenAtRef = useRef(0);
   const romRef = useRef<RomProfile>({ closed: null, open: null });
@@ -199,11 +206,15 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
 
   const [phase, setPhaseState] = useState<GamePhase>('menu');
   const [enemyMaxHp, setEnemyMaxHp] = useState(DEFAULT_ENEMY_HP);
+  const [customEnemyHp, setCustomEnemyHp] = useState(DEFAULT_CUSTOM_ENEMY_HP);
   const [holdDuration, setHoldDuration] = useState(DEFAULT_HOLD_DURATION);
+  const [customHoldDuration, setCustomHoldDuration] = useState(DEFAULT_CUSTOM_HOLD_DURATION);
   const [strictnessThreshold, setStrictnessThreshold] = useState(DEFAULT_STRICTNESS);
   const [targetMode, setTargetMode] = useState<TargetMode>('free');
   const [calibrationIndex, setCalibrationIndex] = useState(0);
+  const [isCalibrationCapturing, setIsCalibrationCapturing] = useState(false);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [calibrationNotice, setCalibrationNotice] = useState('');
   const [enemyHp, setEnemyHp] = useState(DEFAULT_ENEMY_HP);
   const [targetGesture, setTargetGesture] = useState<GestureId>(1);
   const [holdProgress, setHoldProgress] = useState(0);
@@ -454,7 +465,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
     setPhase('combat');
   }, [resetHold, setPhase, t]);
 
-  const advanceCalibration = useCallback((features: number[], step: CalibrationStep, now: number) => {
+  const advanceCalibration = useCallback((features: number[], step: CalibrationStep, notice = '') => {
     if (step.kind === 'rom-closed') {
       romRef.current.closed = features;
     } else if (step.kind === 'rom-open') {
@@ -464,34 +475,51 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
     }
 
     const nextIndex = calibrationIndexRef.current + 1;
+    calibrationCapturingRef.current = false;
     calibrationHoldStartRef.current = null;
     calibrationSamplesRef.current = [];
+    setIsCalibrationCapturing(false);
     setCalibrationProgress(0);
     if (nextIndex >= CALIBRATION_STEPS.length) {
       beginCombat();
       return;
     }
     calibrationIndexRef.current = nextIndex;
-    calibrationReadyAtRef.current = now + CALIBRATION_PREP_MS;
     setCalibrationIndex(nextIndex);
+    setCalibrationNotice(notice);
   }, [beginCombat]);
 
   const handleCalibrationHand = useCallback((landmarks: NormalizedLandmark[], now: number) => {
     const step = CALIBRATION_STEPS[calibrationIndexRef.current];
-    if (!step || now < calibrationReadyAtRef.current) return;
+    if (!step) return;
     setRecognition({ gesture: null, similarity: 0, handVisible: true });
+    if (!calibrationCapturingRef.current) return;
+
     const rawFeatures = extractHandFeatures(landmarks);
     if (calibrationHoldStartRef.current === null) {
       calibrationHoldStartRef.current = now;
       calibrationSamplesRef.current = [];
     }
+
+    if (calibrationSamplesRef.current.length >= CALIBRATION_MIN_STABLE_SAMPLES) {
+      const previousFeatures = averageVectors(calibrationSamplesRef.current);
+      if (calibrationFeatureDifference(previousFeatures, rawFeatures) >= CALIBRATION_CHANGE_THRESHOLD) {
+        advanceCalibration(
+          previousFeatures,
+          step,
+          t('gesture.calibration.changeStopped'),
+        );
+        return;
+      }
+    }
+
     calibrationSamplesRef.current.push(rawFeatures);
     const elapsed = now - calibrationHoldStartRef.current;
     setCalibrationProgress(clamp(elapsed / CALIBRATION_HOLD_MS, 0, 1));
     if (elapsed >= CALIBRATION_HOLD_MS) {
-      advanceCalibration(averageVectors(calibrationSamplesRef.current), step, now);
+      advanceCalibration(averageVectors(calibrationSamplesRef.current), step);
     }
-  }, [advanceCalibration]);
+  }, [advanceCalibration, t]);
 
   const handleNoHand = useCallback((now: number) => {
     setRecognition((current) => current.handVisible
@@ -499,14 +527,37 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
       : current);
     if (now - lastHandSeenAtRef.current <= TRACKING_GRACE_MS) return;
     if (phaseRef.current === 'calibration') {
+      if (!calibrationCapturingRef.current) return;
+      if (calibrationSamplesRef.current.length === 0) return;
+      const step = CALIBRATION_STEPS[calibrationIndexRef.current];
+      if (step && calibrationSamplesRef.current.length >= CALIBRATION_MIN_STABLE_SAMPLES) {
+        advanceCalibration(
+          averageVectors(calibrationSamplesRef.current),
+          step,
+          t('gesture.calibration.changeStopped'),
+        );
+        return;
+      }
+      calibrationCapturingRef.current = false;
       calibrationHoldStartRef.current = null;
       calibrationSamplesRef.current = [];
+      setIsCalibrationCapturing(false);
       setCalibrationProgress(0);
+      setCalibrationNotice(t('gesture.calibration.insufficient'));
     } else if (phaseRef.current === 'combat') {
       resetHold(true);
       setStatusMessage(t('gesture.combat.rest'));
     }
-  }, [resetHold, t]);
+  }, [advanceCalibration, resetHold, t]);
+
+  const startCurrentCalibration = useCallback(() => {
+    calibrationCapturingRef.current = true;
+    calibrationHoldStartRef.current = null;
+    calibrationSamplesRef.current = [];
+    setIsCalibrationCapturing(true);
+    setCalibrationProgress(0);
+    setCalibrationNotice('');
+  }, []);
 
   const processFrame = useCallback((now: number) => {
     animationFrameRef.current = window.requestAnimationFrame(processFrame);
@@ -581,14 +632,16 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
       romRef.current = { closed: null, open: null };
       gestureProfilesRef.current = {};
       calibrationIndexRef.current = 0;
+      calibrationCapturingRef.current = false;
       calibrationHoldStartRef.current = null;
       calibrationSamplesRef.current = [];
-      calibrationReadyAtRef.current = performance.now() + CALIBRATION_PREP_MS;
       lastHandSeenAtRef.current = 0;
       lastDetectionAtRef.current = 0;
       lastVideoTimeRef.current = -1;
       setCalibrationIndex(0);
+      setIsCalibrationCapturing(false);
       setCalibrationProgress(0);
+      setCalibrationNotice('');
       setResult(null);
       setPhase('calibration');
       animationFrameRef.current = window.requestAnimationFrame(processFrame);
@@ -605,6 +658,8 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
   const returnToMenu = useCallback(() => {
     stopVision();
     resetHold(false);
+    calibrationCapturingRef.current = false;
+    setIsCalibrationCapturing(false);
     setResult(null);
     setVisionError('');
     setPhase('menu');
@@ -659,8 +714,8 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
         const scene = sceneRef.current;
         if (!scene || (phaseRef.current !== 'combat' && phaseRef.current !== 'paused')) return;
         const time = ticker.lastTime / 520;
-        scene.enemy.y = Math.sin(time) * 3;
-        scene.player.y = Math.sin(time * 0.8) * 2;
+        scene.enemy.y = scene.enemyBaseY + Math.sin(time) * 3;
+        scene.player.y = scene.playerBaseY + Math.sin(time * 0.8) * 2;
       });
       if (phaseRef.current === 'combat' || phaseRef.current === 'paused') {
         sceneRef.current = drawBattleScene(app);
@@ -692,6 +747,8 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
   const hpPercent = clamp((enemyHp / enemyMaxHp) * 100, 0, 100);
   const similarityPercent = Math.round(recognition.similarity * 100);
   const targetModeLabel = targetMode === 'free' ? t('gesture.config.free') : t('gesture.config.directed');
+  const isCustomEnemyHp = !ENEMY_HP_OPTIONS.includes(enemyMaxHp as typeof ENEMY_HP_OPTIONS[number]);
+  const isCustomHoldDuration = !HOLD_DURATION_OPTIONS.includes(holdDuration as typeof HOLD_DURATION_OPTIONS[number]);
   const resultRows = useMemo(() => result?.Gesture_Stats ?? [], [result]);
 
   const downloadResult = useCallback(() => {
@@ -740,7 +797,6 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                 <span className="training-config-label">{t('gesture.config.label')}</span>
                 <h1>{t('training.gesture.title')}</h1>
               </div>
-              <div className="gesture-config-badge">{t('gesture.config.noTimeLimit')}</div>
             </header>
 
             {visionError && <div className="gesture-error" role="alert">{visionError}</div>}
@@ -755,7 +811,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                   <span>{enemyMaxHp}</span>
                 </div>
                 <div className="training-option-grid training-option-grid-four">
-                  {[5, 10, 15, 20].map((value) => (
+                  {ENEMY_HP_OPTIONS.map((value) => (
                     <button
                       key={value}
                       type="button"
@@ -765,6 +821,27 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                       <span className="training-option-title">{t('training.count', { value })}</span>
                     </button>
                   ))}
+                  <label
+                    className={`training-option training-option-custom ${isCustomEnemyHp ? 'active' : ''}`}
+                    onClick={() => setEnemyMaxHp(customEnemyHp)}
+                  >
+                    <span className="training-option-title">{t('training.custom')}</span>
+                    <input
+                      className="training-number-input"
+                      type="number"
+                      min="1"
+                      max="100"
+                      step="1"
+                      value={customEnemyHp}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 1, 100);
+                        setCustomEnemyHp(value);
+                        setEnemyMaxHp(value);
+                      }}
+                      onFocus={() => setEnemyMaxHp(customEnemyHp)}
+                      aria-label={t('gesture.config.customEnemyHp')}
+                    />
+                  </label>
                 </div>
               </section>
 
@@ -776,8 +853,8 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                   </div>
                   <span>{holdDuration}s</span>
                 </div>
-                <div className="training-option-grid training-option-grid-three">
-                  {[1.5, 2, 3].map((value) => (
+                <div className="training-option-grid training-option-grid-four">
+                  {HOLD_DURATION_OPTIONS.map((value) => (
                     <button
                       key={value}
                       type="button"
@@ -787,6 +864,27 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                       <span className="training-option-title">{value}s</span>
                     </button>
                   ))}
+                  <label
+                    className={`training-option training-option-custom ${isCustomHoldDuration ? 'active' : ''}`}
+                    onClick={() => setHoldDuration(customHoldDuration)}
+                  >
+                    <span className="training-option-title">{t('training.custom')}</span>
+                    <input
+                      className="training-number-input"
+                      type="number"
+                      min="0.5"
+                      max="10"
+                      step="0.1"
+                      value={customHoldDuration}
+                      onChange={(event) => {
+                        const value = clamp(Number(event.target.value), 0.5, 10);
+                        setCustomHoldDuration(value);
+                        setHoldDuration(value);
+                      }}
+                      onFocus={() => setHoldDuration(customHoldDuration)}
+                      aria-label={t('gesture.config.customHoldDuration')}
+                    />
+                  </label>
                 </div>
               </section>
 
@@ -853,7 +951,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
               </div>
               <div className="training-config-actions">
                 <button className="btn btn-primary btn-lg config-start-btn" onClick={() => void startCalibration()}>
-                  {t('gesture.startCalibration')}
+                  {t('training.start')}
                 </button>
                 <button className="btn btn-ghost btn-lg" onClick={exitGame}>{t('training.cancel')}</button>
               </div>
@@ -889,13 +987,30 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                 <span style={{ width: `${calibrationProgress * 100}%` }} />
               </div>
               <strong>
-                {calibrationProgress > 0
+                {isCalibrationCapturing && calibrationProgress > 0
                   ? t('gesture.calibration.hold')
-                  : t('gesture.calibration.showHand')}
+                  : isCalibrationCapturing
+                    ? t('gesture.calibration.waitingForHand')
+                    : t('gesture.calibration.ready')}
               </strong>
+              {calibrationNotice && (
+                <span className="gesture-calibration-notice">{calibrationNotice}</span>
+              )}
             </div>
             <GestureCue gesture={activeCalibrationStep.gesture} />
-            <button className="btn btn-ghost" onClick={returnToMenu}>{t('training.cancel')}</button>
+            <div className="gesture-calibration-actions">
+              <button
+                className="btn btn-primary btn-lg"
+                type="button"
+                onClick={startCurrentCalibration}
+                disabled={isCalibrationCapturing}
+              >
+                {isCalibrationCapturing
+                  ? t('gesture.calibration.capturing')
+                  : t('gesture.calibration.start')}
+              </button>
+              <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.cancel')}</button>
+            </div>
           </div>
         </div>
       )}
@@ -1127,6 +1242,15 @@ function averageVectors(vectors: number[][]): number[] {
   return average;
 }
 
+function calibrationFeatureDifference(previous: number[], current: number[]): number {
+  if (previous.length === 0 || previous.length !== current.length) return 1;
+  const total = previous.reduce((sum, value, index) => {
+    const scale = index < 10 ? 1.5 : 1;
+    return sum + Math.min(Math.abs(value - current[index]) / scale, 1);
+  }, 0);
+  return total / previous.length;
+}
+
 function averagePoints(points: NormalizedLandmark[]): NormalizedLandmark {
   const total = points.reduce(
     (sum, point) => ({ x: sum.x + point.x, y: sum.y + point.y, z: sum.z + point.z }),
@@ -1216,19 +1340,21 @@ function drawBattleScene(app: Application): BattleScene {
 
   const enemy = createPixelEnemy();
   enemy.x = width * 0.73;
-  enemy.y = height * 0.28;
+  const enemyBaseY = clamp(height * 0.32, 130, height * 0.4);
+  enemy.y = enemyBaseY;
   enemy.scale.set(clamp(width / 1050, 0.7, 1.2));
   stage.addChild(enemy);
 
   const player = createPixelHero();
   player.x = width * 0.23;
-  player.y = height * 0.62;
+  const playerBaseY = clamp(height * 0.54, 220, height * 0.6);
+  player.y = playerBaseY;
   player.scale.set(clamp(width / 1100, 0.68, 1.15));
   stage.addChild(player);
 
   const effects = new Container();
   stage.addChild(effects);
-  return { enemy, player, effects, width, height };
+  return { enemy, player, effects, width, height, enemyBaseY, playerBaseY };
 }
 
 function createPixelEnemy(): Container {
@@ -1279,10 +1405,10 @@ function animateAttack(
   const projectile = new Graphics();
   projectile.rect(-10, -10, 20, 20).fill(color);
   projectile.rect(-4, -18, 8, 8).fill(0xffffff);
-  const startX = scene.width * 0.3;
-  const startY = scene.height * 0.57;
-  const endX = scene.width * 0.72;
-  const endY = scene.height * 0.29;
+  const startX = scene.player.x + 72 * scene.player.scale.x;
+  const startY = scene.playerBaseY - 18 * scene.player.scale.y;
+  const endX = scene.enemy.x;
+  const endY = scene.enemyBaseY;
   projectile.x = startX;
   projectile.y = startY;
   scene.effects.addChild(projectile);
