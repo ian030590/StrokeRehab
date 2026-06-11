@@ -1088,7 +1088,6 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
       {phase === 'results' && result && (
         <div className="experiment-container gesture-results-container" style={{ overflowY: 'auto' }}>
           <div className="experiment-results">
-            <span className="gesture-victory-label">VICTORY</span>
             <h1>{t('gesture.results.title')}</h1>
             <div className="training-result-summary gesture-result-summary">
               <span>
