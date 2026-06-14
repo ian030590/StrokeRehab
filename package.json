@@ -16,6 +16,8 @@
     "@jspsych/plugin-html-button-response": "^2.1.0",
     "@jspsych/plugin-html-keyboard-response": "^2.1.0",
     "@mediapipe/tasks-vision": "^0.10.35",
+    "@tensorflow-models/knn-classifier": "^1.2.6",
+    "@tensorflow/tfjs": "^4.22.0",
     "jspsych": "^8.2.1",
     "pinyin-pro": "^3.28.1",
     "pixi.js": "^8.18.1",

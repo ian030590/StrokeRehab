@@ -26,6 +26,9 @@ export default defineConfig(({ mode }) => {
             if (normalizedId.includes('/node_modules/jspsych/') || normalizedId.includes('/node_modules/@jspsych/')) {
               return 'experiment-runtime';
             }
+            if (normalizedId.includes('/node_modules/@tensorflow/') || normalizedId.includes('/node_modules/@tensorflow-models/')) {
+              return 'tensorflow-runtime';
+            }
             if (normalizedId.includes('/node_modules/recharts/')) {
               return 'charts-runtime';
             }
