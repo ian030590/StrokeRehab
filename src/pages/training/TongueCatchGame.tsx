@@ -5,10 +5,11 @@ import type { KNNClassifier } from '@tensorflow-models/knn-classifier';
 import * as tf from '@tensorflow/tfjs';
 import {
   Application,
+  Assets,
   Container,
-  Graphics,
   MeshRope,
   Point,
+  Sprite,
   Texture,
   type Ticker,
 } from 'pixi.js';
@@ -52,12 +53,18 @@ interface CalibrationStep {
 interface AppleSprite {
   view: Container;
   size: number;
+  baseX: number;
+  fallElapsed: number;
+  swayAmplitude: number;
+  swayPhase: number;
+  swaySpeed: number;
 }
 
 interface TongueScene {
   root: Container;
   tongue: MeshRope;
   tongueTexture: Texture;
+  appleTexture: Texture;
   points: Point[];
   apples: AppleSprite[];
   mouthX: number;
@@ -109,6 +116,7 @@ const MOUTH_FEATURE_HEIGHT = 24;
 const MAX_TONGUE_SEGMENTS = 10;
 const TONGUE_WIDTH = 28;
 const TONGUE_COLLISION_RADIUS = TONGUE_WIDTH / 2;
+const APPLE_TEXTURE_URL = `${import.meta.env.BASE_URL}assets/tongue-apple.webp`;
 const CALIBRATION_STEPS: readonly CalibrationStep[] = [
   {
     label: 'Rest',
@@ -137,6 +145,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
   const pixiHostRef = useRef<HTMLDivElement | null>(null);
   const appRef = useRef<Application | null>(null);
   const sceneRef = useRef<TongueScene | null>(null);
+  const appleTextureRef = useRef<Texture | null>(null);
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -231,8 +240,9 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
 
   const beginGame = useCallback(() => {
     const app = appRef.current;
-    if (!app) return;
-    resetTongueScene(app, sceneRef);
+    const appleTexture = appleTextureRef.current;
+    if (!app || !appleTexture) return;
+    resetTongueScene(app, sceneRef, appleTexture);
     metricsRef.current = {
       ...createSessionMetrics(),
       startedAt: performance.now(),
@@ -523,14 +533,16 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
         resizeTo: host,
       });
       initialized = true;
+      const appleTexture = await Assets.load<Texture>(APPLE_TEXTURE_URL);
       if (cancelled) {
         app.destroy(true, { children: true });
         return;
       }
       appRef.current = app;
+      appleTextureRef.current = appleTexture;
       host.appendChild(app.canvas);
       app.canvas.className = 'tongue-catch-canvas';
-      resetTongueScene(app, sceneRef);
+      resetTongueScene(app, sceneRef, appleTexture);
       app.ticker.add((ticker: Ticker) => {
         if (phaseRef.current !== 'playing') return;
         updateTongueGame({
@@ -563,7 +575,8 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
 
     const handleResize = () => {
       const currentApp = appRef.current;
-      if (currentApp) resetTongueScene(currentApp, sceneRef);
+      const appleTexture = appleTextureRef.current;
+      if (currentApp && appleTexture) resetTongueScene(currentApp, sceneRef, appleTexture);
     };
     window.addEventListener('resize', handleResize);
     return () => {
@@ -572,6 +585,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       if (sceneRef.current) destroyTongueScene(sceneRef.current);
       sceneRef.current = null;
       appRef.current = null;
+      appleTextureRef.current = null;
       if (initialized) app.destroy(true, { children: true });
     };
   }, []);
@@ -594,7 +608,8 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
     setRecognition({ label: 'Rest', confidence: 0, faceVisible: false });
     recognitionRef.current = { label: 'Rest', confidence: 0, faceVisible: false };
     const app = appRef.current;
-    if (app) resetTongueScene(app, sceneRef);
+    const appleTexture = appleTextureRef.current;
+    if (app && appleTexture) resetTongueScene(app, sceneRef, appleTexture);
   }, [setPhase, stopVision]);
 
   const exitGame = useCallback(() => {
@@ -1025,6 +1040,7 @@ function createSessionMetrics(): SessionMetrics {
 function resetTongueScene(
   app: Application,
   sceneRef: { current: TongueScene | null },
+  appleTexture: Texture,
 ): void {
   if (sceneRef.current) destroyTongueScene(sceneRef.current);
   const root = new Container();
@@ -1041,6 +1057,7 @@ function resetTongueScene(
     root,
     tongue,
     tongueTexture,
+    appleTexture,
     points,
     apples: [],
     mouthX: app.screen.width / 2,
@@ -1150,8 +1167,16 @@ function updateTongueGame(args: {
 
   for (let index = scene.apples.length - 1; index >= 0; index -= 1) {
     const apple = scene.apples[index];
+    apple.fallElapsed += dt;
     apple.view.y += args.config.appleSpeed * dt;
-    apple.view.rotation = Math.sin(args.ticker.lastTime / 320 + index) * 0.08;
+    const sway = Math.sin(apple.swayPhase + apple.fallElapsed * apple.swaySpeed);
+    const half = apple.size / 2;
+    apple.view.x = clamp(
+      apple.baseX + sway * apple.swayAmplitude,
+      half,
+      args.app.screen.width - half,
+    );
+    apple.view.rotation = sway * 0.09;
     const caught = scene.tongueLength > 20
       && tongueIntersectsApple(scene.points, apple);
     if (caught) {
@@ -1160,7 +1185,6 @@ function updateTongueGame(args: {
       args.onCatch();
       continue;
     }
-    const half = apple.size / 2;
     if (apple.view.y - half > args.app.screen.height) {
       removeApple(scene, index);
       args.metrics.missed += 1;
@@ -1235,36 +1259,33 @@ function spawnApple(scene: TongueScene, width: number, edgeChance: number): numb
       : randomBetween(0.72, 0.9)
     : randomBetween(0.27, 0.73);
   const size = randomBetween(38, 48);
-  const apple = createAppleSprite(size);
-  apple.view.x = width * normalizedX;
+  const apple = createAppleSprite(size, scene.appleTexture);
+  apple.baseX = width * normalizedX;
+  apple.view.x = apple.baseX;
   apple.view.y = -size;
   scene.apples.push(apple);
   scene.root.addChild(apple.view);
   return Number((normalizedX * 200 - 100).toFixed(1));
 }
 
-function createAppleSprite(size: number): AppleSprite {
+function createAppleSprite(size: number, texture: Texture): AppleSprite {
   const view = new Container();
-  const radius = size * 0.35;
-  const body = new Graphics()
-    .circle(-radius * 0.55, 1, radius)
-    .circle(radius * 0.55, 1, radius)
-    .fill({ color: 0xef4444 })
-    .stroke({ color: 0x991b1b, width: 3 });
-  const highlight = new Graphics()
-    .ellipse(-radius * 0.55, -radius * 0.35, radius * 0.3, radius * 0.5)
-    .fill({ color: 0xffffff, alpha: 0.58 });
-  const stem = new Graphics()
-    .moveTo(0, -radius * 0.75)
-    .lineTo(radius * 0.08, -radius * 1.35)
-    .stroke({ color: 0x713f12, width: 5, cap: 'round' });
-  const leaf = new Graphics()
-    .ellipse(radius * 0.38, -radius * 1.18, radius * 0.48, radius * 0.22)
-    .fill({ color: 0x65a30d })
-    .stroke({ color: 0x3f6212, width: 2 });
-  leaf.rotation = -0.35;
-  view.addChild(body, highlight, stem, leaf);
-  return { view, size };
+  const sprite = new Sprite({
+    texture,
+    anchor: 0.5,
+    width: size,
+    height: size,
+  });
+  view.addChild(sprite);
+  return {
+    view,
+    size,
+    baseX: 0,
+    fallElapsed: 0,
+    swayAmplitude: randomBetween(5, 9),
+    swayPhase: randomBetween(0, Math.PI * 2),
+    swaySpeed: randomBetween(1.7, 2.3),
+  };
 }
 
 function removeApple(scene: TongueScene, index: number): void {
