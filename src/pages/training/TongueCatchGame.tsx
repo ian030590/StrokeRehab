@@ -54,11 +54,17 @@ interface CalibrationStep {
 interface AppleSprite {
   view: Container;
   size: number;
+  resultIndex: number;
   baseX: number;
   fallElapsed: number;
   swayAmplitude: number;
   swayPhase: number;
   swaySpeed: number;
+}
+
+interface AppleResult {
+  horizontalPositionPercent: number;
+  caught: boolean;
 }
 
 interface TongueScene {
@@ -86,7 +92,7 @@ interface SessionMetrics {
   elapsed: number;
   score: number;
   missed: number;
-  appleHorizontalPositionsPercent: number[];
+  appleResults: AppleResult[];
   holdStartedAt: number | null;
   holdDirection: TongueClass | null;
   holdDurations: number[];
@@ -104,7 +110,7 @@ interface SessionResult {
   Apple_Speed_PX_Per_Second: number;
   Spawn_Interval_Seconds: number;
   Edge_Chance_Percent: number;
-  Apple_Horizontal_Positions_Percent: number[];
+  Apple_Results: AppleResult[];
 }
 
 const MEDIAPIPE_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
@@ -479,7 +485,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       Apple_Speed_PX_Per_Second: configSnapshot.appleSpeed,
       Spawn_Interval_Seconds: configSnapshot.spawnIntervalSec,
       Edge_Chance_Percent: Math.round(configSnapshot.edgeChance * 100),
-      Apple_Horizontal_Positions_Percent: [...metrics.appleHorizontalPositionsPercent],
+      Apple_Results: metrics.appleResults.map((apple) => ({ ...apple })),
     };
     setResult(session);
     setPhase('results');
@@ -504,9 +510,10 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
         Spawn_Interval_Seconds: session.Spawn_Interval_Seconds,
         Edge_Chance_Percent: session.Edge_Chance_Percent,
       },
-      detailRows: session.Apple_Horizontal_Positions_Percent.map((position, index) => ({
+      detailRows: session.Apple_Results.map((apple, index) => ({
         Apple_Index: index + 1,
-        Apple_Horizontal_Position_Percent: position,
+        Apple_Horizontal_Position_Percent: apple.horizontalPositionPercent,
+        Apple_Caught: apple.caught,
       })),
     });
     writeJsPsychData(
@@ -621,16 +628,22 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
   const downloadResult = useCallback(() => {
     if (!result) return;
     const summaryEntries = Object.entries(result)
-      .filter(([key]) => key !== 'Apple_Horizontal_Positions_Percent');
-    const positions = result.Apple_Horizontal_Positions_Percent.length > 0
-      ? result.Apple_Horizontal_Positions_Percent
+      .filter(([key]) => key !== 'Apple_Results');
+    const appleResults: Array<AppleResult | null> = result.Apple_Results.length > 0
+      ? result.Apple_Results
       : [null];
     const rows = [
-      [...summaryEntries.map(([key]) => key), 'Apple_Index', 'Apple_Horizontal_Position_Percent'],
-      ...positions.map((position, index) => [
+      [
+        ...summaryEntries.map(([key]) => key),
+        'Apple_Index',
+        'Apple_Horizontal_Position_Percent',
+        'Apple_Caught',
+      ],
+      ...appleResults.map((apple, index) => [
         ...summaryEntries.map(([, value]) => value),
-        position === null ? '' : index + 1,
-        position ?? '',
+        apple === null ? '' : index + 1,
+        apple?.horizontalPositionPercent ?? '',
+        apple?.caught ?? '',
       ]),
     ];
     downloadCsvFile(
@@ -975,18 +988,22 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
                 <tr>
                   <th>{t('tongue.results.appleIndex')}</th>
                   <th>{t('tongue.results.appleHorizontalPosition')}</th>
+                  <th>{t('tongue.results.appleCaught')}</th>
                 </tr>
               </thead>
               <tbody>
-                {result.Apple_Horizontal_Positions_Percent.map((position, index) => (
-                  <tr key={`${index}-${position}`}>
+                {result.Apple_Results.map((apple, index) => (
+                  <tr key={`${index}-${apple.horizontalPositionPercent}`}>
                     <td>{index + 1}</td>
-                    <td>{position}%</td>
+                    <td>{apple.horizontalPositionPercent}%</td>
+                    <td className={apple.caught ? 'result-success' : 'result-fail'}>
+                      {t(apple.caught ? 'tongue.results.caughtYes' : 'tongue.results.caughtNo')}
+                    </td>
                   </tr>
                 ))}
-                {result.Apple_Horizontal_Positions_Percent.length === 0 && (
+                {result.Apple_Results.length === 0 && (
                   <tr>
-                    <td colSpan={2}>{t('tongue.results.noApples')}</td>
+                    <td colSpan={3}>{t('tongue.results.noApples')}</td>
                   </tr>
                 )}
               </tbody>
@@ -1039,7 +1056,7 @@ function createSessionMetrics(): SessionMetrics {
     elapsed: 0,
     score: 0,
     missed: 0,
-    appleHorizontalPositionsPercent: [],
+    appleResults: [],
     holdStartedAt: null,
     holdDirection: null,
     holdDurations: [],
@@ -1170,8 +1187,12 @@ function updateTongueGame(args: {
   scene.spawnElapsed += dt;
   if (scene.spawnElapsed >= args.config.spawnIntervalSec) {
     scene.spawnElapsed = 0;
-    const position = spawnApple(scene, args.app.screen.width, args.config.edgeChance);
-    args.metrics.appleHorizontalPositionsPercent.push(position);
+    const resultIndex = args.metrics.appleResults.length;
+    const position = spawnApple(scene, args.app.screen.width, args.config.edgeChance, resultIndex);
+    args.metrics.appleResults.push({
+      horizontalPositionPercent: position,
+      caught: false,
+    });
   }
 
   for (let index = scene.apples.length - 1; index >= 0; index -= 1) {
@@ -1189,6 +1210,8 @@ function updateTongueGame(args: {
     const caught = scene.tongueLength > 20
       && tongueIntersectsApple(scene.points, apple);
     if (caught) {
+      const appleResult = args.metrics.appleResults[apple.resultIndex];
+      if (appleResult) appleResult.caught = true;
       removeApple(scene, index);
       args.metrics.score += 1;
       args.onCatch();
@@ -1259,7 +1282,12 @@ function distanceToSegmentSquared(
   return dx * dx + dy * dy;
 }
 
-function spawnApple(scene: TongueScene, width: number, edgeChance: number): number {
+function spawnApple(
+  scene: TongueScene,
+  width: number,
+  edgeChance: number,
+  resultIndex: number,
+): number {
   const useEdge = Math.random() < edgeChance;
   const side = Math.random() < 0.5 ? -1 : 1;
   const normalizedX = useEdge
@@ -1268,7 +1296,7 @@ function spawnApple(scene: TongueScene, width: number, edgeChance: number): numb
       : randomBetween(0.72, 0.9)
     : randomBetween(0.27, 0.73);
   const size = randomBetween(95, 120);
-  const apple = createAppleSprite(size, scene.appleTexture);
+  const apple = createAppleSprite(size, scene.appleTexture, resultIndex);
   apple.baseX = width * normalizedX;
   apple.view.x = apple.baseX;
   apple.view.y = -size;
@@ -1277,7 +1305,7 @@ function spawnApple(scene: TongueScene, width: number, edgeChance: number): numb
   return Number((normalizedX * 200 - 100).toFixed(1));
 }
 
-function createAppleSprite(size: number, texture: Texture): AppleSprite {
+function createAppleSprite(size: number, texture: Texture, resultIndex: number): AppleSprite {
   const view = new Container();
   const sprite = new Sprite({
     texture,
@@ -1289,6 +1317,7 @@ function createAppleSprite(size: number, texture: Texture): AppleSprite {
   return {
     view,
     size,
+    resultIndex,
     baseX: 0,
     fallElapsed: 0,
     swayAmplitude: randomBetween(5, 9),

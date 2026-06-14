@@ -499,6 +499,9 @@ export const en: Record<TranslationKey, string> = {
   'tongue.results.date': 'Training Date',
   'tongue.results.appleIndex': 'Apple',
   'tongue.results.appleHorizontalPosition': 'Horizontal Position',
+  'tongue.results.appleCaught': 'Successfully Caught',
+  'tongue.results.caughtYes': 'Yes',
+  'tongue.results.caughtNo': 'No',
   'tongue.results.noApples': 'No apples fell during this session.',
 
   // Gesture Battler

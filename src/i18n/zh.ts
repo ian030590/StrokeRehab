@@ -498,6 +498,9 @@ export const zh = {
   'tongue.results.date': '訓練日期',
   'tongue.results.appleIndex': '蘋果',
   'tongue.results.appleHorizontalPosition': '橫向座標',
+  'tongue.results.appleCaught': '是否成功吃到',
+  'tongue.results.caughtYes': '成功',
+  'tongue.results.caughtNo': '未吃到',
   'tongue.results.noApples': '本次訓練沒有蘋果下落。',
 
   // Gesture Battler
