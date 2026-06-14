@@ -828,9 +828,12 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
             <div className="training-config-footer">
               <div className="training-config-summary">
                 <strong>{t('tongue.title')}</strong>
-                <span>{t('training.secondsShort', { value: config.durationSec })}</span>
-                <span>{Math.round(config.sensitivity * 100)}%</span>
-                <span>{difficultyLabel(config)}</span>
+                <span>{t('tongue.config.sensitivity')}: {Math.round(config.sensitivity * 100)}%</span>
+                <span>{t('tongue.config.growthRate')}: {config.growthRate} px/s</span>
+                <span>{t('tongue.config.duration')}: {t('training.secondsShort', { value: config.durationSec })}</span>
+                <span>{t('tongue.config.appleSpeed')}: {config.appleSpeed} px/s</span>
+                <span>{t('tongue.config.spawnRate')}: {config.spawnIntervalSec.toFixed(1)}s</span>
+                <span>{t('tongue.config.edgeChance')}: {Math.round(config.edgeChance * 100)}%</span>
               </div>
               <div className="training-config-actions">
                 {visionError && (
@@ -1258,7 +1261,7 @@ function spawnApple(scene: TongueScene, width: number, edgeChance: number): numb
       ? randomBetween(0.1, 0.28)
       : randomBetween(0.72, 0.9)
     : randomBetween(0.27, 0.73);
-  const size = randomBetween(38, 48);
+  const size = randomBetween(95, 120);
   const apple = createAppleSprite(size, scene.appleTexture);
   apple.baseX = width * normalizedX;
   apple.view.x = apple.baseX;
