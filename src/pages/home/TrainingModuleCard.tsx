@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import type { TranslationKey } from '../../i18n';
 import type { TrainingModuleCardData, TrainingModuleId } from './trainingModules';
 
@@ -9,16 +8,6 @@ interface TrainingModuleCardProps {
   onSelect: (moduleId: TrainingModuleId) => void;
   t: TFunction;
 }
-
-const moduleCardActionStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  marginTop: 16,
-  fontSize: 13,
-  color: 'var(--accent)',
-  fontWeight: 600,
-};
 
 export function TrainingModuleCard({ module, onSelect, t }: TrainingModuleCardProps) {
   return (
@@ -37,7 +26,7 @@ export function TrainingModuleCard({ module, onSelect, t }: TrainingModuleCardPr
       <div className="card-icon">{module.icon}</div>
       <div className="card-title">{t(module.titleKey)}</div>
       <div className="card-desc">{t(module.descKey)}</div>
-      <div style={moduleCardActionStyle}>
+      <div className="card-action">
         {t('btn.selectModule')}
         <svg
           width="16"

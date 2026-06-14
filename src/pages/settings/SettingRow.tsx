@@ -36,10 +36,9 @@ export function SettingRow({
         <p>{desc}</p>
       </div>
       {editing ? (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="setting-actions">
           <input
-            className="input"
-            style={{ width: 120 }}
+            className="input setting-edit-input"
             placeholder={editPlaceholder}
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
@@ -53,7 +52,7 @@ export function SettingRow({
           <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)}>{t('btn.cancel')}</button>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="setting-actions setting-value-actions">
           <span className="setting-value">{value}</span>
           <button className="btn btn-ghost btn-sm" onClick={handleStartEdit}>{t('btn.edit')}</button>
         </div>

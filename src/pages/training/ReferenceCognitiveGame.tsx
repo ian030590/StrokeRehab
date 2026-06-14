@@ -73,6 +73,7 @@ import type {
 import type { TFunction } from './types';
 import { COGNITIVE_ACCENT_CSS, clearStage, drawBackground } from './cognitive/utils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import { StartTrainingButton } from './StartTrainingButton';
 
 export type { ReferenceGameId } from './cognitive/types';
 export { REFERENCE_COGNITIVE_MODULES } from './cognitive/constants';
@@ -366,7 +367,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       <div ref={pixiHostRef} className="cognitive-pixi-stage" />
 
       {phase === 'playing' && (
-        <div className="cognitive-game-hud">
+        <div className="training-game-hud cognitive-game-hud">
           <div><strong>{t('cognitive.hud.time')}</strong> {elapsedSeconds}s</div>
           <div><strong>{hud.primaryLabel}</strong> {hud.primaryValue}</div>
           <div><strong>{hud.secondaryLabel}</strong> {hud.secondaryValue}</div>
@@ -496,7 +497,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
                 <span>{gameId === 'reaction-time' ? t('training.count', { value: reactionTrials }) : formatLimit(effectiveLimit, t)}</span>
               </div>
               <div className="training-config-actions">
-                <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>{t('training.startGame')}</button>
+                <StartTrainingButton onClick={startGame}>{t('training.startGame')}</StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.cancel')}</button>
               </div>
             </div>
@@ -517,7 +518,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container cognitive-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container experiment-container-scrollable cognitive-results-container">
           <div className="experiment-results">
             <h1>{result.Game_Result === 'Victory' ? t('cognitive.results.complete') : t('cognitive.results.ended')}</h1>
             <div className="training-result-summary">

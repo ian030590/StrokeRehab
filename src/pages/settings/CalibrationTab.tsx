@@ -23,7 +23,7 @@ export function CalibrationTab({ refresh }: { refresh: () => void }) {
   return (
     <div className="fade-in">
       {/* Mode Switch */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+      <div className="calibration-mode-switch">
         <button
           className={`btn btn-sm ${calMode === 'ruler' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => setCalMode('ruler')}
@@ -45,9 +45,9 @@ export function CalibrationTab({ refresh }: { refresh: () => void }) {
       )}
 
       {/* Info */}
-      <div className="cal-info" style={{ color: calibrated ? 'var(--success)' : 'var(--warning)' }}>
+      <div className={`cal-info ${calibrated ? 'cal-info-success' : 'cal-info-warning'}`}>
         <p>{t('settings.cal.resolution')} {mmPerPx.toFixed(3)} mm/px ({(1 / mmPerPx).toFixed(2)} px/mm)</p>
-        <p style={{ fontWeight: 600, marginTop: 4 }}>
+        <p className="cal-info-status">
           {calibrated ? t('settings.cal.done') : t('settings.cal.notDone')}
         </p>
       </div>
@@ -73,16 +73,15 @@ export function RulerCalibration({ refresh }: { refresh: () => void }) {
   };
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.8 }}>
+    <div className="calibration-panel">
+      <p className="calibration-instructions">
         {t('settings.cal.rulerInst1')}<br />
         {t('settings.cal.rulerInst2')}
       </p>
       <div className="cal-ruler-bar" style={{ width: rulerBarPx }} />
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
+      <div className="calibration-input-actions">
         <input
-          className="input"
-          style={{ width: 160 }}
+          className="input calibration-input"
           type="number"
           placeholder={t('settings.cal.rulerPlaceholder')}
           value={inputVal}
@@ -110,8 +109,8 @@ export function CardCalibration({ refresh }: { refresh: () => void }) {
   };
 
   return (
-    <div style={{ textAlign: 'center' }}>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.8 }}>
+    <div className="calibration-panel">
+      <p className="calibration-instructions">
         {t('settings.cal.cardInst1')}<br />
         {t('settings.cal.cardInst2')}
       </p>
@@ -119,14 +118,11 @@ export function CardCalibration({ refresh }: { refresh: () => void }) {
         className="cal-card-outline"
         style={{ width: wPx, height: hPx }}
       >
-        <span style={{
-          position: 'absolute', bottom: -24, left: '50%', transform: 'translateX(-50%)',
-          fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap',
-        }}>
+        <span className="cal-card-size-label">
           {CARD_WIDTH_MM}mm × {CARD_HEIGHT_MM}mm
         </span>
       </div>
-      <div className="cal-controls" style={{ marginTop: 36 }}>
+      <div className="cal-controls cal-controls-spaced">
         {labels.map((label, i) => (
           <button
             key={label}
@@ -138,8 +134,7 @@ export function CardCalibration({ refresh }: { refresh: () => void }) {
         ))}
       </div>
       <button
-        className="btn btn-danger btn-sm"
-        style={{ marginTop: 16 }}
+        className="btn btn-danger btn-sm cal-reset-btn"
         onClick={() => { setSetting('calBarLengthInMM', 149); clearDisplayCalibration(); refresh(); }}
       >
         {t('settings.cal.resetBtn')}

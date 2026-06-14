@@ -18,6 +18,8 @@ import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedb
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import { StartTrainingButton } from './StartTrainingButton';
+import { AppDialog } from '../../components/AppDialog';
 import type { TFunction } from './types';
 import {
   createDefaultVoiceVocabulary,
@@ -1407,15 +1409,17 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       <div ref={pixiHostRef} className="drawing-defense-stage voice-defender-stage" />
 
       {showInAppBrowserNotice && (
-        <div className="voice-browser-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-browser-notice-title">
-          <div className="voice-browser-notice">
-            <h2 id="voice-browser-notice-title">{t('voice.browserNotice.title')}</h2>
-            <p>{t('voice.browserNotice.desc')}</p>
+        <AppDialog
+          title={t('voice.browserNotice.title')}
+          titleId="voice-browser-notice-title"
+          actions={(
             <button className="btn btn-primary btn-lg" type="button" onClick={() => setShowInAppBrowserNotice(false)}>
               {t('btn.confirm')}
             </button>
-          </div>
-        </div>
+          )}
+        >
+            <p>{t('voice.browserNotice.desc')}</p>
+        </AppDialog>
       )}
 
       {phase === 'editor' && (
@@ -1865,15 +1869,9 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <span>{backgroundSummary}</span>
               </div>
               <div className="training-config-actions">
-                <button
-                  className="btn btn-primary btn-lg config-start-btn"
-                  onClick={() => void handleStartGame()}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <polygon points="5,3 19,12 5,21" />
-                  </svg>
+                <StartTrainingButton onClick={() => void handleStartGame()}>
                   {t('training.start')}
-                </button>
+                </StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={handleExit}>{t('training.cancel')}</button>
               </div>
             </div>
@@ -1923,7 +1921,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container drawing-defense-results-container voice-defender-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container experiment-container-scrollable drawing-defense-results-container voice-defender-results-container">
           <div className="experiment-results">
             <h1>{t('voice.results.title')}</h1>
             <div className="training-result-summary">

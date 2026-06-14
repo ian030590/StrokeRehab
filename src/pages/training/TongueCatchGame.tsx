@@ -25,15 +25,16 @@ import {
 import {
   DEFAULT_TONGUE_SETTINGS,
   getTongueTrainingSettings,
-  loadTongueClassifier,
-  saveTongueClassifier,
   saveTongueTrainingSettings,
-  type SerializedTongueClassifier,
   type TongueTrainingSettings,
 } from '../../utils/tongueRehabStorage';
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingPrivacyNotice } from './TrainingPrivacyNotice';
+import { AppDialog } from '../../components/AppDialog';
+import { InlineAlert } from '../../components/InlineAlert';
 
 type TongueClass = 'Rest' | 'Tongue_Left' | 'Tongue_Right';
 type GamePhase = 'menu' | 'initializing' | 'calibration' | 'playing' | 'paused' | 'results';
@@ -168,13 +169,12 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
   const [config, setConfig] = useState<TongueTrainingSettings>(() => (
     activeUser ? getTongueTrainingSettings(activeUser) : { ...DEFAULT_TONGUE_SETTINGS }
   ));
-  const [hasCalibration, setHasCalibration] = useState(false);
-  const [lastCalibrated, setLastCalibrated] = useState('');
   const [calibrationIndex, setCalibrationIndex] = useState(0);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [visionError, setVisionError] = useState('');
+  const [showVisionError, setShowVisionError] = useState(false);
   const [recognition, setRecognition] = useState<RecognitionState>(recognitionRef.current);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [score, setScore] = useState(0);
@@ -196,19 +196,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
   }, []);
 
   useEffect(() => {
-    if (!activeUser) return;
-    let cancelled = false;
-    setConfig(getTongueTrainingSettings(activeUser));
-    void loadTongueClassifier(activeUser)
-      .then((saved) => {
-        if (cancelled) return;
-        setHasCalibration(Boolean(saved && hasCompleteDataset(saved)));
-        setLastCalibrated(saved?.lastCalibrated ?? '');
-      })
-      .catch((error) => console.warn('Unable to inspect saved tongue classifier.', error));
-    return () => {
-      cancelled = true;
-    };
+    if (activeUser) setConfig(getTongueTrainingSettings(activeUser));
   }, [activeUser]);
 
   const stopVision = useCallback(() => {
@@ -256,7 +244,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
     setPhase('playing');
   }, [setPhase, t]);
 
-  const finishCalibrationStep = useCallback(async () => {
+  const finishCalibrationStep = useCallback(() => {
     if (!calibrationCaptureRef.current.active) return;
     calibrationCaptureRef.current.active = false;
     setIsCapturing(false);
@@ -277,23 +265,8 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       return;
     }
 
-    const classifier = classifierRef.current;
-    const userId = getActiveUser();
-    if (!classifier || !userId) return;
-    try {
-      const saved = await saveTongueClassifier(userId, classifier);
-      if (!mountedRef.current) return;
-      setHasCalibration(true);
-      setLastCalibrated(saved.lastCalibrated);
-      setStatusMessage(t('tongue.calibration.saved'));
-      beginGame();
-    } catch (error) {
-      console.error('Unable to save tongue classifier.', error);
-      setVisionError(t('tongue.error.storage'));
-      setPhase('menu');
-      stopVision();
-    }
-  }, [setPhase, stopVision, t]);
+    beginGame();
+  }, [beginGame]);
 
   const classifyFeature = useCallback(async (feature: tf.Tensor) => {
     const classifier = classifierRef.current;
@@ -370,15 +343,17 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
     }
   }, [classifyFeature, finishCalibrationStep, syncRecognition]);
 
-  const startSession = useCallback(async (forceCalibration: boolean) => {
+  const startSession = useCallback(async () => {
     if (!verifySelectedTrainingUser(t)) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setVisionError(t('tongue.error.unsupported'));
+      setShowVisionError(true);
       return;
     }
     prepareAudioFeedback(jsPsychRef);
     stopVision();
     setVisionError('');
+    setShowVisionError(false);
     setStatusMessage(t('tongue.loading.camera'));
     setPhase('initializing');
 
@@ -417,33 +392,27 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       classifierRef.current?.dispose();
       const classifier = knnClassifier.create();
       classifierRef.current = classifier;
-      const userId = getActiveUser() || '';
-      const saved = forceCalibration ? null : await loadTongueClassifier(userId);
-      if (saved && hasCompleteDataset(saved)) restoreClassifierDataset(classifier, saved);
 
       lastDetectionAtRef.current = 0;
       lastVideoTimeRef.current = -1;
       animationFrameRef.current = window.requestAnimationFrame(processFrame);
-      if (forceCalibration || !saved || !hasCompleteDataset(saved)) {
-        classifier.clearAllClasses();
-        calibrationIndexRef.current = 0;
-        calibrationCaptureRef.current = { active: false, startedAt: 0, samples: 0 };
-        setCalibrationIndex(0);
-        setCalibrationProgress(0);
-        setIsCapturing(false);
-        setPhase('calibration');
-      } else {
-        beginGame();
-      }
+      classifier.clearAllClasses();
+      calibrationIndexRef.current = 0;
+      calibrationCaptureRef.current = { active: false, startedAt: 0, samples: 0 };
+      setCalibrationIndex(0);
+      setCalibrationProgress(0);
+      setIsCapturing(false);
+      setPhase('calibration');
     } catch (error) {
       console.error('Unable to initialize tongue training.', error);
       stopVision();
       setVisionError(error instanceof DOMException && error.name === 'NotAllowedError'
         ? t('tongue.error.permission')
         : t('tongue.error.initialization'));
+      setShowVisionError(true);
       setPhase('menu');
     }
-  }, [beginGame, processFrame, setPhase, stopVision, t]);
+  }, [processFrame, setPhase, stopVision, t]);
 
   const startCalibrationCapture = useCallback(() => {
     const classifier = classifierRef.current;
@@ -669,13 +638,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
                 <span className="training-config-label">{t('tongue.config.label')}</span>
                 <h1>{t('tongue.title')}</h1>
               </div>
-              <div className={`tongue-calibration-status ${hasCalibration ? 'ready' : ''}`}>
-                <strong>{hasCalibration ? t('tongue.calibration.ready') : t('tongue.calibration.required')}</strong>
-                {lastCalibrated && <span>{new Date(lastCalibrated).toLocaleDateString()}</span>}
-              </div>
             </header>
-
-            {visionError && <div className="gesture-error" role="alert">{visionError}</div>}
 
             <div className="training-config-body">
               <section className="training-setting">
@@ -810,10 +773,10 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
                 />
               </section>
 
-              <section className="training-setting training-setting-wide gesture-privacy-note">
-                <strong>{t('tongue.privacy.title')}</strong>
-                <span>{t('tongue.privacy.desc')}</span>
-              </section>
+              <TrainingPrivacyNotice
+                title={t('tongue.privacy.title')}
+                description={t('tongue.privacy.desc')}
+              />
             </div>
 
             <div className="training-config-footer">
@@ -824,12 +787,19 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
                 <span>{difficultyLabel(config)}</span>
               </div>
               <div className="training-config-actions">
-                <button className="btn btn-secondary btn-lg" onClick={() => void startSession(true)}>
-                  {hasCalibration ? t('tongue.calibration.recalibrate') : t('tongue.calibration.start')}
-                </button>
-                <button className="btn btn-primary btn-lg config-start-btn" onClick={() => void startSession(false)}>
-                  {hasCalibration ? t('training.startGame') : t('tongue.calibration.start')}
-                </button>
+                {visionError && (
+                  <InlineAlert
+                    tone="error"
+                    className="training-start-alert"
+                    onClick={() => setShowVisionError(true)}
+                    aria-label={t('tongue.error.openDetails')}
+                  >
+                    {visionError}
+                  </InlineAlert>
+                )}
+                <StartTrainingButton onClick={() => void startSession()}>
+                  {t('tongue.calibration.start')}
+                </StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={exitGame}>{t('training.cancel')}</button>
               </div>
             </div>
@@ -849,6 +819,9 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
 
       {phase === 'calibration' && activeCalibrationStep && (
         <div className="tongue-calibration-overlay">
+          <div className="tongue-calibration-camera-space" aria-hidden="true">
+            <div className="tongue-camera-guide" />
+          </div>
           <div className="tongue-calibration-card">
             <span className="gesture-step-count">
               {t('tongue.calibration.step', { current: calibrationIndex + 1, total: CALIBRATION_STEPS.length })}
@@ -912,7 +885,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container tongue-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container experiment-container-scrollable tongue-results-container">
           <div className="experiment-results">
             <h1>{t('tongue.results.title')}</h1>
             <div className="training-result-summary">
@@ -943,11 +916,26 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
             </table>
             <div className="results-actions">
               <button className="btn btn-primary btn-lg" onClick={downloadResult}>{t('training.downloadCsvRecord')}</button>
-              <button className="btn btn-secondary btn-lg" onClick={() => void startSession(false)}>{t('training.playAgain')}</button>
+              <button className="btn btn-secondary btn-lg" onClick={() => void startSession()}>{t('training.playAgain')}</button>
               <button className="btn btn-ghost btn-lg" onClick={returnToMenu}>{t('training.returnSettings')}</button>
             </div>
           </div>
         </div>
+      )}
+
+      {showVisionError && visionError && (
+        <AppDialog
+          title={t('tongue.error.title')}
+          titleId="tongue-error-modal-title"
+          tone="error"
+          actions={(
+            <button className="btn btn-primary btn-lg" onClick={() => setShowVisionError(false)}>
+              {t('btn.confirm')}
+            </button>
+          )}
+        >
+          <p>{visionError}</p>
+        </AppDialog>
       )}
     </div>
   );
@@ -1272,23 +1260,6 @@ function mapVideoPointToStage(
     x: offsetX + (1 - normalizedX) * renderedWidth,
     y: offsetY + normalizedY * renderedHeight,
   };
-}
-
-function restoreClassifierDataset(
-  classifier: KNNClassifier,
-  saved: SerializedTongueClassifier,
-): void {
-  const dataset = Object.fromEntries(
-    Object.entries(saved.dataset).map(([label, tensor]) => [
-      label,
-      tf.tensor2d(tensor.data, tensor.shape),
-    ]),
-  );
-  classifier.setClassifierDataset(dataset);
-}
-
-function hasCompleteDataset(saved: SerializedTongueClassifier): boolean {
-  return CALIBRATION_STEPS.every((step) => (saved.dataset[step.label]?.shape[0] ?? 0) >= MIN_CLASS_EXAMPLES);
 }
 
 function isTongueClass(value: string): value is TongueClass {

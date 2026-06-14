@@ -5,7 +5,6 @@ import { downloadAllTrainingRecordsCsv } from '../utils/trainingRecords';
 import { useT } from '../i18n';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) => `navbar-link ${isActive ? 'active' : ''}`;
-const logoStyle = { width: 'auto', objectFit: 'contain' } as const;
 const NAVBAR_SIDEBAR_BREAKPOINT_PX = 1120;
 const NAVBAR_EXPANDED_HORIZONTAL_PADDING_PX = 96;
 const NAVBAR_INNER_MAX_WIDTH_PX = 1440;
@@ -122,7 +121,7 @@ export function Navbar() {
     <nav ref={navbarRef} className={`navbar ${useSidebarLayout ? 'navbar-sidebar' : ''}`}>
       <div className="navbar-inner" ref={navbarInnerRef}>
         <NavLink to="/" className="navbar-brand" onClick={closeMenu}>
-          <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Stroke Trainer Logo" height="22" style={logoStyle} />
+          <img className="navbar-brand-logo" src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Stroke Trainer Logo" height="22" />
           {t('nav.brand')}
         </NavLink>
 
@@ -177,7 +176,7 @@ export function Navbar() {
                   <span>{activeUserName}</span>
                 </>
               ) : (
-                <span style={{ color: 'var(--warning)' }}>{t('nav.noUser')}</span>
+                <span className="navbar-user-warning">{t('nav.noUser')}</span>
               )}
             </div>
           </div>
@@ -185,7 +184,7 @@ export function Navbar() {
       </div>
       <div className="navbar-measure" ref={navbarMeasureRef} aria-hidden="true">
         <span className="navbar-brand">
-          <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="" height="22" style={logoStyle} />
+          <img className="navbar-brand-logo" src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="" height="22" />
           {t('nav.brand')}
         </span>
         <div className="navbar-measure-menu">

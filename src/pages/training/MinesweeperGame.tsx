@@ -7,6 +7,7 @@ import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedb
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import { StartTrainingButton } from './StartTrainingButton';
 
 type MinesweeperPhase = 'menu' | 'playing' | 'paused' | 'results';
 type MinesweeperDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -385,9 +386,9 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
                 <span>{t('minesweeper.config.mineCount', { value: selectedMineCount })}</span>
               </div>
               <div className="training-config-actions">
-                <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
+                <StartTrainingButton onClick={startGame}>
                   {t('training.startGame')}
-                </button>
+                </StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.back')}</button>
               </div>
             </div>
@@ -397,7 +398,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
 
       {phase === 'playing' && (
         <>
-          <div className="minesweeper-hud">
+          <div className="training-game-hud minesweeper-hud">
             <div><strong>{t('minesweeper.hud.time')}</strong> {elapsedSeconds}s</div>
             <div><strong>{t('minesweeper.hud.mines')}</strong> {remainingMineEstimate}</div>
             <div><strong>{t('minesweeper.hud.opened')}</strong> {boardStats.openedSafeCells}</div>
@@ -436,7 +437,7 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container minesweeper-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container experiment-container-scrollable minesweeper-results-container">
           <div className="experiment-results">
             <h1>{result.Game_Result === 'Victory' ? t('minesweeper.results.victory') : t('minesweeper.results.defeat')}</h1>
             <div className="training-result-summary">

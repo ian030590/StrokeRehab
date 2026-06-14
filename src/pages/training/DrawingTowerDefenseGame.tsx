@@ -8,6 +8,7 @@ import { playFailureSound, playGameEndSound, playSuccessSound, prepareAudioFeedb
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import { StartTrainingButton } from './StartTrainingButton';
 import type { TFunction } from './types';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -988,12 +989,9 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
                 <span>{backgroundSummary}</span>
               </div>
               <div className="training-config-actions">
-                <button className="btn btn-primary btn-lg config-start-btn" onClick={startGame}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <polygon points="5,3 19,12 5,21" />
-                  </svg>
+                <StartTrainingButton onClick={startGame}>
                   {t('training.start')}
-                </button>
+                </StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.cancel')}</button>
               </div>
             </div>
@@ -1011,7 +1009,7 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container drawing-defense-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container experiment-container-scrollable drawing-defense-results-container">
           <div className="experiment-results">
             <h1>{t('drawing.results.complete')}</h1>
             <div className="training-result-summary">

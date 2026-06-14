@@ -13,6 +13,9 @@ import { playGameEndSound, playSuccessSound, prepareAudioFeedback } from '../../
 import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
+import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingPrivacyNotice } from './TrainingPrivacyNotice';
+import { InlineAlert } from '../../components/InlineAlert';
 
 type GestureId = 1 | 2 | 3 | 4 | 5;
 type TargetMode = 'free' | 'directed';
@@ -799,7 +802,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
               </div>
             </header>
 
-            {visionError && <div className="gesture-error" role="alert">{visionError}</div>}
+            {visionError && <InlineAlert tone="error" role="alert">{visionError}</InlineAlert>}
 
             <div className="training-config-body">
               <section className="training-setting">
@@ -936,10 +939,10 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                 </div>
               </section>
 
-              <section className="training-setting training-setting-wide gesture-privacy-note">
-                <strong>{t('gesture.privacy.title')}</strong>
-                <span>{t('gesture.privacy.desc')}</span>
-              </section>
+              <TrainingPrivacyNotice
+                title={t('gesture.privacy.title')}
+                description={t('gesture.privacy.desc')}
+              />
             </div>
 
             <div className="training-config-footer">
@@ -950,9 +953,9 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                 <span>{Math.round(strictnessThreshold * 100)}%</span>
               </div>
               <div className="training-config-actions">
-                <button className="btn btn-primary btn-lg config-start-btn" onClick={() => void startCalibration()}>
+                <StartTrainingButton onClick={() => void startCalibration()}>
                   {t('training.start')}
-                </button>
+                </StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={exitGame}>{t('training.cancel')}</button>
               </div>
             </div>
@@ -1086,7 +1089,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
       )}
 
       {phase === 'results' && result && (
-        <div className="experiment-container gesture-results-container" style={{ overflowY: 'auto' }}>
+        <div className="experiment-container experiment-container-scrollable gesture-results-container">
           <div className="experiment-results">
             <h1>{t('gesture.results.title')}</h1>
             <div className="training-result-summary gesture-result-summary">

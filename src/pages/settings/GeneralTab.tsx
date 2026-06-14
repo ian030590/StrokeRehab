@@ -36,7 +36,7 @@ export function GeneralTab({ refresh }: { refresh: () => void }) {
           <h3>{t('settings.language.title')}</h3>
           <p>{t('settings.language.desc')}</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="setting-actions">
           <button
             className={`btn btn-sm ${lang === 'zh' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => { setLang('zh'); refresh(); }}
