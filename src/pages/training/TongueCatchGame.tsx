@@ -105,6 +105,8 @@ const MIN_CLASS_EXAMPLES = 10;
 const MOUTH_FEATURE_WIDTH = 32;
 const MOUTH_FEATURE_HEIGHT = 24;
 const MAX_TONGUE_SEGMENTS = 10;
+const TONGUE_WIDTH = 28;
+const TONGUE_COLLISION_RADIUS = TONGUE_WIDTH / 2;
 const CALIBRATION_STEPS: readonly CalibrationStep[] = [
   {
     label: 'Rest',
@@ -992,7 +994,7 @@ function resetTongueScene(
   const tongue = new MeshRope({
     texture: tongueTexture,
     points,
-    width: 28,
+    width: TONGUE_WIDTH,
   });
   root.addChild(tongue);
   app.stage.addChild(root);
@@ -1079,7 +1081,6 @@ function updateTongueGame(args: {
         ? 1
         : 0
     : 0;
-  const maxLength = Math.min(args.app.screen.width * 0.42, 420);
   if (direction === 0) {
     scene.tongueLength = Math.max(0, scene.tongueLength - args.config.growthRate * 1.7 * dt);
     closeActiveHold(args.metrics, performance.now());
@@ -1089,11 +1090,17 @@ function updateTongueGame(args: {
       args.metrics.holdStartedAt = performance.now();
       args.metrics.holdDirection = args.recognition.label;
     }
+    if (scene.tongueDirection !== 0 && scene.tongueDirection !== direction) {
+      scene.tongueLength = 0;
+    }
     scene.tongueDirection = direction;
+    const maxLength = direction < 0
+      ? Math.max(0, scene.mouthX)
+      : Math.max(0, args.app.screen.width - scene.mouthX);
     scene.tongueLength = Math.min(maxLength, scene.tongueLength + args.config.growthRate * dt);
   }
   if (scene.tongueLength <= 1) scene.tongueDirection = direction;
-  updateTonguePoints(scene, args.ticker.lastTime);
+  updateTonguePoints(scene);
 
   scene.spawnElapsed += dt;
   if (scene.spawnElapsed >= args.config.spawnIntervalSec) {
@@ -1101,23 +1108,19 @@ function updateTongueGame(args: {
     spawnApple(scene, args.app.screen.width, args.config.edgeChance);
   }
 
-  const tip = scene.points[scene.points.length - 1];
   for (let index = scene.apples.length - 1; index >= 0; index -= 1) {
     const apple = scene.apples[index];
     apple.view.y += args.config.appleSpeed * dt;
     apple.view.rotation = Math.sin(args.ticker.lastTime / 320 + index) * 0.08;
-    const half = apple.size / 2;
     const caught = scene.tongueLength > 20
-      && tip.x + 12 >= apple.view.x - half
-      && tip.x - 12 <= apple.view.x + half
-      && tip.y + 12 >= apple.view.y - half
-      && tip.y - 12 <= apple.view.y + half;
+      && tongueIntersectsApple(scene.points, apple);
     if (caught) {
       removeApple(scene, index);
       args.metrics.score += 1;
       args.onCatch();
       continue;
     }
+    const half = apple.size / 2;
     if (apple.view.y - half > args.app.screen.height) {
       removeApple(scene, index);
       args.metrics.missed += 1;
@@ -1126,17 +1129,61 @@ function updateTongueGame(args: {
   }
 }
 
-function updateTonguePoints(scene: TongueScene, time: number): void {
+function updateTonguePoints(scene: TongueScene): void {
   const direction = scene.tongueDirection || 1;
-  const dx = direction * 0.86;
-  const dy = -0.5;
   scene.points.forEach((point, index) => {
     const progress = index / (scene.points.length - 1);
-    const wave = Math.sin(progress * Math.PI + time / 210) * Math.min(7, scene.tongueLength * 0.04) * progress;
-    point.x = scene.mouthX + dx * scene.tongueLength * progress;
-    point.y = scene.mouthY + dy * scene.tongueLength * progress + wave;
+    point.x = scene.mouthX + direction * scene.tongueLength * progress;
+    point.y = scene.mouthY;
   });
   scene.tongue.visible = scene.tongueLength > 2;
+}
+
+function tongueIntersectsApple(points: Point[], apple: AppleSprite): boolean {
+  const collisionRadius = apple.size / 2 + TONGUE_COLLISION_RADIUS;
+  const collisionRadiusSquared = collisionRadius * collisionRadius;
+  for (let index = 1; index < points.length; index += 1) {
+    if (distanceToSegmentSquared(
+      apple.view.x,
+      apple.view.y,
+      points[index - 1].x,
+      points[index - 1].y,
+      points[index].x,
+      points[index].y,
+    ) <= collisionRadiusSquared) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function distanceToSegmentSquared(
+  pointX: number,
+  pointY: number,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+): number {
+  const segmentX = endX - startX;
+  const segmentY = endY - startY;
+  const segmentLengthSquared = segmentX * segmentX + segmentY * segmentY;
+  if (segmentLengthSquared === 0) {
+    const dx = pointX - startX;
+    const dy = pointY - startY;
+    return dx * dx + dy * dy;
+  }
+
+  const projection = clamp(
+    ((pointX - startX) * segmentX + (pointY - startY) * segmentY) / segmentLengthSquared,
+    0,
+    1,
+  );
+  const closestX = startX + segmentX * projection;
+  const closestY = startY + segmentY * projection;
+  const dx = pointX - closestX;
+  const dy = pointY - closestY;
+  return dx * dx + dy * dy;
 }
 
 function spawnApple(scene: TongueScene, width: number, edgeChance: number): void {
