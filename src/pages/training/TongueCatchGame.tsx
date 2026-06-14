@@ -33,6 +33,7 @@ import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingConfigSummary } from './TrainingConfigSummary';
 import { TrainingPrivacyNotice } from './TrainingPrivacyNotice';
 import { InlineAlert } from '../../components/InlineAlert';
 import { MediaDeviceErrorDialog } from '../../components/MediaDeviceErrorDialog';
@@ -826,15 +827,20 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
             </div>
 
             <div className="training-config-footer">
-              <div className="training-config-summary">
-                <strong>{t('tongue.title')}</strong>
-                <span>{t('tongue.config.sensitivity')}: {Math.round(config.sensitivity * 100)}%</span>
-                <span>{t('tongue.config.growthRate')}: {config.growthRate} px/s</span>
-                <span>{t('tongue.config.duration')}: {t('training.secondsShort', { value: config.durationSec })}</span>
-                <span>{t('tongue.config.appleSpeed')}: {config.appleSpeed} px/s</span>
-                <span>{t('tongue.config.spawnRate')}: {config.spawnIntervalSec.toFixed(1)}s</span>
-                <span>{t('tongue.config.edgeChance')}: {Math.round(config.edgeChance * 100)}%</span>
-              </div>
+              <TrainingConfigSummary
+                title={t('tongue.title')}
+                items={[
+                  { label: t('tongue.config.sensitivity'), value: `${Math.round(config.sensitivity * 100)}%` },
+                  { label: t('tongue.config.growthRate'), value: `${config.growthRate} px/s` },
+                  {
+                    label: t('tongue.config.duration'),
+                    value: t('training.secondsShort', { value: config.durationSec }),
+                  },
+                  { label: t('tongue.config.appleSpeed'), value: `${config.appleSpeed} px/s` },
+                  { label: t('tongue.config.spawnRate'), value: `${config.spawnIntervalSec.toFixed(1)}s` },
+                  { label: t('tongue.config.edgeChance'), value: `${Math.round(config.edgeChance * 100)}%` },
+                ]}
+              />
               <div className="training-config-actions">
                 {visionError && (
                   <InlineAlert

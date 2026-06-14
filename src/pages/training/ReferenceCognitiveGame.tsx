@@ -74,6 +74,7 @@ import type { TFunction } from './types';
 import { COGNITIVE_ACCENT_CSS, clearStage, drawBackground } from './cognitive/utils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingConfigSummary } from './TrainingConfigSummary';
 
 export type { ReferenceGameId } from './cognitive/types';
 export { REFERENCE_COGNITIVE_MODULES } from './cognitive/constants';
@@ -491,11 +492,26 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
             </div>
 
             <div className="training-config-footer">
-              <div className="training-config-summary">
-                <strong>{metaTitle}</strong>
-                <span>{activeDifficultyLabel}</span>
-                <span>{gameId === 'reaction-time' ? t('training.count', { value: reactionTrials }) : formatLimit(effectiveLimit, t)}</span>
-              </div>
+              <TrainingConfigSummary
+                title={metaTitle}
+                items={[
+                  { label: t('cognitive.config.difficulty'), value: activeDifficultyLabel },
+                  gameId === 'reaction-time'
+                    ? {
+                        label: t('cognitive.config.reactionTrials'),
+                        value: t('training.count', { value: reactionTrials }),
+                      }
+                    : gameId === 'whack-a-mole'
+                      ? {
+                          label: t('cognitive.config.trainingDuration'),
+                          value: formatSeconds(whackDurationSec, t),
+                        }
+                      : {
+                          label: t('cognitive.config.timeLimit'),
+                          value: formatLimit(sessionLimitSec, t),
+                        },
+                ]}
+              />
               <div className="training-config-actions">
                 <StartTrainingButton onClick={startGame}>{t('training.startGame')}</StartTrainingButton>
                 <button className="btn btn-ghost btn-lg" onClick={onExit}>{t('training.cancel')}</button>

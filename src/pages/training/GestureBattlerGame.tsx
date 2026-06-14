@@ -14,6 +14,7 @@ import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingConfigSummary } from './TrainingConfigSummary';
 import { TrainingPrivacyNotice } from './TrainingPrivacyNotice';
 import { InlineAlert } from '../../components/InlineAlert';
 import { MediaDeviceErrorDialog } from '../../components/MediaDeviceErrorDialog';
@@ -962,12 +963,15 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
             </div>
 
             <div className="training-config-footer">
-              <div className="training-config-summary">
-                <strong>{targetModeLabel}</strong>
-                <span>{t('gesture.config.hpSummary', { value: enemyMaxHp })}</span>
-                <span>{t('gesture.config.holdSummary', { value: holdDuration })}</span>
-                <span>{Math.round(strictnessThreshold * 100)}%</span>
-              </div>
+              <TrainingConfigSummary
+                title={t('training.gesture.title')}
+                items={[
+                  { label: t('gesture.config.enemyHp'), value: enemyMaxHp },
+                  { label: t('gesture.config.holdDuration'), value: `${holdDuration}s` },
+                  { label: t('gesture.config.strictness'), value: `${Math.round(strictnessThreshold * 100)}%` },
+                  { label: t('gesture.config.targetMode'), value: targetModeLabel },
+                ]}
+              />
               <div className="training-config-actions">
                 {visionError && (
                   <InlineAlert

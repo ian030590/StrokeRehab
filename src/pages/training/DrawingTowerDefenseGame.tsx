@@ -9,6 +9,7 @@ import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingConfigSummary } from './TrainingConfigSummary';
 import type { TFunction } from './types';
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -979,15 +980,18 @@ export function DrawingTowerDefenseGame({ onExit }: DrawingTowerDefenseGameProps
             </div>
 
             <div className="training-config-footer">
-              <div className="training-config-summary">
-                <strong>{activeDifficultyLabel}</strong>
-                <span>{gameDurationLabel}</span>
-                <span>{t('drawing.config.hpValue', { value: maxHp })}</span>
-                <span>{t('drawing.config.speedValue', { value: speed })}</span>
-                <span>{strictness}%</span>
-                <span>{t('drawing.config.waitValue', { value: strokeWaitMs })}</span>
-                <span>{backgroundSummary}</span>
-              </div>
+              <TrainingConfigSummary
+                title={t('training.drawing.title')}
+                items={[
+                  { label: t('cognitive.config.difficulty'), value: activeDifficultyLabel },
+                  { label: t('drawing.config.gameDuration'), value: gameDurationLabel },
+                  { label: t('drawing.config.hp'), value: maxHp },
+                  { label: t('drawing.config.enemySpeed'), value: t('drawing.config.speedValue', { value: speed }) },
+                  { label: t('drawing.config.strictness'), value: `${strictness}%` },
+                  { label: t('drawing.config.strokeWait'), value: t('drawing.config.waitValue', { value: strokeWaitMs }) },
+                  { label: t('drawing.config.background'), value: backgroundSummary },
+                ]}
+              />
               <div className="training-config-actions">
                 <StartTrainingButton onClick={startGame}>
                   {t('training.start')}

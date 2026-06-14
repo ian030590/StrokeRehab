@@ -19,6 +19,7 @@ import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingConfigSummary } from './TrainingConfigSummary';
 import { AppDialog } from '../../components/AppDialog';
 import { InlineAlert } from '../../components/InlineAlert';
 import { MediaDeviceErrorDialog } from '../../components/MediaDeviceErrorDialog';
@@ -1884,18 +1885,33 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             </div>
 
             <div className="training-config-footer">
-              <div className="training-config-summary">
-                <strong>{t(activeConfig.labelKey)}</strong>
-                <span>{gameDurationLabel}</span>
-                <span>{t('voice.hpValue', { value: maxHp })}</span>
-                <span>{t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en')}</span>
-                {recognitionEngine && (
-                  <span>{t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech')}</span>
-                )}
-                <span>{t('voice.config.speedValue', { value: speed })}</span>
-                <span>{t('voice.vocabulary.activeCount', { active: activeWords.length, total: languageVocabulary.length })}</span>
-                <span>{backgroundSummary}</span>
-              </div>
+              <TrainingConfigSummary
+                title={t('voice.title')}
+                items={[
+                  { label: t('cognitive.config.difficulty'), value: t(activeConfig.labelKey) },
+                  { label: t('drawing.config.gameDuration'), value: gameDurationLabel },
+                  { label: t('voice.config.hp'), value: maxHp },
+                  {
+                    label: t('voice.config.language'),
+                    value: t(language === 'zh' ? 'voice.language.zh' : 'voice.language.en'),
+                  },
+                  ...(recognitionEngine
+                    ? [{
+                        label: t('voice.config.engine'),
+                        value: t(recognitionEngine === 'vosk' ? 'voice.engine.vosk' : 'voice.engine.webSpeech'),
+                      }]
+                    : []),
+                  { label: t('voice.config.enemySpeed'), value: t('voice.config.speedValue', { value: speed }) },
+                  {
+                    label: t('voice.vocabulary.title'),
+                    value: t('voice.vocabulary.activeCount', {
+                      active: activeWords.length,
+                      total: languageVocabulary.length,
+                    }),
+                  },
+                  { label: t('drawing.config.background'), value: backgroundSummary },
+                ]}
+              />
               <div className="training-config-actions">
                 {showStartValidation && startIssues.length > 0 && (
                   <InlineAlert

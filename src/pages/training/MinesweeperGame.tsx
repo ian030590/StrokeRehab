@@ -8,6 +8,7 @@ import { saveTrainingSessionRecord } from '../../utils/trainingRecords';
 import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
+import { TrainingConfigSummary } from './TrainingConfigSummary';
 
 type MinesweeperPhase = 'menu' | 'playing' | 'paused' | 'results';
 type MinesweeperDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
@@ -379,12 +380,18 @@ export function MinesweeperGame({ onExit }: MinesweeperGameProps) {
             </div>
 
             <div className="training-config-footer">
-              <div className="training-config-summary">
-                <strong>{activeDifficultyLabel}</strong>
-                <span>{selectedBoardConfig.label}</span>
-                <span>{t('minesweeper.config.density', { value: selectedDensityPercent })}</span>
-                <span>{t('minesweeper.config.mineCount', { value: selectedMineCount })}</span>
-              </div>
+              <TrainingConfigSummary
+                title={gameTitle}
+                items={[
+                  { label: t('cognitive.config.difficulty'), value: activeDifficultyLabel },
+                  {
+                    label: t('minesweeper.config.boardSize'),
+                    value: `${selectedBoardConfig.label} (${selectedBoardConfig.rows}x${selectedBoardConfig.cols})`,
+                  },
+                  { label: t('minesweeper.config.mineDensity'), value: `${selectedDensityPercent}%` },
+                  { label: t('minesweeper.config.mineCountLabel'), value: selectedMineCount },
+                ]}
+              />
               <div className="training-config-actions">
                 <StartTrainingButton onClick={startGame}>
                   {t('training.startGame')}
