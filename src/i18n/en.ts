@@ -496,6 +496,10 @@ export const en: Record<TranslationKey, string> = {
   'tongue.results.missed': 'Apples Missed',
   'tongue.results.duration': 'Training Duration',
   'tongue.results.avgHold': 'Average Hold',
+  'tongue.results.date': 'Training Date',
+  'tongue.results.appleIndex': 'Apple',
+  'tongue.results.appleHorizontalPosition': 'Horizontal Position',
+  'tongue.results.noApples': 'No apples fell during this session.',
 
   // Gesture Battler
   'gesture.config.label': 'Fine Hand Movement Settings',

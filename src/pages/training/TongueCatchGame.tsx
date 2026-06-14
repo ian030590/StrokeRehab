@@ -78,6 +78,7 @@ interface SessionMetrics {
   elapsed: number;
   score: number;
   missed: number;
+  appleHorizontalPositionsPercent: number[];
   holdStartedAt: number | null;
   holdDirection: TongueClass | null;
   holdDurations: number[];
@@ -95,6 +96,7 @@ interface SessionResult {
   Apple_Speed_PX_Per_Second: number;
   Spawn_Interval_Seconds: number;
   Edge_Chance_Percent: number;
+  Apple_Horizontal_Positions_Percent: number[];
 }
 
 const MEDIAPIPE_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
@@ -466,6 +468,7 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       Apple_Speed_PX_Per_Second: configSnapshot.appleSpeed,
       Spawn_Interval_Seconds: configSnapshot.spawnIntervalSec,
       Edge_Chance_Percent: Math.round(configSnapshot.edgeChance * 100),
+      Apple_Horizontal_Positions_Percent: [...metrics.appleHorizontalPositionsPercent],
     };
     setResult(session);
     setPhase('results');
@@ -490,6 +493,10 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
         Spawn_Interval_Seconds: session.Spawn_Interval_Seconds,
         Edge_Chance_Percent: session.Edge_Chance_Percent,
       },
+      detailRows: session.Apple_Horizontal_Positions_Percent.map((position, index) => ({
+        Apple_Index: index + 1,
+        Apple_Horizontal_Position_Percent: position,
+      })),
     });
     writeJsPsychData(
       jsPsychRef,
@@ -597,9 +604,18 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
 
   const downloadResult = useCallback(() => {
     if (!result) return;
+    const summaryEntries = Object.entries(result)
+      .filter(([key]) => key !== 'Apple_Horizontal_Positions_Percent');
+    const positions = result.Apple_Horizontal_Positions_Percent.length > 0
+      ? result.Apple_Horizontal_Positions_Percent
+      : [null];
     const rows = [
-      Object.keys(result),
-      Object.values(result),
+      [...summaryEntries.map(([key]) => key), 'Apple_Index', 'Apple_Horizontal_Position_Percent'],
+      ...positions.map((position, index) => [
+        ...summaryEntries.map(([, value]) => value),
+        position === null ? '' : index + 1,
+        position ?? '',
+      ]),
     ];
     downloadCsvFile(
       rows.map((row) => row.map(csvCell).join(',')).join('\n'),
@@ -921,12 +937,34 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
                 <strong>{result.Average_Hold_Seconds}s</strong>
               </span>
             </div>
+            <dl className="tongue-result-details">
+              <div><dt>{t('tongue.results.user')}</dt><dd>{result.Participant_ID}</dd></div>
+              <div><dt>{t('tongue.results.date')}</dt><dd>{result.Test_Date}</dd></div>
+              <div><dt>{t('tongue.config.sensitivity')}</dt><dd>{Math.round(result.Sensitivity * 100)}%</dd></div>
+              <div><dt>{t('tongue.config.growthRate')}</dt><dd>{result.Growth_Rate_PX_Per_Second} px/s</dd></div>
+              <div><dt>{t('tongue.config.appleSpeed')}</dt><dd>{result.Apple_Speed_PX_Per_Second} px/s</dd></div>
+              <div><dt>{t('tongue.config.spawnRate')}</dt><dd>{result.Spawn_Interval_Seconds}s</dd></div>
+              <div><dt>{t('tongue.config.edgeChance')}</dt><dd>{result.Edge_Chance_Percent}%</dd></div>
+            </dl>
             <table className="results-table">
+              <thead>
+                <tr>
+                  <th>{t('tongue.results.appleIndex')}</th>
+                  <th>{t('tongue.results.appleHorizontalPosition')}</th>
+                </tr>
+              </thead>
               <tbody>
-                <tr><th>{t('tongue.results.user')}</th><td>{result.Participant_ID}</td></tr>
-                <tr><th>{t('tongue.config.sensitivity')}</th><td>{Math.round(result.Sensitivity * 100)}%</td></tr>
-                <tr><th>{t('tongue.config.growthRate')}</th><td>{result.Growth_Rate_PX_Per_Second} px/s</td></tr>
-                <tr><th>{t('tongue.config.appleSpeed')}</th><td>{result.Apple_Speed_PX_Per_Second} px/s</td></tr>
+                {result.Apple_Horizontal_Positions_Percent.map((position, index) => (
+                  <tr key={`${index}-${position}`}>
+                    <td>{index + 1}</td>
+                    <td>{position}%</td>
+                  </tr>
+                ))}
+                {result.Apple_Horizontal_Positions_Percent.length === 0 && (
+                  <tr>
+                    <td colSpan={2}>{t('tongue.results.noApples')}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
             <div className="results-actions">
@@ -977,6 +1015,7 @@ function createSessionMetrics(): SessionMetrics {
     elapsed: 0,
     score: 0,
     missed: 0,
+    appleHorizontalPositionsPercent: [],
     holdStartedAt: null,
     holdDirection: null,
     holdDurations: [],
@@ -1105,7 +1144,8 @@ function updateTongueGame(args: {
   scene.spawnElapsed += dt;
   if (scene.spawnElapsed >= args.config.spawnIntervalSec) {
     scene.spawnElapsed = 0;
-    spawnApple(scene, args.app.screen.width, args.config.edgeChance);
+    const position = spawnApple(scene, args.app.screen.width, args.config.edgeChance);
+    args.metrics.appleHorizontalPositionsPercent.push(position);
   }
 
   for (let index = scene.apples.length - 1; index >= 0; index -= 1) {
@@ -1186,7 +1226,7 @@ function distanceToSegmentSquared(
   return dx * dx + dy * dy;
 }
 
-function spawnApple(scene: TongueScene, width: number, edgeChance: number): void {
+function spawnApple(scene: TongueScene, width: number, edgeChance: number): number {
   const useEdge = Math.random() < edgeChance;
   const side = Math.random() < 0.5 ? -1 : 1;
   const normalizedX = useEdge
@@ -1200,6 +1240,7 @@ function spawnApple(scene: TongueScene, width: number, edgeChance: number): void
   apple.view.y = -size;
   scene.apples.push(apple);
   scene.root.addChild(apple.view);
+  return Number((normalizedX * 200 - 100).toFixed(1));
 }
 
 function createAppleSprite(size: number): AppleSprite {

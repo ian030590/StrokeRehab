@@ -4134,6 +4134,43 @@ body #webgazer-calibrate-container #calibration-point {
     radial-gradient(circle at 20% 20%, rgba(251, 113, 133, 0.16), transparent 34%);
 }
 
+.tongue-result-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 8px 24px;
+  width: min(720px, 100%);
+  margin: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  background: var(--bg-card);
+  text-align: left;
+}
+
+.tongue-result-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tongue-result-details dt {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tongue-result-details dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.tongue-results-container .results-table {
+  max-width: 720px;
+}
+
 @media (max-width: 720px) {
   .drawing-defense-hud {
     top: 8px;
@@ -4210,6 +4247,10 @@ body #webgazer-calibrate-container #calibration-point {
   }
 
   .training-result-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .tongue-result-details {
     grid-template-columns: 1fr;
   }
 
