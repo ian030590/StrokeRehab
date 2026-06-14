@@ -1135,10 +1135,11 @@ body[data-ui-font-bold="true"] .app-layout :where(
   padding: 8px 12px;
 }
 
-.training-privacy-note {
+.training-setting.training-privacy-note {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  margin-top: 16px;
   padding: 16px 18px;
   border: 1px solid var(--warning);
   border-radius: var(--radius-m);
