@@ -16,6 +16,7 @@ import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
 import { TrainingPrivacyNotice } from './TrainingPrivacyNotice';
 import { InlineAlert } from '../../components/InlineAlert';
+import { MediaDeviceErrorDialog } from '../../components/MediaDeviceErrorDialog';
 
 type GestureId = 1 | 2 | 3 | 4 | 5;
 type TargetMode = 'free' | 'directed';
@@ -228,6 +229,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
   });
   const [statusMessage, setStatusMessage] = useState('');
   const [visionError, setVisionError] = useState('');
+  const [showVisionError, setShowVisionError] = useState(false);
   const [result, setResult] = useState<SessionRecord | null>(null);
 
   const setPhase = useCallback((nextPhase: GamePhase) => {
@@ -587,18 +589,24 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
       else handleCombatHand(landmarks, now);
     } catch (error) {
       console.warn('Hand landmark detection failed.', error);
+      setVisionError(t('gesture.error.initialization'));
+      setShowVisionError(true);
+      stopVision();
+      setPhase('menu');
     }
-  }, [handleCalibrationHand, handleCombatHand, handleNoHand]);
+  }, [handleCalibrationHand, handleCombatHand, handleNoHand, setPhase, stopVision, t]);
 
   const startCalibration = useCallback(async () => {
     if (!verifySelectedTrainingUser(t)) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setVisionError(t('gesture.error.unsupported'));
+      setShowVisionError(true);
       return;
     }
     prepareAudioFeedback(jsPsychRef);
     stopVision();
     setVisionError('');
+    setShowVisionError(false);
     setStatusMessage(t('gesture.loading.camera'));
     setPhase('initializing');
 
@@ -612,6 +620,15 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
         },
       });
       cameraStreamRef.current = stream;
+      const cameraTrack = stream.getVideoTracks()[0];
+      if (!cameraTrack) throw new Error('Camera track is unavailable.');
+      cameraTrack.addEventListener('ended', () => {
+        if (!mountedRef.current || cameraStreamRef.current !== stream) return;
+        setVisionError(t('gesture.error.disconnected'));
+        setShowVisionError(true);
+        stopVision();
+        setPhase('menu');
+      }, { once: true });
       const video = videoRef.current;
       if (!video) throw new Error('Camera preview is unavailable.');
       video.srcObject = stream;
@@ -654,6 +671,7 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
       setVisionError(error instanceof DOMException && error.name === 'NotAllowedError'
         ? t('gesture.error.permission')
         : t('gesture.error.initialization'));
+      setShowVisionError(true);
       setPhase('menu');
     }
   }, [processFrame, setPhase, stopVision, t]);
@@ -801,8 +819,6 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                 <h1>{t('training.gesture.title')}</h1>
               </div>
             </header>
-
-            {visionError && <InlineAlert tone="error" role="alert">{visionError}</InlineAlert>}
 
             <div className="training-config-body">
               <section className="training-setting">
@@ -953,6 +969,16 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
                 <span>{Math.round(strictnessThreshold * 100)}%</span>
               </div>
               <div className="training-config-actions">
+                {visionError && (
+                  <InlineAlert
+                    tone="error"
+                    className="training-start-alert"
+                    onClick={() => setShowVisionError(true)}
+                    aria-label={t('gesture.error.openDetails')}
+                  >
+                    {visionError}
+                  </InlineAlert>
+                )}
                 <StartTrainingButton onClick={() => void startCalibration()}>
                   {t('training.start')}
                 </StartTrainingButton>
@@ -1141,6 +1167,15 @@ export function GestureBattlerGame({ onExit }: GestureBattlerGameProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {showVisionError && visionError && (
+        <MediaDeviceErrorDialog
+          title={t('gesture.error.title')}
+          titleId="gesture-error-modal-title"
+          message={visionError}
+          onClose={() => setShowVisionError(false)}
+        />
       )}
     </div>
   );

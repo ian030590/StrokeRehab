@@ -33,8 +33,8 @@ import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
 import { TrainingPrivacyNotice } from './TrainingPrivacyNotice';
-import { AppDialog } from '../../components/AppDialog';
 import { InlineAlert } from '../../components/InlineAlert';
+import { MediaDeviceErrorDialog } from '../../components/MediaDeviceErrorDialog';
 
 type TongueClass = 'Rest' | 'Tongue_Left' | 'Tongue_Right';
 type GamePhase = 'menu' | 'initializing' | 'calibration' | 'playing' | 'paused' | 'results';
@@ -340,8 +340,12 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       void classifyFeature(feature);
     } catch (error) {
       console.warn('Face landmark detection failed.', error);
+      setVisionError(t('tongue.error.initialization'));
+      setShowVisionError(true);
+      stopVision();
+      setPhase('menu');
     }
-  }, [classifyFeature, finishCalibrationStep, syncRecognition]);
+  }, [classifyFeature, finishCalibrationStep, setPhase, stopVision, syncRecognition, t]);
 
   const startSession = useCallback(async () => {
     if (!verifySelectedTrainingUser(t)) return;
@@ -367,6 +371,15 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
         },
       });
       cameraStreamRef.current = stream;
+      const cameraTrack = stream.getVideoTracks()[0];
+      if (!cameraTrack) throw new Error('Camera track is unavailable.');
+      cameraTrack.addEventListener('ended', () => {
+        if (!mountedRef.current || cameraStreamRef.current !== stream) return;
+        setVisionError(t('tongue.error.disconnected'));
+        setShowVisionError(true);
+        stopVision();
+        setPhase('menu');
+      }, { once: true });
       const video = videoRef.current;
       if (!video) throw new Error('Camera preview is unavailable.');
       video.srcObject = stream;
@@ -924,18 +937,12 @@ export function TongueCatchGame({ onExit }: TongueCatchGameProps) {
       )}
 
       {showVisionError && visionError && (
-        <AppDialog
+        <MediaDeviceErrorDialog
           title={t('tongue.error.title')}
           titleId="tongue-error-modal-title"
-          tone="error"
-          actions={(
-            <button className="btn btn-primary btn-lg" onClick={() => setShowVisionError(false)}>
-              {t('btn.confirm')}
-            </button>
-          )}
-        >
-          <p>{visionError}</p>
-        </AppDialog>
+          message={visionError}
+          onClose={() => setShowVisionError(false)}
+        />
       )}
     </div>
   );

@@ -20,6 +20,8 @@ import { clamp, csvCell, formatTestDate, writeJsPsychData } from './gameUtils';
 import { verifySelectedTrainingUser } from './selectedUserGuard';
 import { StartTrainingButton } from './StartTrainingButton';
 import { AppDialog } from '../../components/AppDialog';
+import { InlineAlert } from '../../components/InlineAlert';
+import { MediaDeviceErrorDialog } from '../../components/MediaDeviceErrorDialog';
 import type { TFunction } from './types';
 import {
   createDefaultVoiceVocabulary,
@@ -350,6 +352,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [microphoneStatus, setMicrophoneStatus] = useState<MicrophoneStatus>('pending');
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [microphoneError, setMicrophoneError] = useState('');
+  const [showMicrophoneError, setShowMicrophoneError] = useState(false);
   const [hp, setHp] = useState(DEFAULT_HP);
   const [defeated, setDefeated] = useState(0);
   const [score, setScore] = useState(0);
@@ -453,6 +456,19 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   }, [showStartValidation, startIssues.length]);
 
   useEffect(() => {
+    if (!microphoneError) {
+      setShowMicrophoneError(false);
+      return;
+    }
+    setShowMicrophoneError(true);
+    setShowStartValidation(true);
+  }, [microphoneError]);
+
+  useEffect(() => {
+    if (modelStatus === 'error') setShowStartValidation(true);
+  }, [modelStatus]);
+
+  useEffect(() => {
     configRef.current = { language, difficulty, gameDurationSec, maxHp, speed, activeWords };
   }, [activeWords, difficulty, gameDurationSec, language, maxHp, speed]);
 
@@ -474,13 +490,16 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     const handleEnded = () => {
       setMicrophoneLevel(0);
       setMicrophoneStatus('disconnected');
+      setMicrophoneError(t('voice.startBlocked.microphoneDisconnected'));
     };
     const handleMute = () => {
       setMicrophoneLevel(0);
       setMicrophoneStatus('muted');
+      setMicrophoneError(t('voice.startBlocked.microphoneMuted'));
     };
     const handleUnmute = () => {
       setMicrophoneStatus('testing');
+      setMicrophoneError('');
     };
     track.addEventListener('ended', handleEnded);
     track.addEventListener('mute', handleMute);
@@ -490,7 +509,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       track.removeEventListener('mute', handleMute);
       track.removeEventListener('unmute', handleUnmute);
     };
-  }, []);
+  }, [t]);
 
   const stopMicrophoneTest = useCallback(async (resetStatus = true) => {
     const runtime = microphoneTestRuntimeRef.current;
@@ -773,16 +792,20 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
 
         if (track.readyState !== 'live') {
           setMicrophoneStatus('disconnected');
+          setMicrophoneError(t('voice.startBlocked.microphoneDisconnected'));
         } else if (!track.enabled || track.muted) {
           setMicrophoneStatus('muted');
+          setMicrophoneError(t('voice.startBlocked.microphoneMuted'));
         } else if (rms >= MICROPHONE_SIGNAL_THRESHOLD) {
           lastSignalAt = now;
           setMicrophoneStatus('ready');
+          setMicrophoneError('');
         } else if (
           now - startedAt >= MICROPHONE_SILENCE_DELAY_MS
           && (lastSignalAt === 0 || now - lastSignalAt >= MICROPHONE_SILENCE_DELAY_MS)
         ) {
           setMicrophoneStatus('silent');
+          setMicrophoneError(t('voice.startBlocked.microphoneSilent'));
         }
 
         runtime.animationFrame = window.requestAnimationFrame(updateMeter);
@@ -950,9 +973,18 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 5;
-      recognition.onaudiostart = () => setMicrophoneStatus('testing');
-      recognition.onsoundstart = () => setMicrophoneStatus('ready');
-      recognition.onspeechstart = () => setMicrophoneStatus('ready');
+      recognition.onaudiostart = () => {
+        setMicrophoneStatus('testing');
+        setMicrophoneError('');
+      };
+      recognition.onsoundstart = () => {
+        setMicrophoneStatus('ready');
+        setMicrophoneError('');
+      };
+      recognition.onspeechstart = () => {
+        setMicrophoneStatus('ready');
+        setMicrophoneError('');
+      };
       recognition.onresult = (event) => {
         const transcripts = new Set<string>();
         for (let resultIndex = event.resultIndex; resultIndex < event.results.length; resultIndex += 1) {
@@ -962,6 +994,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
           }
         }
         setMicrophoneStatus('ready');
+        setMicrophoneError('');
         handleRecognition([...transcripts]);
       };
       recognition.onerror = (event) => {
@@ -1047,20 +1080,27 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
         setMicrophoneLevel(toMeterLevel(rms));
         if (track.readyState !== 'live') {
           setMicrophoneStatus('disconnected');
+          setMicrophoneError(t('voice.startBlocked.microphoneDisconnected'));
         } else if (!track.enabled || track.muted) {
           setMicrophoneStatus('muted');
+          setMicrophoneError(t('voice.startBlocked.microphoneMuted'));
         } else if (rms >= MICROPHONE_SIGNAL_THRESHOLD) {
           lastSignalAt = now;
           setMicrophoneStatus('ready');
+          setMicrophoneError('');
         } else if (
           now - startedAt >= MICROPHONE_SILENCE_DELAY_MS
           && (lastSignalAt === 0 || now - lastSignalAt >= MICROPHONE_SILENCE_DELAY_MS)
         ) {
           setMicrophoneStatus('silent');
+          setMicrophoneError(t('voice.startBlocked.microphoneSilent'));
         }
         recognizer.acceptWaveform(event.inputBuffer);
       } catch (error) {
         console.warn('Unable to process microphone audio.', error);
+        processor.onaudioprocess = null;
+        setMicrophoneStatus('disconnected');
+        setMicrophoneError(getErrorMessage(error) || t('voice.startBlocked.microphoneDisconnected'));
       }
     };
     source.connect(processor);
@@ -1430,10 +1470,12 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <span className="training-config-label">{t('voice.configLabel')}</span>
                 <h1>{t('voice.title')}</h1>
               </div>
-              <div className={`voice-model-status voice-model-status-${modelStatus}`} aria-live="polite">
-                <span>{modelStatusText}</span>
-                <progress max="100" value={modelProgress} aria-label={modelStatusText} />
-              </div>
+              {modelStatus !== 'error' && (
+                <div className={`voice-model-status voice-model-status-${modelStatus}`} aria-live="polite">
+                  <span>{modelStatusText}</span>
+                  <progress max="100" value={modelProgress} aria-label={modelStatusText} />
+                </div>
+              )}
             </header>
 
             <div className="training-config-body">
@@ -1639,7 +1681,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                     onClick={() => void loadModel(language)}
                   >
                     <span className="training-option-title">{t('voice.model.reload')}</span>
-                    <span className="training-option-meta">{modelError || t('voice.model.cacheHint')}</span>
+                    <span className="training-option-meta">{t('voice.model.cacheHint')}</span>
                   </button>
                 </div>
               </section>
@@ -1747,9 +1789,7 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <div className="training-setting-header">
                   <div>
                     <h2>{t('voice.microphone.title')}</h2>
-                    <p role={microphoneError ? 'alert' : undefined}>
-                      {microphoneError || t('voice.microphone.desc')}
-                    </p>
+                    <p>{t('voice.microphone.desc')}</p>
                   </div>
                   <span>{getMicrophoneStatusText(microphoneStatus, t)}</span>
                 </div>
@@ -1843,18 +1883,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
               </section>
             </div>
 
-            {showStartValidation && startIssues.length > 0 && (
-              <div className="voice-start-validation" role="alert" aria-live="assertive">
-                <strong>{t('voice.startBlocked.title')}</strong>
-                <p>{t('voice.startBlocked.desc')}</p>
-                <ul>
-                  {startIssues.map((issue) => (
-                    <li key={issue.requirement}>{issue.message}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             <div className="training-config-footer">
               <div className="training-config-summary">
                 <strong>{t(activeConfig.labelKey)}</strong>
@@ -1869,6 +1897,29 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
                 <span>{backgroundSummary}</span>
               </div>
               <div className="training-config-actions">
+                {showStartValidation && startIssues.length > 0 && (
+                  <InlineAlert
+                    tone="error"
+                    className="training-start-alert training-start-alert-list"
+                    onClick={() => {
+                      if (microphoneError) {
+                        setShowMicrophoneError(true);
+                        return;
+                      }
+                      scrollToStartRequirement(startIssues[0].requirement);
+                    }}
+                    aria-label={microphoneError
+                      ? t('voice.microphone.openErrorDetails')
+                      : t('voice.startBlocked.title')}
+                  >
+                    <strong>{t('voice.startBlocked.title')}</strong>
+                    <span className="training-start-alert-details">
+                      {startIssues.map((issue) => (
+                        <span key={issue.requirement}>{issue.message}</span>
+                      ))}
+                    </span>
+                  </InlineAlert>
+                )}
                 <StartTrainingButton onClick={() => void handleStartGame()}>
                   {t('training.start')}
                 </StartTrainingButton>
@@ -1894,11 +1945,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             <div className={`voice-listening-indicator voice-listening-${microphoneStatus}`}>
               <span aria-hidden="true" />
               <strong>{getMicrophoneStatusText(microphoneStatus, t)}</strong>
-              {microphoneStatus === 'denied' && microphoneError && (
-                <small className="voice-listening-error" role="alert">
-                  {microphoneError}
-                </small>
-              )}
             </div>
           )}
           <div><strong>{t('voice.hud.heard')}</strong> {recognizedText || '-'}</div>
@@ -1968,6 +2014,15 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {showMicrophoneError && microphoneError && (
+        <MediaDeviceErrorDialog
+          title={t('voice.microphone.errorTitle')}
+          titleId="voice-microphone-error-title"
+          message={microphoneError}
+          onClose={() => setShowMicrophoneError(false)}
+        />
       )}
     </div>
   );
