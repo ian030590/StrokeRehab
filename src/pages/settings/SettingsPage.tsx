@@ -1,24 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useT } from '../../i18n';
 import { GeneralTab } from './GeneralTab';
 import { CalibrationTab } from './CalibrationTab';
 
 type Tab = 'general' | 'calibration';
-
-import {
-  getSetting,
-  setSetting,
-  isCalibrated,
-  markDisplayCalibrated,
-  clearDisplayCalibration,
-  getMMPerPixel,
-  CAL_BAR_LENGTH_PX,
-  CARD_WIDTH_MM,
-  CARD_HEIGHT_MM,
-  DEFAULT_UI_FONT_SIZE_PX,
-  MAX_UI_FONT_SIZE_PX,
-  MIN_UI_FONT_SIZE_PX,
-} from '../../utils/settings';
 
 export function SettingsPage() {
   const { t } = useT();

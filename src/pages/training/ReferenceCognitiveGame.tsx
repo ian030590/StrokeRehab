@@ -320,7 +320,7 @@ export function ReferenceCognitiveGame({ gameId, onExit }: ReferenceCognitiveGam
           const dt = Math.min(ticker.deltaMS / 1000, 0.05);
           metricsRef.current.elapsed += dt;
           const feedbackBefore = stateRef.current?.kind === 'whack-a-mole' ? getFeedbackCounts(stateRef.current) : null;
-          updateTimedState(stateRef.current, metricsRef.current.elapsed, renderRef.current, finishGameRef.current);
+          updateTimedState(stateRef.current, metricsRef.current.elapsed, renderRef.current);
           if (feedbackBefore && stateRef.current?.kind === 'whack-a-mole') {
             playFeedbackForCountChange(feedbackBefore, getFeedbackCounts(stateRef.current), jsPsychRef);
           }
@@ -605,7 +605,6 @@ function updateTimedState(
   state: CognitiveGameState | null,
   elapsed: number,
   render: () => void,
-  finishGame: (result: GameResult) => void,
 ) {
   if (!state) return;
   if (state.kind === 'memory-match') updateMemoryTimedState(state, elapsed, render);

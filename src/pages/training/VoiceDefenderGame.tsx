@@ -356,7 +356,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
   const [showMicrophoneError, setShowMicrophoneError] = useState(false);
   const [hp, setHp] = useState(DEFAULT_HP);
   const [defeated, setDefeated] = useState(0);
-  const [score, setScore] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [recognizedText, setRecognizedText] = useState('');
   const [result, setResult] = useState<SessionRecord | null>(null);
@@ -947,7 +946,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     metricsRef.current.defeated += 1;
     metricsRef.current.score += Math.max(10, Math.round(100 * matched.similarity));
     setDefeated(metricsRef.current.defeated);
-    setScore(metricsRef.current.score);
   }, [recordEnemyOutcome]);
 
   const startListening = useCallback(async () => {
@@ -1215,7 +1213,6 @@ export function VoiceDefenderGame({ onExit }: VoiceDefenderGameProps) {
     lastRecognitionRef.current = { text: '', at: 0 };
     setHp(maxHp);
     setDefeated(0);
-    setScore(0);
     setElapsedSeconds(0);
     setRecognizedText('');
     setResult(null);
