@@ -38,6 +38,21 @@ export function CreditsPage() {
         </svg>
       ),
     },
+    {
+      titleKey: 'credits.mainConcept.title',
+      descKey: 'credits.mainConcept.desc',
+      repo: 'rbcavanaugh/mainConcept',
+      url: 'https://github.com/rbcavanaugh/mainConcept',
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 5h16" />
+          <path d="M4 12h10" />
+          <path d="M4 19h16" />
+          <path d="M17 9h3v3" />
+          <path d="m20 9-5 5" />
+        </svg>
+      ),
+    },
   ];
 
   return (
