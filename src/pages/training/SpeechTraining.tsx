@@ -1,17 +1,18 @@
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
+import { MainConceptTraining } from './MainConceptTraining';
 import { TrainingUserSelector } from './TrainingUserSelector';
 import { TongueCatchGame } from './TongueCatchGame';
 import { useGameModuleGuard } from './useGameModuleGuard';
 import { VoiceDefenderGame } from './VoiceDefenderGame';
 
-type SpeechModuleId = 'voice-defender' | 'tongue-catch';
+type SpeechModuleId = 'voice-defender' | 'tongue-catch' | 'main-concept';
 
 export function SpeechTraining() {
   const { t } = useT();
   const [searchParams] = useSearchParams();
   const requestedGameId = searchParams.get('game');
-  const requestedModule = requestedGameId === 'voice-defender' || requestedGameId === 'tongue-catch'
+  const requestedModule = requestedGameId === 'voice-defender' || requestedGameId === 'tongue-catch' || requestedGameId === 'main-concept'
     ? requestedGameId
     : null;
   const { activeModule, openModule, closeModule } = useGameModuleGuard<SpeechModuleId>({
@@ -27,6 +28,10 @@ export function SpeechTraining() {
 
   if (activeModule === 'tongue-catch') {
     return <TongueCatchGame onExit={closeModule} />;
+  }
+
+  if (activeModule === 'main-concept') {
+    return <MainConceptTraining onExit={closeModule} />;
   }
 
   return (
@@ -48,6 +53,21 @@ export function SpeechTraining() {
           </div>
           <h2 className="card-title">{t('voice.title')}</h2>
           <p className="card-desc">{t('voice.desc')}</p>
+          <div className="card-expand-hint">{t('training.startGame')}</div>
+        </button>
+        <button className="card fade-in-up training-module-button" onClick={() => openModule('main-concept')}>
+          <div className="card-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 5h16" />
+              <path d="M4 12h8" />
+              <path d="M4 19h16" />
+              <path d="M15 9h5v5h-5z" />
+              <path d="M17.5 5v4" />
+              <path d="M17.5 14v5" />
+            </svg>
+          </div>
+          <h2 className="card-title">{t('mainConcept.title')}</h2>
+          <p className="card-desc">{t('mainConcept.desc')}</p>
           <div className="card-expand-hint">{t('training.startGame')}</div>
         </button>
         <button className="card fade-in-up training-module-button" onClick={() => openModule('tongue-catch')}>
