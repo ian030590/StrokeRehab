@@ -1,3 +1,5 @@
+>⚠️ This repo will be archived intergrated to a new repo. The old web url is still searchable, and will be redirect to new url: https://rehabtrainerhub.pages.dev
+
 ![StrokeTrainerLogo](./public/assets/logo2.png)
 
 # StrokeTrainer
